@@ -4,12 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode development",
     "build": "vite build",
     "preview": "vite preview",
-    "preload": "ts-node --esm scripts/preloadPokemon.ts"
+    "preload": "node --loader ts-node/esm --experimental-specifier-resolution=node scripts/preloadPokemon.ts"
   },
   "dependencies": {
+    "dotenv": "^16.5.0",
+    "pinia": "^3.0.2",
+    "pinia-plugin-persistedstate": "^4.2.0",
     "sass": "^1.87.0",
     "vue": "^3.5.13",
     "vue-router": "4"

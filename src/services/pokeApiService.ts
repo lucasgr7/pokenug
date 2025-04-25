@@ -1,3 +1,4 @@
+// TypeScript interfaces for API responses
 interface PokemonListResponse {
   count: number;
   results: Array<{

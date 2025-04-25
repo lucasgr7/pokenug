@@ -1,6 +1,11 @@
-import { fetchPokemonList, fetchPokemonDetails, fetchPokemonSpecies } from '../src/services/pokeApiService';
+import { fetchPokemonList, fetchPokemonDetails, fetchPokemonSpecies } from '../src/services/pokeApiService.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import fs from 'fs';
 import path from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface SimplifiedPokemon {
   id: number;

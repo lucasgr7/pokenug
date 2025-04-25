@@ -1,41 +1,87 @@
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
+    <!-- Add warning message at the top -->
+    <div v-if="!gameStore.activePokemon && gameStore.hasAnyHealthyPokemon()" 
+         class="mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4">
+      Please pick a Pokemon to continue searching
+    </div>
+
+    <!-- Region Selection -->
+    <div class="mb-4">
+      <select 
+        v-model="gameStore.currentRegion"
+        @change="handleRegionChange"
+        class="px-4 py-2 border rounded-lg bg-gray-50"
+      >
+        <option
+          v-for="(region, id) in regions"
+          :key="id"
+          :value="id"
+        >
+          {{ region.name }} (Lvl {{ region.minLevel }}-{{ region.maxLevel }})
+        </option>
+      </select>
+    </div>
+
     <!-- Zone Status Bar -->
     <div class="mb-4 bg-gray-100 p-3 rounded-lg flex justify-between items-center">
       <div>
-        <span class="font-bold text-gray-700">{{ currentZone }}</span>
-        <span class="text-sm text-gray-500 ml-2">Encounter Rate: {{ encounterRate }}%</span>
+        <span class="font-bold text-gray-700">{{ gameStore.currentRegionData.name }}</span>
+        <span class="text-sm text-gray-500 ml-2">Encounter Rate: {{ gameStore.currentRegionData.encounterRate }}%</span>
       </div>
       <div v-if="!wildPokemon" class="text-sm text-gray-600">
         Next spawn in: {{ spawnTimer }}s
       </div>
       <div class="bg-red-100 px-3 py-1 rounded-full text-red-600">
-        <span class="mr-1">🔴</span>{{ pokeballs }} Pokéballs
+        <span class="mr-1">🔴</span>{{ gameStore.pokeballs }} Pokéballs
       </div>
     </div>
 
     <!-- Battle Area -->
     <div class="grid grid-cols-3 gap-4">
       <!-- Player Pokemon Panel -->
-      <div class="bg-blue-50 p-4 rounded-lg shadow">
+      <div v-if="!gameStore.activePokemon && gameStore.hasAnyHealthyPokemon()" 
+           class="bg-blue-50 p-4 rounded-lg shadow flex items-center justify-center text-gray-500">
+        Select a Pokemon from your team
+      </div>
+      <div v-else-if="gameStore?.activePokemon" class="bg-blue-50 p-4 rounded-lg shadow">
         <div class="text-center mb-2 font-bold">Your Pokémon</div>
         <div class="relative">
           <img
-            :src="playerPokemon.sprite"
+            :src="gameStore?.activePokemon?.sprite ?? ''"
             alt="Player Pokemon"
             class="w-32 h-32 mx-auto transition-transform duration-200"
             :class="{ 'animate-attack': isPlayerAttacking }"
           >
-          <!-- HP Bar -->
+          <!-- Type Tags -->
+          <div class="flex justify-center gap-2 my-2">
+            <span
+              v-for="type in gameStore.activePokemon.types"
+              :key="type"
+              class="px-2 py-1 rounded-full text-xs text-white"
+              :class="getTypeColor(type)"
+            >
+              {{ type }}
+            </span>
+          </div>
+          <!-- HP Bar and Level -->
           <div class="mt-2">
-            <div class="text-sm text-gray-700 flex justify-between">
-              <span>{{ playerPokemon.name }}</span>
-              <span>{{ playerPokemon.currentHP }}/{{ playerPokemon.maxHP }}</span>
+            <div class="text-sm text-gray-700 flex justify-between items-center">
+              <div>
+                <span class="capitalize">{{ gameStore.activePokemon.name }}</span>
+                <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">Lvl {{ gameStore.activePokemon.level }}</span>
+              </div>
+              <span>{{ gameStore.activePokemon.currentHP }}/{{ gameStore.activePokemon.maxHP }}</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2.5">
               <div
-                class="bg-green-600 h-2.5 rounded-full transition-all duration-300"
-                :style="{ width: (playerPokemon.currentHP / playerPokemon.maxHP * 100) + '%' }"
+                class="h-2.5 rounded-full transition-all duration-300"
+                :class="{
+                  'bg-green-600': hpPercentage > 25,
+                  'bg-yellow-500': hpPercentage <= 25 && hpPercentage > 10,
+                  'bg-red-500': hpPercentage <= 10
+                }"
+                :style="{ width: hpPercentage + '%' }"
               ></div>
             </div>
           </div>
@@ -62,7 +108,7 @@
         </button>
         <button
           @click="tryCapture"
-          :disabled="!wildPokemon || pokeballs <= 0"
+          :disabled="!wildPokemon || gameStore.pokeballs <= 0"
           class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
         >
           Try Capture
@@ -77,7 +123,11 @@
             :src="wildPokemon.sprite"
             alt="Wild Pokemon"
             class="w-32 h-32 mx-auto transition-transform duration-200"
-            :class="{ 'animate-damage': isWildPokemonHurt }"
+            :class="{ 
+              'animate-damage': isWildPokemonHurt, 
+              'animate-enemy-attack': isEnemyAttacking,
+              'animate-catch': isTryingCatch 
+            }"
           >
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2">
@@ -92,13 +142,21 @@
           </div>
           <!-- HP Bar -->
           <div class="mt-2">
-            <div class="text-sm text-gray-700 flex justify-between">
-              <span>{{ wildPokemon.name }}</span>
+            <div class="text-sm text-gray-700 flex justify-between items-center">
+              <div>
+                <span class="capitalize">{{ wildPokemon.name }}</span>
+                <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">Lvl {{ wildPokemon.level }}</span>
+              </div>
               <span>{{ wildPokemon.currentHP }}/{{ wildPokemon.maxHP }}</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2.5">
               <div
-                class="bg-green-600 h-2.5 rounded-full transition-all duration-300"
+                class="h-2.5 rounded-full transition-all duration-300"
+                :class="{
+                  'bg-green-600': (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 25,
+                  'bg-yellow-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 25 && (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 10,
+                  'bg-red-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 10
+                }"
                 :style="{ width: (wildPokemon.currentHP / wildPokemon.maxHP * 100) + '%' }"
               ></div>
             </div>
@@ -109,46 +167,147 @@
         No wild Pokémon found...
       </div>
     </div>
+
+    <!-- Battle Log -->
+    <BattleLog :logs="battleLogs" />
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useGameStore, regions } from '../stores/gameStore'
+import { usePokemon } from '../composables/usePokemon'
+import { tickSystem } from '../services/tickSystem'
+import BattleLog from '../components/BattleLog.vue'
+import type { Pokemon } from '../types/pokemon'
 
-// State
-const playerPokemon = ref({
-  name: 'Pikachu', // Example
-  sprite: 'path/to/sprite.png',
-  currentHP: 100,
-  maxHP: 100
-})
+// Store and Pokemon data
+const gameStore = useGameStore()
+const { pokemonList, findById } = usePokemon()
 
-const wildPokemon = ref(null)
-const pokeballs = ref(5)
-const currentZone = ref('Viridian Forest')
-const encounterRate = ref(30)
+// Battle state
+const wildPokemon = ref<Pokemon | null>(null)
 const spawnTimer = ref(10)
 const isPlayerAttacking = ref(false)
 const isWildPokemonHurt = ref(false)
 const isRecovering = ref(false)
 const recoveryProgress = ref(0)
+const battleLogs = ref<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>([])
+const isEnemyAttacking = ref(false)
+const isTryingCatch = ref(false)
 
-// Battle Functions
+// Add computed property for HP percentage
+const hpPercentage = computed(() => {
+  if (!gameStore.activePokemon) return 0
+  return Math.floor((gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100)
+})
+
+// Constants
+const ENEMY_ATTACK_INTERVAL = 3000 // 3 seconds
+const RUN_CHANCE = 0.15 // 15% chance to run each check
+const RUN_CHECK_INTERVAL = 5000 // Check for running every 5 seconds
+const BASE_HITS_TO_DEFEAT = 10 // Base number of hits needed to defeat same-level enemy
+const LEVEL_SCALING_FACTOR = 1.2 // How much harder it gets per level difference
+
+const calculateStats = (level: number) => {
+  const baseHP = 100 // Base HP for level 1
+  const hpPerLevel = 20 // HP increase per level
+  
+  // Calculate max HP based on level
+  const maxHP = Math.floor(baseHP + (hpPerLevel * (level - 1)))
+  
+  // Calculate attack to achieve desired number of hits to defeat
+  const baseAttack = Math.floor(baseHP / BASE_HITS_TO_DEFEAT)
+  const attackPerLevel = baseAttack * 0.2 // 20% increase per level
+  const attack = Math.floor(baseAttack + (attackPerLevel * (level - 1)))
+  
+  // Defense scales similarly to attack but slightly lower
+  const baseDefense = Math.floor(baseAttack * 0.8)
+  const defensePerLevel = baseDefense * 0.2
+  const defense = Math.floor(baseDefense + (defensePerLevel * (level - 1)))
+  
+  return {
+    maxHP,
+    attack,
+    defense
+  }
+}
+
+const calculateDamage = (attack: number, defense: number, attackerLevel: number, defenderLevel: number) => {
+  // Base damage calculation
+  const levelDifference = attackerLevel - defenderLevel
+  const levelScaling = Math.pow(LEVEL_SCALING_FACTOR, levelDifference)
+  
+  // Calculate base damage
+  let baseDamage = (attack * levelScaling) * (1 - (defense / (defense + 100)))
+  
+  // Add randomness (±15% variation)
+  const variation = 0.85 + (Math.random() * 0.3)
+  const finalDamage = Math.max(1, Math.floor(baseDamage * variation))
+  
+  return finalDamage
+}
+
+// Update the spawnWildPokemon function
+const spawnWildPokemon = async () => {
+  const region = gameStore.currentRegionData
+  const poolPokemon = region.pool[Math.floor(Math.random() * region.pool.length)]
+  
+  const pokemon = await findById(poolPokemon.id)
+  if (pokemon) {
+    const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel
+    const stats = calculateStats(level)
+    
+    wildPokemon.value = {
+      ...pokemon,
+      level,
+      currentHP: stats.maxHP,
+      maxHP: stats.maxHP,
+      attack: stats.attack,
+      defense: stats.defense,
+      lastAttackTime: Date.now(),
+      isRunning: false
+    }
+
+    battleLogs.value.push({
+      message: `A wild ${pokemon.name} (Lvl ${level}) appeared!`,
+      type: 'system'
+    })
+  }
+  
+  spawnTimer.value = 10
+}
+
+// Update the attack function
 const attack = () => {
-  if (!wildPokemon.value) return
+  if (!wildPokemon.value || !gameStore.activePokemon) return
   
   isPlayerAttacking.value = true
   setTimeout(() => {
     isPlayerAttacking.value = false
     isWildPokemonHurt.value = true
     
-    // Calculate damage
-    const damage = Math.floor(Math.random() * 20) + 10
-    wildPokemon.value.currentHP = Math.max(0, wildPokemon.value.currentHP - damage)
+    const damage = calculateDamage(
+      gameStore.activePokemon.attack!,
+      wildPokemon.value.defense!,
+      gameStore.activePokemon.level!,
+      wildPokemon.value.level!
+    )
+    
+    wildPokemon.value.currentHP = Math.max(0, wildPokemon.value.currentHP! - damage)
+    
+    battleLogs.value.push({
+      message: `${gameStore.activePokemon.name} attacks ${wildPokemon.value.name} for ${damage} damage!`,
+      type: 'damage'
+    })
     
     setTimeout(() => {
       isWildPokemonHurt.value = false
-      if (wildPokemon.value.currentHP <= 0) {
+      if (wildPokemon.value?.currentHP === 0) {
+        battleLogs.value.push({
+          message: `${wildPokemon.value.name} fainted!`,
+          type: 'system'
+        })
         wildPokemon.value = null
         startSpawnTimer()
       }
@@ -156,23 +315,132 @@ const attack = () => {
   }, 200)
 }
 
-const tryCapture = () => {
-  if (!wildPokemon.value || pokeballs.value <= 0) return
+const handlePokemonFaint = () => {
+  const nextPokemon = gameStore.findNextAvailablePokemon()
   
-  pokeballs.value--
-  
-  // Calculate capture chance based on remaining HP percentage
-  const hpPercentage = wildPokemon.value.currentHP / wildPokemon.value.maxHP
-  const captureChance = 1 - hpPercentage // Higher chance with lower HP
-  
-  if (Math.random() < captureChance) {
-    // Success
+  if (nextPokemon) {
+    battleLogs.value.push({
+      message: `Go, ${nextPokemon.name}!`,
+      type: 'system'
+    })
+    gameStore.setActivePokemon(nextPokemon)
+  } else if (wildPokemon.value) {
+    battleLogs.value.push({
+      message: `No more Pokemon available! The wild ${wildPokemon.value.name} fled.`,
+      type: 'system'
+    })
     wildPokemon.value = null
     startSpawnTimer()
   }
 }
 
+// Update the enemyAttack function
+const enemyAttack = () => {
+  if (!wildPokemon.value || !gameStore.activePokemon || wildPokemon.value.isRunning) return
+  
+  const now = Date.now()
+  if (!wildPokemon.value.lastAttackTime || (now - wildPokemon.value.lastAttackTime) >= ENEMY_ATTACK_INTERVAL) {
+    isEnemyAttacking.value = true
+    setTimeout(() => {
+      isEnemyAttacking.value = false
+      const damage = calculateDamage(
+        wildPokemon.value!.attack!,
+        gameStore.activePokemon!.defense!,
+        wildPokemon.value!.level!,
+        gameStore.activePokemon!.level!
+      )
+      
+      gameStore.activePokemon.currentHP = Math.max(0, gameStore.activePokemon.currentHP! - damage)
+      wildPokemon.value!.lastAttackTime = now
+      
+      battleLogs.value.push({
+        message: `${wildPokemon.value!.name} attacks ${gameStore.activePokemon.name} for ${damage} damage!`,
+        type: 'damage'
+      })
+
+      if (gameStore.activePokemon.currentHP === 0) {
+        battleLogs.value.push({
+          message: `${gameStore.activePokemon.name} fainted!`,
+          type: 'system'
+        })
+        gameStore.saveState()
+        handlePokemonFaint()
+      } else {
+        gameStore.saveState()
+      }
+    }, 200)
+  }
+}
+
+const tryPokemonRun = () => {
+  if (!wildPokemon.value || wildPokemon.value.isRunning) return
+  
+  if (Math.random() < RUN_CHANCE) {
+    wildPokemon.value.isRunning = true
+    battleLogs.value.push({
+      message: `Wild ${wildPokemon.value.name} is trying to run away!`,
+      type: 'system'
+    })
+    
+    setTimeout(() => {
+      if (wildPokemon.value) {
+        battleLogs.value.push({
+          message: `Wild ${wildPokemon.value.name} ran away!`,
+          type: 'system'
+        })
+        wildPokemon.value = null
+        startSpawnTimer()
+      }
+    }, 2000)
+  }
+}
+
+const tryCapture = async () => {
+  if (!wildPokemon.value || !gameStore.usePokeball()) return
+
+  isTryingCatch.value = true
+  battleLogs.value.push({
+    message: `Threw a Pokéball at ${wildPokemon.value.name}!`,
+    type: 'system'
+  })
+
+  // Calculate catch chance based on HP percentage
+  const hpPercentage = (wildPokemon.value.currentHP! / wildPokemon.value.maxHP!) * 100
+  let catchChance = 0
+
+  if (hpPercentage > 50) {
+    catchChance = Math.max(5 - wildPokemon.value.level!, 1)
+  } else if (hpPercentage < 10) {
+    catchChance = Math.max(55 - wildPokemon.value.level!, 10)
+  } else if (hpPercentage < 25) {
+    catchChance = Math.max(35 - wildPokemon.value.level!, 5)
+  }
+
+  // Wait for animation
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  isTryingCatch.value = false
+
+  // Check if catch successful
+  if (Math.random() * 100 <= catchChance) {
+    battleLogs.value.push({
+      message: `Caught ${wildPokemon.value.name}!`,
+      type: 'system'
+    })
+    
+    gameStore.addPokemonToInventory({ ...wildPokemon.value })
+    wildPokemon.value = null
+    startSpawnTimer()
+  } else {
+    battleLogs.value.push({
+      message: `${wildPokemon.value.name} broke free!`,
+      type: 'system'
+    })
+  }
+}
+
+// Spawn system
 const startSpawnTimer = () => {
+  spawnTimer.value = 10
   const interval = setInterval(() => {
     spawnTimer.value--
     if (spawnTimer.value <= 0) {
@@ -182,38 +450,55 @@ const startSpawnTimer = () => {
   }, 1000)
 }
 
-const spawnWildPokemon = () => {
-  // Example wild Pokemon spawn
-  wildPokemon.value = {
-    name: 'Rattata',
-    sprite: 'path/to/rattata.png',
-    currentHP: 50,
-    maxHP: 50,
-    types: ['Normal']
-  }
-  spawnTimer.value = 10
-}
-
-const getTypeColor = (type) => {
-  const colors = {
-    Normal: 'bg-gray-400',
-    Fire: 'bg-red-500',
-    Water: 'bg-blue-500',
-    Electric: 'bg-yellow-500',
-    Grass: 'bg-green-500',
-    // Add more types as needed
-  }
-  return colors[type] || 'bg-gray-400'
-}
 
 // Lifecycle
+let unsubscribe: (() => void) | null = null
+
 onMounted(() => {
+  gameStore.initializeGame()
   startSpawnTimer()
+  
+  // Subscribe to tick system
+  unsubscribe = tickSystem.subscribe((elapsed) => {
+    if (wildPokemon.value) {
+      enemyAttack()
+      if (elapsed >= RUN_CHECK_INTERVAL) {
+        tryPokemonRun()
+      }
+    }
+  })
 })
 
 onUnmounted(() => {
-  // Clean up any running timers
+  if (unsubscribe) {
+    unsubscribe()
+  }
 })
+
+// Type colors function
+const getTypeColor = (type: string) => {
+  const colors: Record<string, string> = {
+    normal: 'bg-gray-400',
+    fire: 'bg-red-500',
+    water: 'bg-blue-500',
+    electric: 'bg-yellow-500',
+    grass: 'bg-green-500',
+    ice: 'bg-blue-300',
+    fighting: 'bg-red-700',
+    poison: 'bg-purple-500',
+    ground: 'bg-yellow-700',
+    flying: 'bg-indigo-400',
+    psychic: 'bg-pink-500',
+    bug: 'bg-green-600',
+    rock: 'bg-yellow-600',
+    ghost: 'bg-purple-700',
+    dragon: 'bg-indigo-700',
+    dark: 'bg-gray-700',
+    steel: 'bg-gray-500',
+    fairy: 'bg-pink-400'
+  }
+  return colors[type.toLowerCase()] || 'bg-gray-400'
+}
 </script>
 
 <style scoped>
@@ -223,6 +508,14 @@ onUnmounted(() => {
 
 .animate-damage {
   animation: damage 0.3s ease-in-out;
+}
+
+.animate-enemy-attack {
+  animation: enemy-attack 0.2s ease-in-out;
+}
+
+.animate-catch {
+  animation: catch-attempt 1s ease-in-out;
 }
 
 @keyframes attack {
@@ -237,5 +530,19 @@ onUnmounted(() => {
   50% { transform: translateX(10px); opacity: 0.7; }
   75% { transform: translateX(-10px); opacity: 0.7; }
   100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes enemy-attack {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(-20px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes catch-attempt {
+  0% { transform: scale(1) translateX(0); }
+  25% { transform: scale(1.2) translateX(0); }
+  50% { transform: scale(0.8) translateX(100px); }
+  75% { transform: scale(0.6) translateX(0); }
+  100% { transform: scale(1) translateX(0); }
 }
 </style>

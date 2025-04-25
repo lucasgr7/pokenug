@@ -14,6 +14,12 @@
           {{ route.name }}
         </router-link>
       </nav>
+      
+      <!-- Team List -->
+      <div class="mt-6">
+        <h3 class="text-sm font-semibold mb-2 px-2">My Team</h3>
+        <TeamList />
+      </div>
     </div>
     <!-- Main Content -->
     <div class="flex-1 p-8">
@@ -23,6 +29,8 @@
 </template>
 
 <script setup>
+import TeamList from './components/TeamList.vue'
+
 const routes = [
   { path: '/', name: 'Explore' },
   { path: '/idle-jobs', name: 'Idle Jobs' },
