@@ -1,11 +1,40 @@
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
-    <!-- Add warning message at the top -->
+    <!-- XP Bar -->
+    <div v-if="gameStore.activePokemon" class="relative mb-4">
+      <div class="relative w-full h-3 bg-yellow-100 rounded-full overflow-hidden">
+        <!-- XP Bar -->
+        <div
+          class="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-600 ease-out rounded-full"
+          :class="{ 'animate-level-up': isLevelingUp }"
+          :style="{
+            width: `${(gameStore.activePokemon.experience! / gameStore.activePokemon.experienceToNextLevel!) * 100}%`,
+            boxShadow: isGainingXP ? '0 0 10px rgba(234, 179, 8, 0.8)' : 'none'
+          }"
+        ></div>
+        <!-- Floating XP Numbers -->
+        <TransitionGroup name="float-up" tag="div" class="absolute inset-0 overflow-hidden pointer-events-none">
+          <div v-for="xpGain in recentXPGains" 
+               :key="xpGain.id"
+               class="absolute text-yellow-600 font-bold text-sm animate-float-up"
+               :style="{ left: `${xpGain.x}%`, bottom: '0' }">
+            +{{ xpGain.amount }}
+          </div>
+        </TransitionGroup>
+      </div>
+      <!-- XP Text -->
+      <div class="absolute top-0 left-1/2 transform -translate-x-1/2 text-xs text-yellow-700 font-bold">
+        Level {{ gameStore.activePokemon.level }} - {{ Math.floor(gameStore.activePokemon.experience!) }}/{{ gameStore.activePokemon.experienceToNextLevel! }} XP
+      </div>
+    </div>
+
+    <!-- Add warning message -->
     <div v-if="!gameStore.activePokemon && gameStore.hasAnyHealthyPokemon()" 
          class="mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4">
       Please pick a Pokemon to continue searching
     </div>
 
+    <!-- Rest of the template -->
     <!-- Region Selection -->
     <div class="mb-4">
       <select 
@@ -174,7 +203,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, TransitionGroup } from 'vue'
 import { useGameStore, regions } from '../stores/gameStore'
 import { usePokemon } from '../composables/usePokemon'
 import { tickSystem } from '../services/tickSystem'
@@ -187,7 +216,8 @@ const { pokemonList, findById } = usePokemon()
 
 // Battle state
 const wildPokemon = ref<Pokemon | null>(null)
-const spawnTimer = ref(10)
+const DEFAULT_SPAWN_TIMER = 1
+const spawnTimer = ref(DEFAULT_SPAWN_TIMER)
 const isPlayerAttacking = ref(false)
 const isWildPokemonHurt = ref(false)
 const isRecovering = ref(false)
@@ -248,6 +278,14 @@ const calculateDamage = (attack: number, defense: number, attackerLevel: number,
   return finalDamage
 }
 
+const calculateXPGain = (playerLevel: number, enemyLevel: number) => {
+  return Math.floor(10 * (enemyLevel / playerLevel))
+}
+
+const calculateXPForNextLevel = (currentLevel: number) => {
+  return Math.floor(100 * Math.pow(currentLevel, 1.5))
+}
+
 // Update the spawnWildPokemon function
 const spawnWildPokemon = async () => {
   const region = gameStore.currentRegionData
@@ -275,10 +313,56 @@ const spawnWildPokemon = async () => {
     })
   }
   
-  spawnTimer.value = 10
+  spawnTimer.value = DEFAULT_SPAWN_TIMER
 }
 
-// Update the attack function
+// Add new refs for XP animations
+const isGainingXP = ref(false)
+const isLevelingUp = ref(false)
+const recentXPGains = ref<Array<{ id: number, amount: number, x: number }>>([])
+let xpGainCounter = 0
+
+// Handle XP gain separately to reduce nesting
+const handleXPGain = (playerPokemon: Pokemon, defeatedPokemon: Pokemon) => {
+  const xpGain = calculateXPGain(playerPokemon.level!, defeatedPokemon.level!)
+  const currentXP = playerPokemon.experience || 0
+  const nextLevelXP = playerPokemon.experienceToNextLevel || calculateXPForNextLevel(playerPokemon.level!)
+  
+  // Add floating XP number
+  const newXPGain = {
+    id: xpGainCounter++,
+    amount: xpGain,
+    x: Math.random() * 80 + 10
+  }
+  recentXPGains.value.push(newXPGain)
+  setTimeout(() => {
+    recentXPGains.value = recentXPGains.value.filter(g => g.id !== newXPGain.id)
+  }, 2000)
+  
+  // Animate XP bar
+  isGainingXP.value = true
+  setTimeout(() => {
+    isGainingXP.value = false
+  }, 600)
+  
+  playerPokemon.experience = currentXP + xpGain
+  
+  battleLogs.value.push({
+    message: `${playerPokemon.name} gained ${xpGain} XP!`,
+    type: 'system'
+  })
+  
+  // Check for level up
+  if (playerPokemon.experience >= nextLevelXP) {
+    isLevelingUp.value = true
+    setTimeout(() => {
+      isLevelingUp.value = false
+    }, 1000)
+    gameStore.levelUpPokemon(playerPokemon)
+  }
+}
+
+// Update attack function to use handleXPGain
 const attack = () => {
   if (!wildPokemon.value || !gameStore.activePokemon) return
   
@@ -304,18 +388,32 @@ const attack = () => {
     setTimeout(() => {
       isWildPokemonHurt.value = false
       if (wildPokemon.value?.currentHP === 0) {
+        const defeatedPokemon = { ...wildPokemon.value }
+        handleXPGain(gameStore.activePokemon!, defeatedPokemon)
+        
         battleLogs.value.push({
-          message: `${wildPokemon.value.name} fainted!`,
+          message: `${defeatedPokemon.name} fainted!`,
           type: 'system'
         })
         wildPokemon.value = null
         startSpawnTimer()
+        
+        gameStore.saveState()
       }
     }, 300)
   }, 200)
 }
 
 const handlePokemonFaint = () => {
+  if (!gameStore.activePokemon) return
+  
+  // Set fainted status and recovery timer
+  const now = Date.now()
+  gameStore.activePokemon.faintedAt = now
+  gameStore.activePokemon.recoveryEndTime = now + (60 * 1000) // 60 seconds
+  gameStore.saveState()
+
+  // Find next available Pokemon
   const nextPokemon = gameStore.findNextAvailablePokemon()
   
   if (nextPokemon) {
@@ -350,7 +448,11 @@ const enemyAttack = () => {
         gameStore.activePokemon!.level!
       )
       
-      gameStore.activePokemon.currentHP = Math.max(0, gameStore.activePokemon.currentHP! - damage)
+      const updatedHP = Math.max(0, gameStore.activePokemon.currentHP! - damage)
+      
+      // Use the new store action to update HP
+      gameStore.updatePokemonHP(gameStore.activePokemon, updatedHP)
+      
       wildPokemon.value!.lastAttackTime = now
       
       battleLogs.value.push({
@@ -358,15 +460,12 @@ const enemyAttack = () => {
         type: 'damage'
       })
 
-      if (gameStore.activePokemon.currentHP === 0) {
+      if (updatedHP === 0) {
         battleLogs.value.push({
           message: `${gameStore.activePokemon.name} fainted!`,
           type: 'system'
         })
-        gameStore.saveState()
         handlePokemonFaint()
-      } else {
-        gameStore.saveState()
       }
     }, 200)
   }
@@ -440,7 +539,7 @@ const tryCapture = async () => {
 
 // Spawn system
 const startSpawnTimer = () => {
-  spawnTimer.value = 10
+  spawnTimer.value = DEFAULT_SPAWN_TIMER;
   const interval = setInterval(() => {
     spawnTimer.value--
     if (spawnTimer.value <= 0) {
@@ -544,5 +643,41 @@ const getTypeColor = (type: string) => {
   50% { transform: scale(0.8) translateX(100px); }
   75% { transform: scale(0.6) translateX(0); }
   100% { transform: scale(1) translateX(0); }
+}
+
+.animate-level-up {
+  animation: levelUp 0.6s ease-out;
+}
+
+@keyframes levelUp {
+  0% { transform: scaleY(1); }
+  50% { transform: scaleY(1.5); filter: brightness(1.5); }
+  100% { transform: scaleY(1); }
+}
+
+.float-up-enter-active {
+  animation: float-up 2s ease-out forwards;
+}
+
+.float-up-leave-active {
+  display: none;
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+}
+
+.animate-float-up {
+  animation: float-up 2s ease-out forwards;
 }
 </style>

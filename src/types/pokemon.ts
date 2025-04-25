@@ -7,9 +7,12 @@ export interface Pokemon {
   currentHP?: number;
   maxHP?: number;
   experience?: number;
+  experienceToNextLevel?: number;
   level?: number;
   attack?: number;
   defense?: number;
   lastAttackTime?: number;
   isRunning?: boolean;
+  faintedAt?: number;
+  recoveryEndTime?: number;
 }
