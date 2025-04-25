@@ -1,6 +1,22 @@
 import { defineStore } from 'pinia'
 import type { Pokemon } from '../types/pokemon.js'
 
+interface IdleJob {
+  type: string;
+  name: string;
+  description: string;
+  maxSlots: number;
+  assignedPokemon: Pokemon[];
+  progress: number;
+  baseTime: number; // in milliseconds
+  reward: {
+    type: string;
+    chance: number;
+  };
+  completions: number;
+  successfulCompletions: number;
+}
+
 interface BattleState {
   wildPokemon: Pokemon | null;
   spawnTimer: number;
@@ -31,6 +47,10 @@ interface GameState {
     inventory: boolean;
     idleJobs: boolean;
   };
+  idleJobs: {
+    [key: string]: IdleJob;
+  };
+  idleWorking: Pokemon[];
 }
 
 // Region definitions
@@ -84,13 +104,43 @@ export const useGameStore = defineStore('game', {
       pokedex: false,
       inventory: false,
       idleJobs: false
-    }
+    },
+    idleJobs: {
+      'pokeball-production': {
+        type: 'bug',
+        name: 'Produce Crappy Pokeball',
+        description: 'Bug Pokemon work together to produce Pokeballs',
+        maxSlots: 5,
+        assignedPokemon: [],
+        progress: 0,
+        baseTime: 60000, // 1 minute in milliseconds
+        reward: {
+          type: 'pokeball',
+          chance: 0.1 // 10% chance
+        },
+        completions: 0,
+        successfulCompletions: 0
+      }
+    },
+    idleWorking: []
   }),
 
   getters: {
     hasStarterPokemon: (state) => state.playerPokemon.length > 0,
     currentRegionData: (state) => regions[state.currentRegion as keyof typeof regions],
-    activePokemon: (state) => state.playerPokemon[state.activePokemonIndex] || null
+    activePokemon: (state) => state.playerPokemon[state.activePokemonIndex] || null,
+    getJobTimeReduction: (state) => (jobId: string) => {
+      const job = state.idleJobs[jobId];
+      if (!job) return 0;
+      return job.assignedPokemon.length * 1000; // 1 second per Pokemon
+    },
+    
+    getJobRemainingTime: (state) => (jobId: string) => {
+      const job = state.idleJobs[jobId];
+      if (!job) return 0;
+      const reduction = state.idleJobs[jobId].assignedPokemon.length * 1000;
+      return Math.max(1000, job.baseTime - reduction); // Minimum 1 second
+    }
   },
 
   actions: {
@@ -98,11 +148,41 @@ export const useGameStore = defineStore('game', {
       const savedState = localStorage.getItem('gameState')
       if (savedState) {
         const state = JSON.parse(savedState)
+        const now = Date.now()
+        const lastSaveTime = state.lastSaveTime ?? now
+
+        // Calculate offline progress for idle jobs
+        if (state.idleJobs) {
+          Object.entries(state.idleJobs).forEach(([jobId, job]: [string, any]) => {
+            if (job.assignedPokemon && job.assignedPokemon.length > 0) {
+              const elapsedTime = now - lastSaveTime
+              const jobTime = this.getJobRemainingTime(jobId)
+              const possibleCompletions = Math.floor(elapsedTime / jobTime)
+              
+              // Apply completions
+              for (let i = 0; i < possibleCompletions; i++) {
+                if (Math.random() < job.reward.chance) {
+                  job.successfulCompletions++
+                  state.pokeballs = (state.pokeballs ?? 0) + 1
+                }
+                job.completions++
+              }
+              
+              // Calculate remaining progress
+              const remainingTime = elapsedTime % jobTime
+              job.progress = (remainingTime / jobTime) * 100
+            }
+          })
+        }
+
         this.$patch({
           playerPokemon: state.playerPokemon ?? [],
           activePokemonIndex: state.activePokemonIndex ?? 0,
-          pokeballs: state.pokeballs,
-          unlocked: state.unlocked
+          pokeballs: state.pokeballs ?? 50,
+          unlocked: state.unlocked ?? { pokedex: false, inventory: false, idleJobs: false },
+          idleJobs: state.idleJobs ?? this.$state.idleJobs,
+          idleWorking: state.idleWorking ?? [],
+          inventory: state.inventory ?? { pokemon: {} }
         })
       } else {
         this.selectRandomStarter()
@@ -282,7 +362,11 @@ export const useGameStore = defineStore('game', {
         pokeballs: this.pokeballs,
         unlocked: this.unlocked,
         battle: JSON.parse(JSON.stringify(this.battle)),
-        currentRegion: this.currentRegion
+        currentRegion: this.currentRegion,
+        idleJobs: JSON.parse(JSON.stringify(this.idleJobs)),
+        idleWorking: JSON.parse(JSON.stringify(this.idleWorking)),
+        inventory: JSON.parse(JSON.stringify(this.inventory)),
+        lastSaveTime: Date.now()
       }
       localStorage.setItem('gameState', JSON.stringify(state))
       
@@ -587,6 +671,105 @@ export const useGameStore = defineStore('game', {
         isTryingCatch: false,
         battleLogs: []
       }
+    },
+
+    assignPokemonToJob(pokemon: Pokemon, jobId: string) {
+      const job = this.idleJobs[jobId];
+      if (!job || job.assignedPokemon.length >= job.maxSlots) return false;
+      
+      // Check if Pokemon matches job type requirement
+      if (job.type && !pokemon.types.includes(job.type)) return false;
+      
+      // Check if Pokemon is already working in any job
+      const isAlreadyWorking = Object.values(this.idleJobs).some(j => 
+        j.assignedPokemon.some(p => 
+          p.name === pokemon.name && 
+          p.level === pokemon.level
+        )
+      );
+      
+      if (isAlreadyWorking) return false;
+      
+      // If Pokemon is in team, remove it
+      const teamIndex = this.playerPokemon.findIndex(p => 
+        p.name === pokemon.name && 
+        p.level === pokemon.level
+      );
+      
+      if (teamIndex !== -1) {
+        this.playerPokemon.splice(teamIndex, 1);
+        if (teamIndex <= this.activePokemonIndex && this.activePokemonIndex > 0) {
+          this.activePokemonIndex--;
+        }
+      }
+      
+      // Create a unique ID for this Pokemon instance
+      const workingPokemon = {
+        ...pokemon,
+        workId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+      };
+      
+      job.assignedPokemon.push(workingPokemon);
+      this.idleWorking.push(workingPokemon);
+      this.saveState();
+      return true;
+    },
+
+    removePokemonFromJob(pokemon: Pokemon, jobId: string) {
+      const job = this.idleJobs[jobId];
+      if (!job) return false;
+      
+      const index = job.assignedPokemon.findIndex(p => p.workId === pokemon.workId);
+      if (index === -1) return false;
+      
+      const removedPokemon = job.assignedPokemon[index];
+      job.assignedPokemon.splice(index, 1);
+      
+      const workingIndex = this.idleWorking.findIndex(p => p.workId === pokemon.workId);
+      if (workingIndex !== -1) {
+        this.idleWorking.splice(workingIndex, 1);
+      }
+      
+      // Add back to team if there's space (without the workId)
+      if (this.playerPokemon.length < 6) {
+        const { workId, ...cleanPokemon } = removedPokemon;
+        this.playerPokemon.push(cleanPokemon);
+      }
+      
+      this.saveState();
+      return true;
+    },
+
+    completeJob(jobId: string) {
+      const job = this.idleJobs[jobId];
+      if (!job) return;
+      
+      job.completions++;
+      
+      // Check reward chance
+      if (Math.random() < job.reward.chance) {
+        if (job.reward.type === 'pokeball') {
+          this.pokeballs++;
+          job.successfulCompletions++;
+        }
+      }
+      
+      job.progress = 0;
+      this.saveState();
+    },
+
+    updateJobProgress(jobId: string, elapsed: number) {
+      const job = this.idleJobs[jobId];
+      if (!job || job.assignedPokemon.length === 0) return;
+      
+      const remainingTime = this.getJobRemainingTime(jobId);
+      job.progress += (elapsed / remainingTime) * 100;
+      
+      if (job.progress >= 100) {
+        this.completeJob(jobId);
+      }
+      
+      this.saveState();
     }
   }
 });

@@ -15,4 +15,5 @@ export interface Pokemon {
   isRunning?: boolean;
   faintedAt?: number;
   recoveryEndTime?: number;
+  workId?: string;
 }
