@@ -128,26 +128,86 @@ export const useGameStore = defineStore('game', {
       await this.setStarterPokemon(randomStarter)
     },
 
-    levelUpPokemon(pokemon: Pokemon) {
-      pokemon.level!++
-      
-      // Calculate new stats
+    generatePokemonStats(level: number) {
       const baseHP = 100
       const hpPerLevel = 20
       const baseAttack = Math.floor(baseHP / 10)
       const attackPerLevel = baseAttack * 0.2
-      const baseDefense = Math.floor(baseAttack * 0.8)
+      const baseDefense = Math.floor(baseHP * 0.8)
       const defensePerLevel = baseDefense * 0.2
 
+      return {
+        maxHP: Math.floor(baseHP + (hpPerLevel * (level - 1))),
+        attack: Math.floor(baseAttack + (attackPerLevel * (level - 1))),
+        defense: Math.floor(baseDefense + (defensePerLevel * (level - 1)))
+      }
+    },
+
+    addPokemonToInventory(pokemon: Pokemon) {
+      // Ensure the Pokemon has all required stats
+      pokemon.level ??= 1
+      pokemon.experience ??= 0
+      pokemon.experienceToNextLevel ??= Math.floor(100 * Math.pow(pokemon.level, 1.5))
+
+      // Generate stats if they don't exist
+      if (!pokemon.maxHP || !pokemon.attack || !pokemon.defense) {
+        const stats = this.generatePokemonStats(pokemon.level)
+        pokemon.maxHP = stats.maxHP
+        pokemon.currentHP = stats.maxHP
+        pokemon.attack = stats.attack
+        pokemon.defense = stats.defense
+      }
+
+      const key = pokemon.name
+      if (this.inventory.pokemon[key]) {
+        this.inventory.pokemon[key].count++
+      } else {
+        this.inventory.pokemon[key] = {
+          count: 1,
+          data: pokemon
+        }
+      }
+
+      // Add to team if there's space
+      if (this.playerPokemon.length < 6) {
+        this.playerPokemon.push(pokemon)
+      }
+      
+      this.saveState()
+    },
+
+    levelUpPokemon(pokemon: Pokemon) {
+      pokemon.level!++
+      
+      // Generate new stats for this level
+      const newStats = this.generatePokemonStats(pokemon.level!)
+      
+      // Calculate stat increases
+      const hpIncrease = newStats.maxHP - pokemon.maxHP!
+      const attackIncrease = newStats.attack - pokemon.attack!
+      const defenseIncrease = newStats.defense - pokemon.defense!
+      
       // Update stats
-      pokemon.maxHP = Math.floor(baseHP + (hpPerLevel * (pokemon.level! - 1)))
+      pokemon.maxHP = newStats.maxHP
       pokemon.currentHP = pokemon.maxHP // Heal to full on level up
-      pokemon.attack = Math.floor(baseAttack + (attackPerLevel * (pokemon.level! - 1)))
-      pokemon.defense = Math.floor(baseDefense + (defensePerLevel * (pokemon.level! - 1)))
+      pokemon.attack = newStats.attack
+      pokemon.defense = newStats.defense
       
       // Reset XP and calculate new requirement
       pokemon.experience = 0
       pokemon.experienceToNextLevel = Math.floor(100 * Math.pow(pokemon.level!, 1.5))
+
+      // Add level up message to battle logs
+      this.battle.battleLogs.push({
+        message: `${pokemon.name} reached level ${pokemon.level}!`,
+        type: 'system'
+      })
+      
+      // Add stat increase messages
+      this.battle.battleLogs.push({
+        message: `Stats increased! HP +${hpIncrease}, Attack +${attackIncrease}, Defense +${defenseIncrease}`,
+        type: 'system'
+      })
       
       this.saveState()
     },
@@ -184,25 +244,6 @@ export const useGameStore = defineStore('game', {
         this.activePokemonIndex = 0
         this.saveState()
       }
-    },
-
-    addPokemonToInventory(pokemon: Pokemon) {
-      const key = pokemon.name
-      if (this.inventory.pokemon[key]) {
-        this.inventory.pokemon[key].count++
-      } else {
-        this.inventory.pokemon[key] = {
-          count: 1,
-          data: pokemon
-        }
-      }
-
-      // Add to team if there's space
-      if (this.playerPokemon.length < 6) {
-        this.playerPokemon.push(pokemon)
-      }
-      
-      this.saveState()
     },
 
     usePokeball() {
@@ -311,7 +352,7 @@ export const useGameStore = defineStore('game', {
       const attackPerLevel = baseAttack * 0.2
       const attack = Math.floor(baseAttack + (attackPerLevel * (level - 1)))
       
-      const baseDefense = Math.floor(baseAttack * 0.8)
+      const baseDefense = Math.floor(baseHP * 0.8)
       const defensePerLevel = baseDefense * 0.2
       const defense = Math.floor(baseDefense + (defensePerLevel * (level - 1)))
       
