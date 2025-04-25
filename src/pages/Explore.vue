@@ -261,7 +261,7 @@ const calculateDamage = (attack: number, defense: number, attackerLevel: number,
 }
 
 const calculateXPGain = (playerLevel: number, enemyLevel: number) => {
-  return Math.floor(10 * (enemyLevel / playerLevel))
+  return Math.floor(10 * (enemyLevel / playerLevel))*20
 }
 
 const calculateXPForNextLevel = (currentLevel: number) => {
