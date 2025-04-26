@@ -6,7 +6,7 @@ import { tickSystem } from '../services/tickSystem'
 import type { Pokemon } from '../types/pokemon'
 
 const gameStore = useGameStore()
-let regenInterval: number | null = null
+let regenInterval: number | NodeJS.Timeout | null = null
 let unsubscribe: (() => void) | null = null
 
 const hpPercentage = (pokemon: Pokemon) => {

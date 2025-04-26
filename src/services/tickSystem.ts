@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-const TICK_INTERVAL = 1000 // 1 second
+const TICK_INTERVAL = 250 // 1 second
 const SAVE_INTERVAL = 5000 // Save state every 5 seconds
 
 interface GameTime {

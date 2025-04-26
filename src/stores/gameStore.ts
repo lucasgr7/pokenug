@@ -1,21 +1,8 @@
 import { defineStore } from 'pinia'
-import type { Pokemon } from '../types/pokemon.js'
-
-interface IdleJob {
-  type: string;
-  name: string;
-  description: string;
-  maxSlots: number;
-  assignedPokemon: Pokemon[];
-  progress: number;
-  baseTime: number; // in milliseconds
-  reward: {
-    type: string;
-    chance: number;
-  };
-  completions: number;
-  successfulCompletions: number;
-}
+import { Pokemon, PokemonType } from '../types/pokemon.js'
+import { IdleJob, DEFAULT_IDLE_JOBS } from '../types/idleJobs.js'
+import { itemFactory } from '../services/itemFactory'
+import { useInventoryStore } from './inventoryStore'
 
 interface BattleState {
   wildPokemon: Pokemon | null;
@@ -49,9 +36,7 @@ interface GameState {
     inventory: boolean;
     idleJobs: boolean;
   };
-  idleJobs: {
-    [key: string]: IdleJob;
-  };
+  idleJobs: Record<string, IdleJob>;
   idleWorking: Pokemon[];
 }
 
@@ -72,7 +57,21 @@ export const regions = {
       { id: 25, name: 'Pikachu' },
       { id: 16, name: 'Pidgey' }
     ]
-  }
+  },
+  'cerulean-cave (10-15)': {
+    name: 'Cerulean Cave',
+    minLevel: 10,
+    maxLevel: 15,
+    encounterRate: 40,
+    pool: [
+      { id: 41, name: 'Zubat' },
+      { id: 42, name: 'Golbat' },
+      { id: 74, name: 'Geodude' },
+      { id: 75, name: 'Graveler' },
+      { id: 95, name: 'Onix' },
+      { id: 104, name: 'Cubone' }
+    ]
+  },
 } as const;
 
 // Constants
@@ -108,23 +107,7 @@ export const useGameStore = defineStore('game', {
       inventory: false,
       idleJobs: false
     },
-    idleJobs: {
-      'pokeball-production': {
-        type: 'bug',
-        name: 'Produce Crappy Pokeball',
-        description: 'Bug Pokemon work together to produce Pokeballs',
-        maxSlots: 5,
-        assignedPokemon: [],
-        progress: 0,
-        baseTime: 60000, // 1 minute in milliseconds
-        reward: {
-          type: 'pokeball',
-          chance: 0.1 // 10% chance
-        },
-        completions: 0,
-        successfulCompletions: 0
-      }
-    },
+    idleJobs: DEFAULT_IDLE_JOBS,
     idleWorking: []
   }),
 
@@ -150,12 +133,16 @@ export const useGameStore = defineStore('game', {
   },
 
   actions: {
-      initializeGame() {
+    initializeGame() {
       const savedState = localStorage.getItem('gameState')
       if (savedState) {
         const state = JSON.parse(savedState)
         const now = Date.now()
         const lastSaveTime = state.lastSaveTime ?? now
+
+        // Initialize the inventory store
+        const inventoryStore = useInventoryStore();
+        inventoryStore.initializeInventory();
 
         // Calculate offline progress for idle jobs
         if (state.idleJobs) {
@@ -169,7 +156,41 @@ export const useGameStore = defineStore('game', {
               for (let i = 0; i < possibleCompletions; i++) {
                 if (Math.random() < job.reward.chance) {
                   job.successfulCompletions++
-                  state.pokeballs = (state.pokeballs ?? 0) + 1
+                  
+                  // Handle rewards based on job type
+                  if (job.reward.itemDetails) {
+                    const { name, description, params } = job.reward.itemDetails;
+                    
+                    switch (job.reward.type) {
+                      case 'pokeball':
+                        inventoryStore.addItem(
+                          itemFactory.createPokeball(name, description, params.catchRate)
+                        );
+                        break;
+                      case 'potion':
+                        inventoryStore.addItem(
+                          itemFactory.createPotion(name, description, params.healAmount)
+                        );
+                        break;
+                      case 'berry':
+                        inventoryStore.addItem(
+                          itemFactory.createBerry(name, description, params.effect)
+                        );
+                        break;
+                      case 'material':
+                        inventoryStore.addItem(
+                          itemFactory.createMaterial(name, description)
+                        );
+                        break;
+                      default:
+                        // Legacy fallback for pokeball only system
+                        state.pokeballs = (state.pokeballs ?? 0) + 1
+                        break;
+                    }
+                  } else {
+                    // Legacy fallback for pokeball only system
+                    state.pokeballs = (state.pokeballs ?? 0) + 1
+                  }
                 }
                 job.completions++
               }
@@ -191,6 +212,9 @@ export const useGameStore = defineStore('game', {
           inventory: state.inventory ?? { pokemon: {} }
         })
       } else {
+        // Initialize the inventory store with defaults
+        const inventoryStore = useInventoryStore();
+        inventoryStore.initializeInventory();
         this.selectRandomStarter()
       }
     },
@@ -803,14 +827,47 @@ export const useGameStore = defineStore('game', {
 
     completeJob(jobId: string) {
       const job = this.idleJobs[jobId];
+      const inventoryStore = useInventoryStore();
+      
       if (!job) return;
       
       job.completions++;
       
       // Check reward chance
       if (Math.random() < job.reward.chance) {
-        if (job.reward.type === 'pokeball') {
-          this.pokeballs++;
+        // Handle the reward based on type
+        if (job.reward.itemDetails) {
+          const { name, description, params } = job.reward.itemDetails;
+          
+          switch (job.reward.type) {
+            case 'pokeball':
+              inventoryStore.addItem(
+                itemFactory.createPokeball(name, description, params.catchRate)
+              );
+              break;
+            case 'potion':
+              inventoryStore.addItem(
+                itemFactory.createPotion(name, description, params.healAmount)
+              );
+              break;
+            case 'berry':
+              inventoryStore.addItem(
+                itemFactory.createBerry(name, description, params.effect)
+              );
+              break;
+            case 'material':
+              inventoryStore.addItem(
+                itemFactory.createMaterial(name, description)
+              );
+              break;
+            default:
+              // Legacy fallback for pokeball only system
+              if (job.reward.type === 'pokeball') {
+                this.pokeballs++;
+              }
+              break;
+          }
+          
           job.successfulCompletions++;
         }
       }

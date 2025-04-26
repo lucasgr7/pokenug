@@ -20,6 +20,11 @@
         <h3 class="text-sm font-semibold mb-2 px-2">My Team</h3>
         <TeamList />
       </div>
+
+      <!-- Quick Inventory Access -->
+      <div class="mt-6">
+        <QuickInventory />
+      </div>
     </div>
     <!-- Main Content -->
     <div class="flex-1 p-8">
@@ -28,8 +33,11 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import TeamList from './components/TeamList.vue'
+import QuickInventory from './components/QuickInventory.vue'
+import { useInventory } from './composables/useInventory'
 
 const routes = [
   { path: '/', name: 'Explore' },
@@ -37,4 +45,13 @@ const routes = [
   { path: '/inventory', name: 'Inventory' },
   { path: '/pokedex', name: 'Pokédex' }
 ]
+
+// Use the inventory composable
+const inventory = useInventory()
+
+onMounted(() => {
+  // Initialize inventory
+  const inventoryStore = inventory.getInventoryStore()
+  inventoryStore.initializeInventory()
+})
 </script>

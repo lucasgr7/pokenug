@@ -43,7 +43,7 @@
         Next spawn in: {{ spawnTimer }}s
       </div>
       <div class="bg-red-100 px-3 py-1 rounded-full text-red-600">
-        <span class="mr-1">🔴</span>{{ gameStore.pokeballs }} Pokéballs
+        <span class="mr-1">🔴</span>{{ totalPokeballs }} Pokéballs
       </div>
     </div>
 
@@ -117,8 +117,8 @@
           Attack
         </button>
         <button
-          @click="tryCapture"
-          :disabled="!wildPokemon || gameStore.pokeballs <= 0"
+          @click="openPokeballSelector"
+          :disabled="!wildPokemon || totalPokeballs <= 0"
           class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
         >
           Try Capture
@@ -178,6 +178,43 @@
       </div>
     </div>
 
+    <!-- Pokeball Selector Modal -->
+    <div v-if="showPokeballSelector" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">Select a Pokéball</h3>
+        
+        <div class="grid grid-cols-1 gap-3">
+          <div 
+            v-for="ball in availablePokeballs" 
+            :key="ball.id"
+            class="border rounded-lg p-3 flex items-center hover:bg-gray-100 cursor-pointer"
+            @click="selectPokeball(ball)"
+          >
+            <div class="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded-lg overflow-hidden">
+              <img 
+                :src="ball.icon" 
+                :alt="ball.name"
+                class="w-full h-full object-contain"
+                @error="$event.target.src = '/images/crappyball.png'"
+              >
+            </div>
+            
+            <div class="flex-1">
+              <div class="font-medium">{{ ball.name }} <span class="text-sm text-gray-500">({{ ball.quantity }})</span></div>
+              <div class="text-xs text-gray-600">{{ ball.description }}</div>
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          @click="showPokeballSelector = false"
+          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+
     <!-- Battle Log -->
     <BattleLog :logs="battleLogs" />
   </div>
@@ -187,14 +224,16 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useGameStore, regions } from '../stores/gameStore'
 import { usePokemon } from '../composables/usePokemon'
+import { useInventory } from '../composables/useInventory'
 import { tickSystem } from '../services/tickSystem'
 import BattleLog from '../components/BattleLog.vue'
 import XPBar from '../components/XPBar.vue'
-import type { Pokemon } from '../types/pokemon'
+import type { Pokemon, InventoryItem } from '../types/pokemon'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
 const { pokemonList, findById } = usePokemon()
+const inventory = useInventory()
 
 // Battle state
 const wildPokemon = ref<Pokemon | null>(null)
@@ -207,6 +246,18 @@ const recoveryProgress = ref(0)
 const battleLogs = ref<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>([])
 const isEnemyAttacking = ref(false)
 const isTryingCatch = ref(false)
+const showPokeballSelector = ref(false)
+const selectedPokeball = ref<InventoryItem | null>(null)
+
+// Get available pokeballs from inventory
+const availablePokeballs = computed(() => {
+  return inventory.getItemsByType('pokeball')
+})
+
+// Total pokeball count
+const totalPokeballs = computed(() => {
+  return inventory.getPokeballCount()
+})
 
 // Add computed property for HP percentage
 const hpPercentage = computed(() => {
@@ -220,6 +271,86 @@ const RUN_CHANCE = 0.15 // 15% chance to run each check
 const RUN_CHECK_INTERVAL = 5000 // Check for running every 5 seconds
 const BASE_HITS_TO_DEFEAT = 10 // Base number of hits needed to defeat same-level enemy
 const LEVEL_SCALING_FACTOR = 1.2 // How much harder it gets per level difference
+
+// Select a pokeball to use
+function selectPokeball(ball: InventoryItem) {
+  selectedPokeball.value = ball
+  showPokeballSelector.value = false
+  performCapture(ball)
+}
+
+// Handle showing the pokeball selector
+function openPokeballSelector() {
+  if (!wildPokemon.value) return
+  
+  // If only one type of pokeball is available, use it directly
+  if (availablePokeballs.value.length === 1) {
+    selectPokeball(availablePokeballs.value[0])
+    return
+  }
+  
+  showPokeballSelector.value = true
+}
+
+// Perform the actual capture attempt with the selected pokeball
+async function performCapture(ball: InventoryItem) {
+  if (!wildPokemon.value) return
+  
+  // Extract catch rate from the pokeball (default to 0.1 if not found)
+  const catchRate = (ball as any)?.catchRate || 0.1
+  
+  isTryingCatch.value = true
+  battleLogs.value.push({
+    message: `Threw a ${ball.name} at ${wildPokemon.value.name}!`,
+    type: 'system'
+  })
+  
+  // Use the item from inventory
+  if (!inventory.useItem(ball.id)) {
+    battleLogs.value.push({
+      message: `No ${ball.name}s left!`,
+      type: 'system'
+    })
+    isTryingCatch.value = false
+    return
+  }
+
+  // Calculate catch chance based on HP percentage and the pokeball's catch rate
+  const hpPercentage = (wildPokemon.value.currentHP! / wildPokemon.value.maxHP!) * 100
+  let baseCatchChance = 0
+
+  if (hpPercentage > 50) {
+    baseCatchChance = Math.max(5 - wildPokemon.value.level!, 1)
+  } else if (hpPercentage < 10) {
+    baseCatchChance = Math.max(55 - wildPokemon.value.level!, 10)
+  } else if (hpPercentage < 25) {
+    baseCatchChance = Math.max(35 - wildPokemon.value.level!, 5)
+  }
+  
+  // Apply the pokeball's catch rate modifier
+  const finalCatchChance = baseCatchChance * (1 + catchRate * 10)
+
+  // Wait for animation
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  isTryingCatch.value = false
+
+  // Check if catch successful
+  if (Math.random() * 100 <= finalCatchChance) {
+    battleLogs.value.push({
+      message: `Caught ${wildPokemon.value.name}!`,
+      type: 'system'
+    })
+    
+    gameStore.addPokemonToInventory({ ...wildPokemon.value })
+    wildPokemon.value = null
+    startSpawnTimer()
+  } else {
+    battleLogs.value.push({
+      message: `${wildPokemon.value.name} broke free!`,
+      type: 'system'
+    })
+  }
+}
 
 const calculateStats = (level: number) => {
   const baseHP = 100 // Base HP for level 1
@@ -452,49 +583,6 @@ const tryPokemonRun = () => {
   }
 }
 
-const tryCapture = async () => {
-  if (!wildPokemon.value || !gameStore.usePokeball()) return
-
-  isTryingCatch.value = true
-  battleLogs.value.push({
-    message: `Threw a Pokéball at ${wildPokemon.value.name}!`,
-    type: 'system'
-  })
-
-  // Calculate catch chance based on HP percentage
-  const hpPercentage = (wildPokemon.value.currentHP! / wildPokemon.value.maxHP!) * 100
-  let catchChance = 0
-
-  if (hpPercentage > 50) {
-    catchChance = Math.max(5 - wildPokemon.value.level!, 1)
-  } else if (hpPercentage < 10) {
-    catchChance = Math.max(55 - wildPokemon.value.level!, 10)
-  } else if (hpPercentage < 25) {
-    catchChance = Math.max(35 - wildPokemon.value.level!, 5)
-  }
-
-  // Wait for animation
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  isTryingCatch.value = false
-
-  // Check if catch successful
-  if (Math.random() * 100 <= catchChance) {
-    battleLogs.value.push({
-      message: `Caught ${wildPokemon.value.name}!`,
-      type: 'system'
-    })
-    
-    gameStore.addPokemonToInventory({ ...wildPokemon.value })
-    wildPokemon.value = null
-    startSpawnTimer()
-  } else {
-    battleLogs.value.push({
-      message: `${wildPokemon.value.name} broke free!`,
-      type: 'system'
-    })
-  }
-}
-
 // Spawn system
 const startSpawnTimer = () => {
   spawnTimer.value = DEFAULT_SPAWN_TIMER;
@@ -514,6 +602,29 @@ let unsubscribe: (() => void) | null = null
 onMounted(() => {
   gameStore.initializeGame()
   startSpawnTimer()
+  
+  // Create default pokeballs if needed
+  const existingPokeballs = inventory.getItemsByType('pokeball')
+  if (existingPokeballs.length === 0) {
+    // Convert the old pokeballs count to inventory items
+    if (gameStore.pokeballs > 0) {
+      inventory.addPokeball(
+        "Crappy Pokeball", 
+        "A poorly made Pokeball. Has a low catch rate.", 
+        0.1, 
+        gameStore.pokeballs
+      )
+      gameStore.pokeballs = 0 // Reset the old counter
+    } else {
+      // Add 5 starter pokeballs if none exist
+      inventory.addPokeball(
+        "Crappy Pokeball", 
+        "A poorly made Pokeball. Has a low catch rate.", 
+        0.1, 
+        5
+      )
+    }
+  }
   
   // Subscribe to tick system
   unsubscribe = tickSystem.subscribe((elapsed) => {
