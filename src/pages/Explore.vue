@@ -404,9 +404,9 @@ const enemyAttack = () => {
         gameStore.activePokemon!.defense!,
         wildPokemon.value!.level!,
         gameStore.activePokemon!.level!
-      )
+      ) * 5
       
-      const updatedHP = Math.max(0, gameStore.activePokemon.currentHP! - damage)
+      const updatedHP = Math.max(0, gameStore.activePokemon.currentHP! - damage);
       
       // Use the new store action to update HP
       gameStore.updatePokemonHP(gameStore.activePokemon, updatedHP)

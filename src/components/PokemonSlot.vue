@@ -5,166 +5,125 @@
 -->
 <template>
   <div
-    class="pokemon-slot relative overflow-hidden transition-transform duration-200 hover:scale-105"
-    :class="[
-      isParty ? 'bg-red-50' : 'bg-white',
-      { 'cursor-pointer': !disabled },
-      { 'shadow-md': !isParty },
-      { 'shadow-lg': isParty }
-    ]"
-    :draggable="!disabled"
-    @dragstart="handleDragStart"
+    class="w-full h-full bg-white rounded-lg shadow-md p-2 hover:shadow-lg transition-shadow duration-200"
+    :class="{ 
+      'border-2 border-red-500': isParty && isSelected,
+      'cursor-pointer': true
+    }"
+    draggable="true"
+    @dragstart="$emit('dragstart', $event)"
   >
-    <!-- Type-based background -->
-    <div 
-      class="absolute inset-0"
-      :class="backgroundClass"
-    >
-      <template v-if="pokemon?.types.length === 2">
-        <div class="absolute inset-0 diagonal-split first-type opacity-25" :class="getTypeColor(pokemon.types[0])"></div>
-        <div class="absolute inset-0 diagonal-split second-type opacity-25" :class="getTypeColor(pokemon.types[1])"></div>
-      </template>
-      <div v-else class="absolute inset-0 opacity-25" :class="getTypeColor(pokemon?.types[0] || '')"></div>
-    </div>
-
-    <!-- Pokemon Card Content -->
-    <div class="relative p-2 rounded-lg">
-      <!-- Rest of the content remains the same -->
-      <div class="w-32 h-32 mx-auto">
-        <img 
-          v-if="pokemon" 
-          :src="pokemon.sprite" 
-          :alt="pokemon.name"
-          class="w-full h-full object-contain"
-          :class="{ 'opacity-50': disabled }"
-        />
-        <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
-          Empty Slot
-        </div>
-      </div>
-
-      <!-- Pokemon Info -->
-      <div v-if="pokemon" class="mt-2 space-y-2">
-        <!-- Name and Level -->
-        <div class="flex justify-between items-center">
-          <span class="text-sm font-semibold capitalize">{{ pokemon.name }}</span>
-          <span class="text-xs bg-gray-100 px-2 py-1 rounded-full">Lvl {{ pokemon.level || 1 }}</span>
-        </div>
-
-        <!-- Health Bar -->
-        <div v-if="pokemon.maxHP">
-          <div class="flex justify-between text-xs text-gray-600">
-            <span>HP</span>
-            <span>{{ pokemon.currentHP }}/{{ pokemon.maxHP }}</span>
-          </div>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div
-              class="h-2 rounded-full transition-all duration-300"
-              :class="{
-                'bg-green-500': healthPercentage > 50,
-                'bg-yellow-500': healthPercentage <= 50 && healthPercentage > 25,
-                'bg-red-500': healthPercentage <= 25
-              }"
-              :style="{ width: `${healthPercentage}%` }"
-            ></div>
-          </div>
-          <!-- Add Healing Indicator -->
-          <div v-if="isHealing" class="mt-1">
-            <div class="w-full bg-gray-200 rounded-full h-1">
-              <div class="bg-blue-400 h-1 rounded-full transition-all duration-300 animate-pulse"></div>
-            </div>
-            <div class="text-xs text-blue-500 text-center mt-0.5">Healing...</div>
-          </div>
-        </div>
-
-        <!-- Experience Bar -->
-        <div v-if="pokemon.experienceToNextLevel">
-          <div class="flex justify-between text-xs text-gray-600">
-            <span>EXP</span>
-            <span>{{ pokemon.experience }}/{{ pokemon.experienceToNextLevel }}</span>
-          </div>
-          <div class="w-full bg-gray-200 rounded-full h-1">
-            <div
-              class="h-1 bg-blue-500 rounded-full transition-all duration-300"
-              :style="{ width: `${expPercentage}%` }"
-            ></div>
-          </div>
-        </div>
-
-        <!-- Type Tags -->
-        <div class="flex flex-wrap gap-1">
+    <div class="flex flex-col items-center">
+      <img
+        :src="pokemon.sprite"
+        :alt="pokemon.name"
+        class="w-20 h-20 object-contain"
+      />
+      <div class="text-center mt-2">
+        <div class="font-semibold capitalize">{{ pokemon.name }}</div>
+        <div class="text-sm text-gray-500">Lvl {{ pokemon.level }}</div>
+        <div class="flex justify-center space-x-1 mt-1">
           <span
             v-for="type in pokemon.types"
             :key="type"
-            class="px-2 py-0.5 rounded-full text-white text-xs"
+            class="px-2 py-0.5 rounded-full text-xs text-white"
             :class="getTypeColor(type)"
           >
             {{ type }}
           </span>
         </div>
       </div>
-    </div>
-
-    <!-- Add healing indicator -->
-    <div v-if="isHealing && !disabled" class="absolute bottom-0 left-0 right-0 p-2 bg-blue-500/20">
-      <div class="flex items-center justify-center space-x-1">
-        <div class="w-1 h-1 bg-blue-500 rounded-full animate-bounce"></div>
-        <div class="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-        <div class="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+      <!-- Health Bar -->
+      <div class="w-full mt-2">
+        <div class="flex justify-between items-center text-xs text-gray-600">
+          <span>HP</span>
+          <span>{{ Math.floor(pokemon.currentHP || 0) }}/{{ pokemon.maxHP }}</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-1.5 mt-0.5">
+          <div
+            class="h-1.5 rounded-full transition-all duration-300"
+            :class="{
+              'bg-green-600': hpPercentage > 50,
+              'bg-yellow-500': hpPercentage <= 50 && hpPercentage > 25,
+              'bg-red-500': hpPercentage <= 25
+            }"
+            :style="{ width: hpPercentage + '%' }"
+          ></div>
+        </div>
+      </div>
+      
+      <!-- Fainted Status Overlay -->
+      <div
+        v-if="pokemon.faintedAt"
+        class="absolute inset-0 bg-red-900 bg-opacity-50 flex items-center justify-center rounded-lg"
+      >
+        <div class="text-white font-bold text-center">
+          <div>Fainted</div>
+          <div class="text-xs mt-1">Recovering: {{ recoveryTimeLeft }}</div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, onUnmounted, defineEmits } from 'vue'
 import type { Pokemon } from '../types/pokemon'
-import { computed } from 'vue'
+import { useGameStore } from '../stores/gameStore'
+
+const gameStore = useGameStore()
+const emits = defineEmits(['dragstart'])
 
 const props = defineProps<{
-  pokemon?: Pokemon
-  disabled?: boolean
-  isParty?: boolean
+  pokemon: Pokemon
+  isParty: boolean
 }>()
 
-// Define emits for the component
-const emit = defineEmits(['dragstart'])
-
-// Add isHealing computed property
-const isHealing = computed(() => {
-  if (!props.pokemon) return false
-  return props.pokemon.currentHP! < props.pokemon.maxHP! && 
-         !props.pokemon.faintedAt && 
-         !props.disabled
+const isSelected = computed(() => {
+  return props.isParty && gameStore.playerPokemon[gameStore.activePokemonIndex] === props.pokemon
 })
 
-// Update healthPercentage to handle cases where HP is being regenerated
-const healthPercentage = computed(() => {
-  if (!props.pokemon?.maxHP) return 0
-  const currentHP = props.pokemon.currentHP || 0
-  const maxHP = props.pokemon.maxHP
-  return Math.min(100, Math.max(0, (currentHP / maxHP) * 100))
+// Calculate HP percentage for display
+const hpPercentage = computed(() => {
+  if (!props.pokemon.currentHP || !props.pokemon.maxHP) return 0
+  const percentage = (props.pokemon.currentHP / props.pokemon.maxHP) * 100
+  return Math.min(100, Math.max(0, percentage)) // Clamp between 0-100
 })
 
-const expPercentage = computed(() => {
-  if (!props.pokemon?.experienceToNextLevel) return 0
-  return (props.pokemon.experience || 0) / props.pokemon.experienceToNextLevel * 100
-})
+// Calculate recovery time left
+const recoveryTimeLeft = ref('--:--')
+const recoveryInterval = ref<number | null>(null)
 
-const backgroundClass = computed(() => {
-  if (!props.pokemon?.types.length) return ''
-  return props.pokemon.types.length === 2 ? 'dual-type' : 'single-type'
-})
-
-// Event handlers
-function handleDragStart(event: DragEvent) {
-  if (props.disabled || !props.pokemon || !event.dataTransfer) return
-  
-  event.dataTransfer.setData('application/json', JSON.stringify(props.pokemon))
-  emit('dragstart', props.pokemon)
+const updateRecoveryTime = () => {
+  if (props.pokemon.recoveryEndTime) {
+    const now = Date.now()
+    const timeLeft = props.pokemon.recoveryEndTime - now
+    
+    if (timeLeft <= 0) {
+      recoveryTimeLeft.value = 'Ready'
+      clearInterval(recoveryInterval.value!)
+      recoveryInterval.value = null
+    } else {
+      const seconds = Math.floor((timeLeft / 1000) % 60).toString().padStart(2, '0')
+      const minutes = Math.floor((timeLeft / 1000 / 60)).toString().padStart(2, '0')
+      recoveryTimeLeft.value = `${minutes}:${seconds}`
+    }
+  }
 }
 
-// Type color mapping
-function getTypeColor(type: string) {
+if (props.pokemon.faintedAt) {
+  updateRecoveryTime()
+  recoveryInterval.value = setInterval(updateRecoveryTime, 1000)
+}
+
+onUnmounted(() => {
+  if (recoveryInterval.value) {
+    clearInterval(recoveryInterval.value)
+  }
+})
+
+// Color mapping for Pokemon types
+const getTypeColor = (type: string) => {
   const colors: Record<string, string> = {
     normal: 'bg-gray-400',
     fire: 'bg-red-500',
@@ -188,22 +147,3 @@ function getTypeColor(type: string) {
   return colors[type.toLowerCase()] || 'bg-gray-400'
 }
 </script>
-
-<style scoped>
-.pokemon-slot {
-  width: 12rem;
-  min-height: 18rem;
-}
-
-.diagonal-split {
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-}
-
-.first-type {
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-}
-
-.second-type {
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-}
-</style>

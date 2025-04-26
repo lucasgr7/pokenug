@@ -7,7 +7,7 @@ import PokemonGrid from '../components/PokemonGrid.vue'
 const gameStore = useGameStore()
 const currentJobType = ref('bug') // Since we only have the bug-type job for now
 
-function handleDrop(event: DragEvent, jobId: string) {
+function handleDrop(event: DragEvent, jobId: string | number) {
   if (!event.dataTransfer) return
   
   const data = JSON.parse(event.dataTransfer.getData('application/json'))
@@ -15,26 +15,26 @@ function handleDrop(event: DragEvent, jobId: string) {
   // Find the actual Pokemon reference from the store based on data properties
   let pokemon
   if (data.isParty) {
+    // For party Pokémon, don't compare workId as it might not exist yet
     pokemon = gameStore.playerPokemon.find(p => 
       p.name === data.name && 
-      p.level === data.level &&
-      (!data.workId || p.workId === data.workId)
+      p.level === data.level
     )
   } else {
+    // For available Pokémon, don't compare workId as it might not exist yet
     pokemon = gameStore.availablePokemon.find(p => 
       p.name === data.name && 
-      p.level === data.level &&
-      (!data.workId || p.workId === data.workId)
+      p.level === data.level
     )
   }
   
   if (pokemon) {
-    gameStore.assignPokemonToJob(pokemon, jobId)
+    gameStore.assignPokemonToJob(pokemon, String(jobId))
   }
 }
 
-function removePokemon(pokemon: Pokemon, jobId: string) {
-  gameStore.removePokemonFromJob(pokemon, jobId)
+function removePokemon(pokemon: Pokemon, jobId: string | number) {
+  gameStore.removePokemonFromJob(pokemon, String(jobId))
 }
 </script>
 <template>
@@ -68,7 +68,7 @@ function removePokemon(pokemon: Pokemon, jobId: string) {
             </div>
           </div>
           <div class="text-xs text-gray-600 text-right">
-            Time per cycle: {{ Math.round((gameStore.getJobRemainingTime(id) / 1000)) }}s
+            Time per cycle: {{ Math.round((gameStore.getJobRemainingTime(String(id)) / 1000)) }}s
           </div>
         </div>
         

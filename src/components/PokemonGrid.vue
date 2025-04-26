@@ -1,7 +1,7 @@
 <template>
   <div class="mt-8 space-y-8">
     <!-- Party Pokemon Section -->
-    <div class="bg-gray-100 p-4 rounded-lg">
+    <div v-if="showParty" class="bg-gray-100 p-4 rounded-lg">
       <h3 class="text-lg font-semibold mb-4">Party Pokemon ({{ partyPokemon.length }}/6)</h3>
       <div class="grid grid-cols-6 gap-4">
         <!-- All 6 Party Slots (filled or empty) -->
@@ -17,6 +17,7 @@
               draggable="true"
               @dragstart="handleDragStart($event, partyPokemon[slotIndex - 1])"
               class="border-2 border-red-500 relative group"
+              :class="{ 'opacity-50': isWorkingInJob(partyPokemon[slotIndex - 1]) }"
             >
               <!-- Drag indicator -->
               <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
@@ -28,6 +29,10 @@
             <div v-if="partyPokemon[slotIndex - 1] === gameStore.activePokemon" 
                  class="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1 text-xs">
               Active
+            </div>
+            <div v-if="isWorkingInJob(partyPokemon[slotIndex - 1])" 
+                 class="absolute -top-2 left-0 bg-yellow-500 text-white rounded-full p-1 text-xs">
+              Working
             </div>
           </div>
           <!-- Empty Slot -->
@@ -60,6 +65,7 @@
             draggable="true"
             @dragstart="handleDragStart($event, pokemon)"
             class="relative"
+            :class="{ 'opacity-50': isWorkingInJob(pokemon) }"
           >
             <!-- Drag indicator -->
             <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200">
@@ -68,6 +74,10 @@
               </svg>
             </div>
           </PokemonSlot>
+          <div v-if="isWorkingInJob(pokemon)" 
+               class="absolute -top-2 -right-2 bg-yellow-500 text-white rounded-full p-1 text-xs">
+            Working
+          </div>
         </div>
         
         <!-- Display empty placeholder slots (minimum 3 slots or more if needed) -->
@@ -86,36 +96,62 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, defineProps } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import PokemonSlot from './PokemonSlot.vue'
 import type { Pokemon } from '../types/pokemon'
 
+const props = defineProps({
+  filterType: {
+    type: String,
+    default: ''
+  },
+  showParty: {
+    type: Boolean,
+    default: true
+  }
+})
+
 const gameStore = useGameStore()
 const isDraggingOver = ref<number | 'available' | null>(null)
 
-// Get party Pokemon (those in active battle team)
+// Get party Pokemon (those in active battle team) - without any filtering
 const partyPokemon = computed(() => {
-  return [...gameStore.playerPokemon]
+  return [...gameStore.playerPokemon];
 })
 
 // Get all Pokemon from inventory that aren't in the team or working
 const availablePokemon = computed(() => {
   return [...gameStore.availablePokemon].filter(pokemon => {
     // Make sure this Pokemon is not currently working in any job
-    return !gameStore.idleWorking.some(workingPokemon => 
-      workingPokemon.name === pokemon.name && 
-      workingPokemon.level === pokemon.level
-    );
+    if (isWorkingInJob(pokemon)) return false;
+    
+    // When filtering by type for idle jobs, only show matching types
+    if (props.filterType) {
+      return pokemon.types.includes(props.filterType);
+    }
+    return true;
   });
 })
+
+function isWorkingInJob(pokemon: Pokemon): boolean {
+  // Check if this Pokemon is currently assigned to any job
+  return gameStore.idleWorking.some(workingPokemon => 
+    workingPokemon.name === pokemon.name && 
+    workingPokemon.level === pokemon.level
+  );
+}
 
 function handleDragStart(event: DragEvent, pokemon: Pokemon) {
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
+    // Add workId if it exists
+    const workId = pokemon.workId || null;
+    
     event.dataTransfer.setData('application/json', JSON.stringify({
       ...pokemon,
       isParty: partyPokemon.value.includes(pokemon),
+      workId,
       originalIndex: partyPokemon.value.indexOf(pokemon)
     }))
   }
