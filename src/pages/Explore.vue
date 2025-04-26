@@ -222,23 +222,23 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useGameStore, regions } from '../stores/gameStore'
+import { useGameStore } from '../stores/gameStore'
 import { usePokemon } from '../composables/usePokemon'
 import { useInventory } from '../composables/useInventory'
 import { tickSystem } from '../services/tickSystem'
 import BattleLog from '../components/BattleLog.vue'
 import XPBar from '../components/XPBar.vue'
 import type { Pokemon, InventoryItem } from '../types/pokemon'
+import regions from '../constants/regions'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
-const { pokemonList, findById } = usePokemon()
+const { findById } = usePokemon()
 const inventory = useInventory()
 
 // Battle state
 const wildPokemon = ref<Pokemon | null>(null)
-const DEFAULT_SPAWN_TIMER = 1
-const spawnTimer = ref(DEFAULT_SPAWN_TIMER)
+const spawnTimer = ref(0)
 const isPlayerAttacking = ref(false)
 const isWildPokemonHurt = ref(false)
 const isRecovering = ref(false)
@@ -392,7 +392,7 @@ const calculateDamage = (attack: number, defense: number, attackerLevel: number,
 }
 
 const calculateXPGain = (playerLevel: number, enemyLevel: number) => {
-  return Math.floor(10 * (enemyLevel / playerLevel))*20
+  return Math.floor(10 * (enemyLevel / playerLevel))*200
 }
 
 const calculateXPForNextLevel = (currentLevel: number) => {
@@ -402,9 +402,23 @@ const calculateXPForNextLevel = (currentLevel: number) => {
 // Update the spawnWildPokemon function
 const spawnWildPokemon = async () => {
   const region = gameStore.currentRegionData
-  const poolPokemon = region.pool[Math.floor(Math.random() * region.pool.length)]
   
-  const pokemon = await findById(poolPokemon.id)
+  // Use probability-based selection instead of random index
+  // Create a weighted array of Pokémon based on their probability
+  const weightedPool: Array<{id: number, name: string}> = []
+  
+  region.pool.forEach((pokemon: { probability: number; id: any; name: any }) => {
+    // Add Pokémon to the pool multiple times based on its probability
+    const count = pokemon.probability || 1
+    for (let i = 0; i < count; i++) {
+      weightedPool.push({ id: pokemon.id, name: pokemon.name })
+    }
+  })
+  
+  // Select a random Pokémon from the weighted pool
+  const selectedPokemon = weightedPool[Math.floor(Math.random() * weightedPool.length)]
+  
+  const pokemon = await findById(selectedPokemon.id)
   if (pokemon) {
     const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel
     const stats = calculateStats(level)
@@ -583,13 +597,18 @@ const tryPokemonRun = () => {
   }
 }
 
-// Spawn system
+// Spawn system with region-specific timer
 const startSpawnTimer = () => {
-  spawnTimer.value = DEFAULT_SPAWN_TIMER;
+  // Use the region-specific spawnTimer
+  const regionTimer = gameStore.currentRegionData.spawnTimer || 10
+  spawnTimer.value = regionTimer
+  
   const interval = setInterval(() => {
     spawnTimer.value--
     if (spawnTimer.value <= 0) {
       clearInterval(interval)
+      
+      // Always spawn a Pokémon when the timer ends
       spawnWildPokemon()
     }
   }, 1000)

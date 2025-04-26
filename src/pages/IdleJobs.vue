@@ -1,12 +1,43 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import type { Pokemon } from '../types/pokemon'
-import { PokemonType } from '../types/pokemon'
 import PokemonGrid from '../components/PokemonGrid.vue'
 
 const gameStore = useGameStore()
 
+// Tooltip functionality
+const showTooltip = ref(false)
+const tooltipContent = ref('')
+const tooltipX = ref(0)
+const tooltipY = ref(0)
+
+function showInfoTooltip(event: MouseEvent, content: string) {
+  tooltipContent.value = content
+  tooltipX.value = event.clientX + 10
+  tooltipY.value = event.clientY + 10
+  showTooltip.value = true
+}
+
+function hideTooltip() {
+  showTooltip.value = false
+}
+
+// Tooltip content dictionary
+const tooltips = {
+  totalLevel: "The sum of all assigned Pokémon levels. Higher total levels means faster job completion and better success chance.",
+  baseSuccess: "The base probability of getting a reward when the job completes.",
+  multiPokemonBonus: "Bonus success chance from assigning multiple Pokémon to this job. Each additional Pokémon increases success rate.",
+  levelBonus: "Bonus success chance from Pokémon levels. Each level contributes +0.2% success chance.",
+  currentSuccess: "Total success probability including all bonuses.",
+  multiPokemonSpeed: "Speed bonus from assigning multiple Pokémon. Each additional Pokémon reduces completion time.",
+  levelSpeed: "Speed bonus from Pokémon levels. Each level contributes +0.5% speed boost.",
+  remainingTime: "Estimated time remaining until job completes.",
+  successRate: "Number of successful completions compared to total attempts.",
+  dragPokemon: "Drag Pokémon here from your party or available Pokémon to assign them to this job."
+}
+
+// Rest of the existing code
 function handleDrop(event: DragEvent, jobId: string | number) {
   if (!event.dataTransfer) return
   
@@ -58,6 +89,43 @@ function getContrastingTextColor(hexColor: string): string {
   // Return white for dark backgrounds, black for light backgrounds
   return luminance > 0.5 ? '#000000' : '#FFFFFF';
 }
+
+// Format percentage for display
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}
+
+// Calculate level-based speed boost for a job
+function getLevelSpeedBoost(jobId: string): number {
+  const job = gameStore.idleJobs[jobId];
+  if (!job || job.assignedPokemon.length === 0) return 0;
+  
+  // Calculate total level boost (0.5% per level)
+  return job.assignedPokemon.reduce((sum, pokemon) => {
+    return sum + ((pokemon.level || 1) * 0.005);
+  }, 0);
+}
+
+// Calculate level-based success chance boost for a job
+function getLevelSuccessBoost(jobId: string): number {
+  const job = gameStore.idleJobs[jobId];
+  if (!job || job.assignedPokemon.length === 0) return 0;
+  
+  // Calculate total level boost (0.2% per level)
+  return job.assignedPokemon.reduce((sum, pokemon) => {
+    return sum + ((pokemon.level || 1) * 0.002);
+  }, 0);
+}
+
+// Get the total levels of all Pokémon assigned to a job
+function getTotalLevels(jobId: string): number {
+  const job = gameStore.idleJobs[jobId];
+  if (!job || job.assignedPokemon.length === 0) return 0;
+  
+  return job.assignedPokemon.reduce((sum, pokemon) => {
+    return sum + (pokemon.level || 1);
+  }, 0);
+}
 </script>
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
@@ -91,13 +159,78 @@ function getContrastingTextColor(hexColor: string): string {
                 <div class="px-2 py-1 rounded bg-white bg-opacity-20 text-sm">
                   {{ job.assignedPokemon.length }}/{{ job.maxSlots }} Slots
                 </div>
-                <div class="mt-1 text-xs">
-                  Completions: {{ job.completions }} (Success: {{ job.successfulCompletions }})
+                <div class="mt-1 text-xs font-medium">
+                  <!-- Improved stats display -->
+                  <span 
+                    class="bg-white bg-opacity-15 px-2 py-1 rounded-full cursor-help"
+                    @mouseover="showInfoTooltip($event, tooltips.successRate)"
+                    @mouseout="hideTooltip"
+                  >
+                    Success: {{ job.successfulCompletions }}/{{ job.completions }}
+                  </span>
                 </div>
               </div>
             </div>
             
             <p class="text-sm opacity-80 mb-3">{{ job.description }}</p>
+            
+            <!-- Total Level Display -->
+            <div v-if="job.assignedPokemon.length > 0" class="text-xs font-medium mb-2">
+              <span 
+                class="bg-white bg-opacity-30 px-2 py-1 rounded-full cursor-help"
+                @mouseover="showInfoTooltip($event, tooltips.totalLevel)"
+                @mouseout="hideTooltip"
+              >
+                Total Level: {{ getTotalLevels(String(id)) }}
+              </span>
+            </div>
+            
+            <!-- Success Chance Display -->
+            <div class="flex flex-wrap gap-2 mb-2 text-xs">
+              <div 
+                class="bg-white bg-opacity-20 px-2 py-1 rounded-full cursor-help"
+                @mouseover="showInfoTooltip($event, tooltips.baseSuccess)"
+                @mouseout="hideTooltip"
+              >
+                <span class="font-medium">Base Success: {{ formatPercent(job.reward.chance) }}</span>
+              </div>
+              
+              <!-- Multi-Pokémon Bonus -->
+              <div 
+                v-if="job.assignedPokemon.length > 1" 
+                class="bg-white bg-opacity-30 px-2 py-1 rounded-full cursor-help"
+                @mouseover="showInfoTooltip($event, tooltips.multiPokemonBonus)"
+                @mouseout="hideTooltip"
+              >
+                <span class="font-medium">
+                  +{{ formatPercent(job.percentualProgressWithAdditionalPokemon * (job.assignedPokemon.length - 1)) }} (Multi-Pokémon)
+                </span>
+              </div>
+              
+              <!-- Level Bonus -->
+              <div 
+                v-if="job.assignedPokemon.length > 0 && getLevelSuccessBoost(String(id)) > 0" 
+                class="bg-white bg-opacity-30 px-2 py-1 rounded-full cursor-help"
+                @mouseover="showInfoTooltip($event, tooltips.levelBonus)"
+                @mouseout="hideTooltip"
+              >
+                <span class="font-medium">
+                  +{{ formatPercent(getLevelSuccessBoost(String(id))) }} (Levels)
+                </span>
+              </div>
+              
+              <!-- Current Success Rate -->
+              <div 
+                v-if="job.assignedPokemon.length > 0" 
+                class="bg-white bg-opacity-50 px-2 py-1 rounded-full ml-auto cursor-help"
+                @mouseover="showInfoTooltip($event, tooltips.currentSuccess)"
+                @mouseout="hideTooltip"
+              >
+                <span class="font-bold">
+                  Current: {{ formatPercent(gameStore.getJobSuccessChance(String(id))) }}
+                </span>
+              </div>
+            </div>
             
             <!-- Progress Bar -->
             <div class="relative pt-1 mb-3">
@@ -108,8 +241,43 @@ function getContrastingTextColor(hexColor: string): string {
                 >
                 </div>
               </div>
-              <div class="text-xs text-right mt-1">
-                Time per cycle: {{ Math.round((gameStore.getJobRemainingTime(String(id)) / 1000)) }}s
+              
+              <!-- Speed Bonuses -->
+              <div class="flex flex-wrap gap-2 mt-2 text-xs">
+                <!-- Multi-Pokémon Speed Bonus -->
+                <div 
+                  v-if="job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1" 
+                  class="bg-white bg-opacity-20 px-2 py-1 rounded-full cursor-help"
+                  @mouseover="showInfoTooltip($event, tooltips.multiPokemonSpeed)"
+                  @mouseout="hideTooltip"
+                >
+                  <span class="font-medium">
+                    +{{ formatPercent(job.percentualProgressWithAdditionalPokemon * (job.assignedPokemon.length - 1)) }} Speed (Multi-Pokémon)
+                  </span>
+                </div>
+                
+                <!-- Level-based Speed Bonus -->
+                <div 
+                  v-if="job.assignedPokemon.length > 0 && getLevelSpeedBoost(String(id)) > 0" 
+                  class="bg-white bg-opacity-20 px-2 py-1 rounded-full cursor-help"
+                  @mouseover="showInfoTooltip($event, tooltips.levelSpeed)"
+                  @mouseout="hideTooltip"
+                >
+                  <span class="font-medium">
+                    +{{ formatPercent(getLevelSpeedBoost(String(id))) }} Speed (Levels)
+                  </span>
+                </div>
+                
+                <!-- Remaining Time -->
+                <div 
+                  class="bg-white bg-opacity-40 px-2 py-1 rounded-full ml-auto cursor-help"
+                  @mouseover="showInfoTooltip($event, tooltips.remainingTime)"
+                  @mouseout="hideTooltip"
+                >
+                  <span class="font-bold">
+                    Time: {{ Math.round((gameStore.getJobRemainingTime(String(id)) / 1000)) }}s
+                  </span>
+                </div>
               </div>
             </div>
             
@@ -118,6 +286,8 @@ function getContrastingTextColor(hexColor: string): string {
               class="grid grid-cols-5 gap-2 mt-3 bg-white bg-opacity-10 p-2 rounded-lg" 
               @dragover.prevent
               @drop="handleDrop($event, id)"
+              @mouseover="showInfoTooltip($event, tooltips.dragPokemon)"
+              @mouseout="hideTooltip"
             >
               <div 
                 v-for="i in job.maxSlots" 
@@ -138,6 +308,10 @@ function getContrastingTextColor(hexColor: string): string {
                       :alt="job.assignedPokemon[i-1].name"
                       class="w-10 h-10 object-contain"
                     >
+                    <!-- Show the Pokémon's level in a badge -->
+                    <span class="absolute top-0 right-0 bg-white text-black text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {{ job.assignedPokemon[i-1].level }}
+                    </span>
                     <div class="absolute inset-0 bg-black bg-opacity-50 group-hover:flex items-center justify-center hidden text-white text-xs rounded-md">
                       Remove
                     </div>
@@ -154,6 +328,15 @@ function getContrastingTextColor(hexColor: string): string {
 
       <!-- Available Pokemon Grid -->
       <PokemonGrid :show-party="true" />
+    </div>
+    
+    <!-- Tooltip component -->
+    <div 
+      v-if="showTooltip" 
+      class="fixed bg-black bg-opacity-80 text-white text-xs p-2 rounded shadow-lg z-50 max-w-xs"
+      :style="{ left: tooltipX + 'px', top: tooltipY + 'px' }"
+    >
+      {{ tooltipContent }}
     </div>
   </div>
 </template>

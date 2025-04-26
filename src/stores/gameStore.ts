@@ -3,6 +3,7 @@ import { Pokemon, PokemonType } from '../types/pokemon.js'
 import { IdleJob, DEFAULT_IDLE_JOBS } from '../types/idleJobs.js'
 import { itemFactory } from '../services/itemFactory'
 import { useInventoryStore } from './inventoryStore'
+import regions from '../constants/regions.js'
 
 interface BattleState {
   wildPokemon: Pokemon | null;
@@ -16,6 +17,13 @@ interface BattleState {
 
 }
 
+interface Notification {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+  timestamp: number;
+}
+
 interface GameState {
   playerPokemon: Pokemon[]; // This will now be specifically the active party
   availablePokemon: Pokemon[]; // Pokemon not in party or working
@@ -23,6 +31,7 @@ interface GameState {
   pokeballs: number;
   currentRegion: string;
   battle: BattleState;
+  notifications: Notification[];
   inventory: {
     pokemon: {
       [key: string]: {
@@ -39,40 +48,6 @@ interface GameState {
   idleJobs: Record<string, IdleJob>;
   idleWorking: Pokemon[];
 }
-
-// Region definitions
-export const regions = {
-  'viridian-forest': {
-    name: 'Viridian Forest',
-    minLevel: 3,
-    maxLevel: 7,
-    encounterRate: 30,
-    pool: [
-      { id: 10, name: 'Caterpie' },
-      { id: 11, name: 'Metapod' },
-      { id: 12, name: 'Butterfree' },
-      { id: 13, name: 'Weedle' },
-      { id: 14, name: 'Kakuna' },
-      { id: 15, name: 'Beedrill' },
-      { id: 25, name: 'Pikachu' },
-      { id: 16, name: 'Pidgey' }
-    ]
-  },
-  'cerulean-cave (10-15)': {
-    name: 'Cerulean Cave',
-    minLevel: 10,
-    maxLevel: 15,
-    encounterRate: 40,
-    pool: [
-      { id: 41, name: 'Zubat' },
-      { id: 42, name: 'Golbat' },
-      { id: 74, name: 'Geodude' },
-      { id: 75, name: 'Graveler' },
-      { id: 95, name: 'Onix' },
-      { id: 104, name: 'Cubone' }
-    ]
-  },
-} as const;
 
 // Constants
 const BASE_HITS_TO_DEFEAT = 10
@@ -99,6 +74,7 @@ export const useGameStore = defineStore('game', {
       isTryingCatch: false,
       battleLogs: []
     },
+    notifications: [],
     inventory: {
       pokemon: {}
     },
@@ -127,8 +103,62 @@ export const useGameStore = defineStore('game', {
     getJobRemainingTime: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
-      const reduction = state.idleJobs[jobId].assignedPokemon.length * 1000;
-      return Math.max(1000, job.baseTime - reduction); // Minimum 1 second
+      
+      // Base reduction from number of assigned Pokemon (keeping this for backward compatibility)
+      const baseReduction = job.assignedPokemon.length * 1000;
+      
+      // Calculate level-based time reduction
+      let levelReduction = 0;
+      if (job.assignedPokemon.length > 0) {
+        // Sum up the level contribution of all Pokémon
+        const totalLevelBoost = job.assignedPokemon.reduce((sum, pokemon) => {
+          // Each level provides a small reduction in time (0.5% per level)
+          return sum + ((pokemon.level || 1) * 0.005);
+        }, 0);
+        
+        // Apply level-based reduction to base time
+        levelReduction = job.baseTime * totalLevelBoost;
+      }
+      
+      // Additional percentage-based reduction if the job has the percentual property
+      let percentReduction = 0;
+      if (job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1) {
+        // Apply the percentage reduction for each additional Pokemon (after the first one)
+        const additionalPokemon = job.assignedPokemon.length - 1;
+        percentReduction = job.baseTime * (job.percentualProgressWithAdditionalPokemon * additionalPokemon);
+      }
+      
+      // Total reduction is the sum of base, level-based, and percentage reductions
+      const totalReduction = baseReduction + levelReduction + percentReduction;
+      
+      return Math.max(1000, job.baseTime - totalReduction); // Minimum 1 second
+    },
+    getJobSuccessChance: (state) => (jobId: string) => {
+      const job = state.idleJobs[jobId];
+      if (!job) return 0;
+      
+      // Base chance from the job configuration
+      let successChance = job.reward.chance;
+      
+      // Additional bonus from extra Pokemon (keep existing functionality)
+      if (job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1) {
+        const additionalPokemon = job.assignedPokemon.length - 1;
+        const bonusChance = job.percentualProgressWithAdditionalPokemon * additionalPokemon;
+        successChance += bonusChance;
+      }
+      
+      // Additional bonus from Pokemon levels
+      if (job.assignedPokemon.length > 0) {
+        // Each level provides a small bonus to success chance (0.2% per level)
+        const levelBonus = job.assignedPokemon.reduce((sum, pokemon) => {
+          return sum + ((pokemon.level || 1) * 0.002);
+        }, 0);
+        
+        successChance += levelBonus;
+      }
+      
+      // Cap at 100% chance
+      return Math.min(1.0, successChance);
     }
   },
 
@@ -151,6 +181,11 @@ export const useGameStore = defineStore('game', {
               const elapsedTime = now - lastSaveTime
               const jobTime = this.getJobRemainingTime(jobId)
               const possibleCompletions = Math.floor(elapsedTime / jobTime)
+              
+              // If jobs were completed while away, show a summary notification
+              if (possibleCompletions > 0) {
+                this.addNotification(`While you were away: ${job.name} completed ${possibleCompletions} times!`, 'info');
+              }
               
               // Apply completions
               for (let i = 0; i < possibleCompletions; i++) {
@@ -833,8 +868,11 @@ export const useGameStore = defineStore('game', {
       
       job.completions++;
       
-      // Check reward chance
-      if (Math.random() < job.reward.chance) {
+      // Use the enhanced success chance calculation that accounts for additional Pokémon
+      const successChance = this.getJobSuccessChance(jobId);
+      
+      // Check reward chance with the enhanced calculation
+      if (Math.random() < successChance) {
         // Handle the reward based on type
         if (job.reward.itemDetails) {
           const { name, description, params } = job.reward.itemDetails;
@@ -869,7 +907,12 @@ export const useGameStore = defineStore('game', {
           }
           
           job.successfulCompletions++;
+          // Add success notification
+          this.addNotification(`${job.name} complete! Received ${name}.`, 'success');
         }
+      } else {
+        // Add failure notification - job completed but no reward
+        this.addNotification(`${job.name} complete, but no reward found.`, 'error');
       }
       
       job.progress = 0;
@@ -939,6 +982,32 @@ export const useGameStore = defineStore('game', {
         this.saveState();
       }
       return success;
+    },
+
+    // Notification methods
+    addNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+      const notification: Notification = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        message,
+        type,
+        timestamp: Date.now()
+      };
+      
+      this.notifications.push(notification);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        this.removeNotification(notification.id);
+      }, 5000);
+      
+      return notification;
+    },
+    
+    removeNotification(id: string) {
+      const index = this.notifications.findIndex(n => n.id === id);
+      if (index !== -1) {
+        this.notifications.splice(index, 1);
+      }
     },
   }
 });

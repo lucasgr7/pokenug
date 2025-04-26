@@ -8,11 +8,11 @@ function generateId(prefix: string): string {
 // Default icons by type
 const defaultIcons = {
   pokeball: '/images/crappyball.png', // Using the existing crappyball image
-  potion: '/images/potion-default.png',
-  berries: '/images/berry-default.png',
-  material: '/images/material-default.png',
-  key: '/images/key-default.png',
-  special: '/images/special-default.png'
+  potion: '/images/potion.png',
+  berries: '/images/berry.png',
+  material: '/images/material.png',
+  key: '/images/key.png',
+  special: '/images/special.png'
 };
 
 export class GameItemFactory implements ItemFactory {

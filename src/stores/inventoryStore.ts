@@ -14,7 +14,12 @@ export const useInventoryStore = defineStore('inventory', {
     getAllItems: (state) => Object.values(state.items),
     
     getItemsByType: (state) => (type: ItemType) => {
-      return Object.values(state.items).filter(item => item.type === type)
+      return Object.values(state.items)
+        .filter(item => item.type === type)
+        .map(item => ({
+          ...item,
+          icon: item.icon?.replace('-default', '') ? '' : item.icon
+        }))
     },
     
     getPokeballs: (state) => {

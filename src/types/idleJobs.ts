@@ -23,6 +23,7 @@ export interface IdleJob {
   successfulCompletions: number;
   icon: string;
   backgroundColor: string; // Background color based on Pokemon type
+  percentualProgressWithAdditionalPokemon?: number; // Optional property for additional progress calculation
 }
 
 // Type color mapping for job backgrounds
@@ -70,7 +71,8 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     completions: 0,
     successfulCompletions: 0,
     icon: '/images/crappyball.png',
-    backgroundColor: TYPE_COLORS[PokemonType.Bug]
+    backgroundColor: TYPE_COLORS[PokemonType.Bug],
+    percentualProgressWithAdditionalPokemon: 0.06 // 5% progress per additional Pokemon
   },
   'potion-brewing': {
     id: 'potion-brewing',
@@ -93,7 +95,8 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     completions: 0,
     successfulCompletions: 0,
     icon: '/public/images/potion.png', // You'll need to add this image
-    backgroundColor: TYPE_COLORS[PokemonType.Grass]
+    backgroundColor: TYPE_COLORS[PokemonType.Grass],
+    percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
   },
   'berry-gathering': {
     id: 'berry-gathering',
@@ -116,7 +119,9 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     completions: 0,
     successfulCompletions: 0,
     icon: '/public/images/berry.png', // You'll need to add this image
-    backgroundColor: TYPE_COLORS[PokemonType.Normal]
+    backgroundColor: TYPE_COLORS[PokemonType.Normal],
+    percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
+    
   },
   'material-mining': {
     id: 'material-mining',
@@ -139,6 +144,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     completions: 0,
     successfulCompletions: 0,
     icon: '/public/images/stone.png', // You'll need to add this image
-    backgroundColor: TYPE_COLORS[PokemonType.Rock]
+    backgroundColor: TYPE_COLORS[PokemonType.Rock],
+    percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
   }
 };

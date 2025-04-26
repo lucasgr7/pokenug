@@ -30,6 +30,9 @@
     <div class="flex-1 p-8">
       <router-view></router-view>
     </div>
+    
+    <!-- Notification System -->
+    <NotificationSystem />
   </div>
 </template>
 
@@ -37,6 +40,7 @@
 import { ref, computed, onMounted } from 'vue'
 import TeamList from './components/TeamList.vue'
 import QuickInventory from './components/QuickInventory.vue'
+import NotificationSystem from './components/NotificationSystem.vue'
 import { useInventory } from './composables/useInventory'
 
 const routes = [
