@@ -26,10 +26,12 @@ interface BattleState {
   isTryingCatch: boolean;
   battleLogs: Array<{ message: string; type: 'damage' | 'heal' | 'system' }>;
 
+
 }
 
 interface GameState {
-  playerPokemon: Pokemon[];
+  playerPokemon: Pokemon[]; // This will now be specifically the active party
+  availablePokemon: Pokemon[]; // Pokemon not in party or working
   activePokemonIndex: number;
   pokeballs: number;
   currentRegion: string;
@@ -85,6 +87,7 @@ const RUN_CHECK_INTERVAL = 5000
 export const useGameStore = defineStore('game', {
   state: (): GameState => ({
     playerPokemon: [],
+    availablePokemon: [],
     activePokemonIndex: 0,
     pokeballs: 50,
     currentRegion: 'viridian-forest',
@@ -129,6 +132,9 @@ export const useGameStore = defineStore('game', {
     hasStarterPokemon: (state) => state.playerPokemon.length > 0,
     currentRegionData: (state) => regions[state.currentRegion as keyof typeof regions],
     activePokemon: (state) => state.playerPokemon[state.activePokemonIndex] || null,
+    getAllPokemon: (state) => [...state.playerPokemon, ...state.availablePokemon],
+    getAvailablePokemonCount: (state) => state.availablePokemon.length,
+    getPartyCount: (state) => state.playerPokemon.length,
     getJobTimeReduction: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
@@ -144,7 +150,7 @@ export const useGameStore = defineStore('game', {
   },
 
   actions: {
-    initializeGame() {
+      initializeGame() {
       const savedState = localStorage.getItem('gameState')
       if (savedState) {
         const state = JSON.parse(savedState)
@@ -223,6 +229,47 @@ export const useGameStore = defineStore('game', {
       }
     },
 
+    addPokemonToParty(pokemon: Pokemon) {
+      if (this.playerPokemon.length >= 6) return false;
+      
+      // Remove from available if it's there
+      const availableIndex = this.availablePokemon.findIndex(p => p === pokemon);
+      if (availableIndex !== -1) {
+        this.availablePokemon.splice(availableIndex, 1);
+      }
+      
+      this.playerPokemon.push(pokemon);
+      this.saveState();
+      return true;
+    },
+
+    removePokemonFromParty(pokemon: Pokemon) {
+      const index = this.playerPokemon.indexOf(pokemon);
+      if (index === -1) return false;
+      
+      // If it's the active pokemon, switch to another one first
+      if (index === this.activePokemonIndex) {
+        const nextPokemon = this.findNextAvailablePokemon();
+        if (!nextPokemon) {
+          // Don't remove if it's the last healthy pokemon
+          if (!this.hasAnyHealthyPokemon()) return false;
+        }
+        if (nextPokemon) {
+          this.setActivePokemon(nextPokemon);
+        }
+      }
+      
+      // Adjust active pokemon index if needed
+      if (index <= this.activePokemonIndex && this.activePokemonIndex > 0) {
+        this.activePokemonIndex--;
+      }
+      
+      this.playerPokemon.splice(index, 1);
+      this.availablePokemon.push(pokemon);
+      this.saveState();
+      return true;
+    },
+
     addPokemonToInventory(pokemon: Pokemon) {
       // Ensure the Pokemon has all required stats
       pokemon.level ??= 1
@@ -238,19 +285,21 @@ export const useGameStore = defineStore('game', {
         pokemon.defense = stats.defense
       }
 
-      const key = pokemon.name
+      const key = pokemon.name;
       if (this.inventory.pokemon[key]) {
-        this.inventory.pokemon[key].count++
+        this.inventory.pokemon[key].count++;
       } else {
         this.inventory.pokemon[key] = {
           count: 1,
           data: pokemon
-        }
+        };
       }
 
-      // Add to team if there's space
+      // Add to party if there's space, otherwise to available
       if (this.playerPokemon.length < 6) {
-        this.playerPokemon.push(pokemon)
+        this.playerPokemon.push(pokemon);
+      } else {
+        this.availablePokemon.push(pokemon);
       }
       
       this.saveState()
@@ -302,7 +351,7 @@ export const useGameStore = defineStore('game', {
         const hpPerLevel = 20
         const baseAttack = Math.floor(baseHP / 10)
         const attackPerLevel = baseAttack * 0.2
-        const baseDefense = Math.floor(baseAttack * 0.8)
+        const baseDefense = Math.floor(baseHP * 0.8)
         const defensePerLevel = baseDefense * 0.2
 
         const maxHP = Math.floor(baseHP + (hpPerLevel * (starterLevel - 1)))
@@ -681,36 +730,50 @@ export const useGameStore = defineStore('game', {
       if (job.type && !pokemon.types.includes(job.type)) return false;
       
       // Check if Pokemon is already working in any job
-      const isAlreadyWorking = Object.values(this.idleJobs).some(j => 
-        j.assignedPokemon.some(p => 
-          p.name === pokemon.name && 
-          p.level === pokemon.level
-        )
-      );
-      
+      const isAlreadyWorking = this.idleWorking.some(p => p.name === pokemon.name && p.level === pokemon.level);
       if (isAlreadyWorking) return false;
       
-      // If Pokemon is in team, remove it
-      const teamIndex = this.playerPokemon.findIndex(p => 
-        p.name === pokemon.name && 
-        p.level === pokemon.level
-      );
+      // Remove from party or available list
+      const partyIndex = this.playerPokemon.findIndex(p => p.name === pokemon.name && p.level === pokemon.level);
+      const availableIndex = this.availablePokemon.findIndex(p => p.name === pokemon.name && p.level === pokemon.level);
       
-      if (teamIndex !== -1) {
-        this.playerPokemon.splice(teamIndex, 1);
-        if (teamIndex <= this.activePokemonIndex && this.activePokemonIndex > 0) {
-          this.activePokemonIndex--;
-        }
+      if (partyIndex !== -1) {
+        // Don't allow assignment if it's the last healthy pokemon in party
+        if (this.playerPokemon.length === 1 && !this.hasAnyHealthyPokemon()) return false;
+        
+        // Use the actual Pokemon reference from the party collection
+        const pokemonToAssign = this.playerPokemon[partyIndex];
+        this.playerPokemon.splice(partyIndex, 1);
+        
+        // Update active Pokemon index if needed
+        this.handleActivePokemonChange(partyIndex);
+        
+        // Create a unique work ID for this Pokemon instance
+        const workingPokemon = {
+          ...pokemonToAssign,
+          workId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+        };
+        
+        job.assignedPokemon.push(workingPokemon);
+        this.idleWorking.push(workingPokemon);
+      } else if (availableIndex !== -1) {
+        // Use the actual Pokemon reference from the available collection
+        const pokemonToAssign = this.availablePokemon[availableIndex];
+        this.availablePokemon.splice(availableIndex, 1);
+        
+        // Create a unique ID for this Pokemon instance
+        const workingPokemon = {
+          ...pokemonToAssign,
+          workId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+        };
+        
+        job.assignedPokemon.push(workingPokemon);
+        this.idleWorking.push(workingPokemon);
+      } else {
+        // Pokemon not found in either collection
+        return false;
       }
       
-      // Create a unique ID for this Pokemon instance
-      const workingPokemon = {
-        ...pokemon,
-        workId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
-      };
-      
-      job.assignedPokemon.push(workingPokemon);
-      this.idleWorking.push(workingPokemon);
       this.saveState();
       return true;
     },
@@ -730,11 +793,9 @@ export const useGameStore = defineStore('game', {
         this.idleWorking.splice(workingIndex, 1);
       }
       
-      // Add back to team if there's space (without the workId)
-      if (this.playerPokemon.length < 6) {
-        const { workId, ...cleanPokemon } = removedPokemon;
-        this.playerPokemon.push(cleanPokemon);
-      }
+      // Always add the Pokemon back to the available list, not to the party
+      const { workId, ...cleanPokemon } = removedPokemon;
+      this.availablePokemon.push(cleanPokemon);
       
       this.saveState();
       return true;
@@ -770,6 +831,57 @@ export const useGameStore = defineStore('game', {
       }
       
       this.saveState();
-    }
+    },
+    moveToParty(pokemon: Pokemon, targetSlotIndex?: number) {
+      if (this.playerPokemon.length >= 6) {
+        return false; // Party is full
+      }
+      const availableIndex = this.availablePokemon.findIndex(p => p === pokemon);
+      if (availableIndex === -1) return false;
+      
+      this.availablePokemon.splice(availableIndex, 1);
+      
+      if (typeof targetSlotIndex === 'number' && targetSlotIndex >= 0 && targetSlotIndex < 6) {
+        this.playerPokemon.splice(targetSlotIndex, 0, pokemon);
+      } else {
+        this.playerPokemon.push(pokemon);
+      }
+      return true;
+    },
+
+    moveToAvailable(pokemon: Pokemon) {
+      if (this.playerPokemon.length <= 1) {
+        return false; // Can't remove last party pokemon
+      }
+      const partyIndex = this.playerPokemon.findIndex(p => p === pokemon);
+      if (partyIndex === -1) return false;
+
+      this.handleActivePokemonChange(partyIndex);
+      this.playerPokemon.splice(partyIndex, 1);
+      this.availablePokemon.push(pokemon);
+      return true;
+    },
+
+    handleActivePokemonChange(removedIndex: number) {
+      if (this.activePokemonIndex === removedIndex) {
+        const nextIndex = (removedIndex + 1) % this.playerPokemon.length;
+        if (nextIndex !== removedIndex) {
+          this.activePokemonIndex = nextIndex;
+        }
+      } else if (removedIndex < this.activePokemonIndex) {
+        this.activePokemonIndex--;
+      }
+    },
+
+    swapPokemonBetweenPartyAndAvailable(pokemon: Pokemon, toParty: boolean, targetSlotIndex?: number) {
+      const success = toParty 
+        ? this.moveToParty(pokemon, targetSlotIndex)
+        : this.moveToAvailable(pokemon);
+      
+      if (success) {
+        this.saveState();
+      }
+      return success;
+    },
   }
 });

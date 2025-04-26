@@ -1,65 +1,3 @@
-<template>
-  <div class="w-full space-y-2">
-    <template v-for="index in 6" :key="index">
-      <!-- Filled slot -->
-      <div v-if="gameStore.playerPokemon[index - 1]"
-           class="flex items-center p-2 rounded-lg cursor-pointer transition-colors"
-           :class="{ 
-             'bg-red-500 hover:bg-red-700': !isFainted(gameStore.playerPokemon[index - 1]),
-             'bg-gray-500 hover:bg-gray-600': isFainted(gameStore.playerPokemon[index - 1]),
-             'opacity-75': gameStore.playerPokemon[index - 1] !== gameStore.activePokemon 
-           }"
-           @click="swapPokemon(gameStore.playerPokemon[index - 1])">
-        <img :src="gameStore.playerPokemon[index - 1].sprite" 
-             :alt="gameStore.playerPokemon[index - 1].name" 
-             class="w-5 h-5 object-contain">
-        <div class="ml-2 flex-1">
-          <div class="flex justify-between items-center">
-            <div class="flex items-center">
-              <span class="text-xs text-white capitalize">{{ gameStore.playerPokemon[index - 1].name }}</span>
-              <span v-if="isFainted(gameStore.playerPokemon[index - 1])" 
-                    class="ml-1 text-xs bg-gray-700 text-white px-1 rounded">
-                Fainted ({{ getRecoveryTimeLeft(gameStore.playerPokemon[index - 1]) }}s)
-              </span>
-            </div>
-            <span class="text-xs text-white">
-              {{ getPokemonHP(gameStore.playerPokemon[index - 1]) }}
-            </span>
-          </div>
-          <div class="w-full bg-red-800/50 rounded-full h-1">
-            <div class="h-1 rounded-full transition-all duration-300"
-                 :class="{
-                   'bg-green-500': hpPercentage(gameStore.playerPokemon[index - 1]) > 25,
-                   'bg-yellow-500': hpPercentage(gameStore.playerPokemon[index - 1]) <= 25 && hpPercentage(gameStore.playerPokemon[index - 1]) > 10,
-                   'bg-red-500': hpPercentage(gameStore.playerPokemon[index - 1]) <= 10
-                 }"
-                 :style="{ width: hpPercentage(gameStore.playerPokemon[index - 1]) + '%' }">
-            </div>
-          </div>
-          <!-- Recovery Progress Bar -->
-          <div v-if="isFainted(gameStore.playerPokemon[index - 1])" class="mt-1">
-            <div class="w-full bg-gray-700/50 rounded-full h-1">
-              <div class="h-1 rounded-full bg-blue-400 transition-all duration-300"
-                   :style="{ width: getRecoveryProgress(gameStore.playerPokemon[index - 1]) + '%' }">
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Empty slot -->
-      <div v-else
-           class="flex items-center p-2 bg-red-500/25 rounded-lg cursor-not-allowed">
-        <div class="w-5 h-5 bg-white/10 rounded-full"></div>
-        <div class="ml-2 flex-1">
-          <div class="flex justify-between items-center">
-            <span class="text-xs text-white/50">Empty Slot</span>
-          </div>
-          <div class="w-full bg-red-800/25 rounded-full h-1"></div>
-        </div>
-      </div>
-    </template>
-  </div>
-</template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
@@ -131,3 +69,65 @@ onUnmounted(() => {
   }
 })
 </script>
+<template>
+  <div class="w-full space-y-2">
+    <template v-for="index in 6" :key="index">
+      <!-- Filled slot -->
+      <div v-if="gameStore.playerPokemon[index - 1]"
+           class="flex items-center p-2 rounded-lg cursor-pointer transition-colors"
+           :class="{ 
+             'bg-red-500 hover:bg-red-700': !isFainted(gameStore.playerPokemon[index - 1]),
+             'bg-gray-500 hover:bg-gray-600': isFainted(gameStore.playerPokemon[index - 1]),
+             'opacity-75': gameStore.playerPokemon[index - 1] !== gameStore.activePokemon 
+           }"
+           @click="swapPokemon(gameStore.playerPokemon[index - 1])">
+        <img :src="gameStore.playerPokemon[index - 1].sprite" 
+             :alt="gameStore.playerPokemon[index - 1].name" 
+             class="w-5 h-5 object-contain">
+        <div class="ml-2 flex-1">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center">
+              <span class="text-xs text-white capitalize">{{ gameStore.playerPokemon[index - 1].name }}</span>
+              <span v-if="isFainted(gameStore.playerPokemon[index - 1])" 
+                    class="ml-1 text-xs bg-gray-700 text-white px-1 rounded">
+                Fainted ({{ getRecoveryTimeLeft(gameStore.playerPokemon[index - 1]) }}s)
+              </span>
+            </div>
+            <span class="text-xs text-white">
+              {{ getPokemonHP(gameStore.playerPokemon[index - 1]) }}
+            </span>
+          </div>
+          <div class="w-full bg-red-800/50 rounded-full h-1">
+            <div class="h-1 rounded-full transition-all duration-300"
+                 :class="{
+                   'bg-green-500': hpPercentage(gameStore.playerPokemon[index - 1]) > 25,
+                   'bg-yellow-500': hpPercentage(gameStore.playerPokemon[index - 1]) <= 25 && hpPercentage(gameStore.playerPokemon[index - 1]) > 10,
+                   'bg-red-500': hpPercentage(gameStore.playerPokemon[index - 1]) <= 10
+                 }"
+                 :style="{ width: hpPercentage(gameStore.playerPokemon[index - 1]) + '%' }">
+            </div>
+          </div>
+          <!-- Recovery Progress Bar -->
+          <div v-if="isFainted(gameStore.playerPokemon[index - 1])" class="mt-1">
+            <div class="w-full bg-gray-700/50 rounded-full h-1">
+              <div class="h-1 rounded-full bg-blue-400 transition-all duration-300"
+                   :style="{ width: getRecoveryProgress(gameStore.playerPokemon[index - 1]) + '%' }">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Empty slot -->
+      <div v-else
+           class="flex items-center p-2 bg-red-500/25 rounded-lg cursor-not-allowed">
+        <div class="w-5 h-5 bg-white/10 rounded-full"></div>
+        <div class="ml-2 flex-1">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-white/50">Empty Slot</span>
+          </div>
+          <div class="w-full bg-red-800/25 rounded-full h-1"></div>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>

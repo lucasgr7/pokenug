@@ -8,9 +8,16 @@ interface GameTime {
   currentTick: number;
 }
 
+/**
+ * Manages game time and tick-based updates for the game system.
+ * Handles saving/loading game state and notifying subscribers of time updates.
+ */
 class TickSystem {
+  /** Set of callback functions to be called on each tick */
   private readonly subscribers: Set<(elapsed: number) => void> = new Set()
+  /** Reference to the main tick interval */
   private interval: ReturnType<typeof setInterval> | null = null
+  /** Reactive game time state */
   private readonly gameTime = ref<GameTime>({
     lastTick: Date.now(),
     currentTick: Date.now()

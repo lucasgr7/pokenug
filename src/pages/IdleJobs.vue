@@ -1,3 +1,42 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useGameStore } from '../stores/gameStore'
+import type { Pokemon } from '../types/pokemon'
+import PokemonGrid from '../components/PokemonGrid.vue'
+
+const gameStore = useGameStore()
+const currentJobType = ref('bug') // Since we only have the bug-type job for now
+
+function handleDrop(event: DragEvent, jobId: string) {
+  if (!event.dataTransfer) return
+  
+  const data = JSON.parse(event.dataTransfer.getData('application/json'))
+  
+  // Find the actual Pokemon reference from the store based on data properties
+  let pokemon
+  if (data.isParty) {
+    pokemon = gameStore.playerPokemon.find(p => 
+      p.name === data.name && 
+      p.level === data.level &&
+      (!data.workId || p.workId === data.workId)
+    )
+  } else {
+    pokemon = gameStore.availablePokemon.find(p => 
+      p.name === data.name && 
+      p.level === data.level &&
+      (!data.workId || p.workId === data.workId)
+    )
+  }
+  
+  if (pokemon) {
+    gameStore.assignPokemonToJob(pokemon, jobId)
+  }
+}
+
+function removePokemon(pokemon: Pokemon, jobId: string) {
+  gameStore.removePokemonFromJob(pokemon, jobId)
+}
+</script>
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
     <h1 class="text-2xl font-bold text-gray-800 mb-4">Idle Jobs</h1>
@@ -59,27 +98,6 @@
     </div>
 
     <!-- Available Pokemon Grid -->
-    <PokemonGrid :filter-type="currentJobType" />
+    <PokemonGrid :filter-type="currentJobType" :show-party="true" />
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useGameStore } from '../stores/gameStore'
-import type { Pokemon } from '../types/pokemon'
-import PokemonGrid from '../components/PokemonGrid.vue'
-
-const gameStore = useGameStore()
-const currentJobType = ref('bug') // Since we only have the bug-type job for now
-
-function handleDrop(event: DragEvent, jobId: string) {
-  if (!event.dataTransfer) return
-  
-  const pokemon = JSON.parse(event.dataTransfer.getData('application/json'))
-  gameStore.assignPokemonToJob(pokemon, jobId)
-}
-
-function removePokemon(pokemon: Pokemon, jobId: string) {
-  gameStore.removePokemonFromJob(pokemon, jobId)
-}
-</script>
