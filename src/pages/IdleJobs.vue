@@ -29,6 +29,14 @@ function handleDrop(event: DragEvent, jobId: string | number) {
   }
   
   if (pokemon) {
+    // Don't assign fainted Pokémon to jobs
+    if (pokemon.faintedAt) {
+      // Instead of attempting to assign to a job, move to available if from party
+      if (data.isParty) {
+        gameStore.swapPokemonBetweenPartyAndAvailable(pokemon, false)
+      }
+      return
+    }
     gameStore.assignPokemonToJob(pokemon, String(jobId))
   }
 }
@@ -98,6 +106,6 @@ function removePokemon(pokemon: Pokemon, jobId: string | number) {
     </div>
 
     <!-- Available Pokemon Grid -->
-    <PokemonGrid :filter-type="currentJobType" :show-party="true" />
+    <PokemonGrid  :show-party="true" />
   </div>
 </template>
