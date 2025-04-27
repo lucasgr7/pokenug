@@ -195,7 +195,7 @@
                 :src="ball.icon" 
                 :alt="ball.name"
                 class="w-full h-full object-contain"
-                @error="$event.target.src = '/images/crappyball.png'"
+                @error="$event.target.src = '/images/not-found.png'"
               >
             </div>
             
@@ -230,6 +230,7 @@ import BattleLog from '@/components/BattleLog.vue'
 import XPBar from '@/components/XPBar.vue'
 import type { Pokemon, InventoryItem } from '@/types/pokemon'
 import regions from '@/constants/regions'
+import { useRouter } from 'vue-router'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
@@ -248,6 +249,7 @@ const isEnemyAttacking = ref(false)
 const isTryingCatch = ref(false)
 const showPokeballSelector = ref(false)
 const selectedPokeball = ref<InventoryItem | null>(null)
+const router = useRouter()
 
 // Get available pokeballs from inventory
 const availablePokeballs = computed(() => {
@@ -271,6 +273,8 @@ const RUN_CHANCE = 0.15 // 15% chance to run each check
 const RUN_CHECK_INTERVAL = 5000 // Check for running every 5 seconds
 const BASE_HITS_TO_DEFEAT = 10 // Base number of hits needed to defeat same-level enemy
 const LEVEL_SCALING_FACTOR = 1.2 // How much harder it gets per level difference
+const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const DEFAULT_SPAWN_TIMER = 10 // Default spawn timer in seconds
 
 // Select a pokeball to use
 function selectPokeball(ball: InventoryItem) {
@@ -392,7 +396,7 @@ const calculateDamage = (attack: number, defense: number, attackerLevel: number,
 }
 
 const calculateXPGain = (playerLevel: number, enemyLevel: number) => {
-  return Math.floor(10 * (enemyLevel / playerLevel))*200
+  return Math.floor(10 * (enemyLevel / playerLevel)) * (IS_DEVELOPMENT ? 200 : 20)
 }
 
 const calculateXPForNextLevel = (currentLevel: number) => {
@@ -529,8 +533,14 @@ const handlePokemonFaint = () => {
     battleLogs.value.push({
       message: `No more Pokemon available! The wild ${wildPokemon.value.name} fled.`,
       type: 'system'
-    })
+    });
+    gameStore.addNotification(
+      `No more Pokemon available! The wild ${wildPokemon.value.name} fled.`,
+      'warning'
+    );
+    router.push('/idle-jobs')
     wildPokemon.value = null
+    
     startSpawnTimer()
   }
 }
@@ -634,14 +644,6 @@ onMounted(() => {
         gameStore.pokeballs
       )
       gameStore.pokeballs = 0 // Reset the old counter
-    } else {
-      // Add 5 starter pokeballs if none exist
-      inventory.addPokeball(
-        "Crappy Pokeball", 
-        "A poorly made Pokeball. Has a low catch rate.", 
-        0.1, 
-        5
-      )
     }
   }
   

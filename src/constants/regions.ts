@@ -9,13 +9,13 @@ const regions = {
     pool: [
       { id: 10, name: 'Caterpie', probability: 25 },   // Common (25%)
       { id: 11, name: 'Metapod', probability: 15 },    // Uncommon (15%)
-      { id: 12, name: 'Butterfree', probability: 5 },  // Rare (5%)
       { id: 13, name: 'Weedle', probability: 25 },     // Common (25%)
       { id: 14, name: 'Kakuna', probability: 15 },     // Uncommon (15%)
-      { id: 15, name: 'Beedrill', probability: 5 },    // Rare (5%)
-      { id: 25, name: 'Pikachu', probability: 3 },     // Very rare (3%)
+      { id: 25, name: 'Pikachu', probability: 0.5 },     // Very rare (3%)
+      { id: 133, name: 'Eevee', probability: 0.5 },     // Very rare (3%)
       { id: 16, name: 'Pidgey', probability: 7 },       // Uncommon (7%)
-      { id: 43, name: 'oddish', probability: 7 } // Very rare (2%)
+      { id: 43, name: 'oddish', probability: 7 }, // Very rare (2%)
+      { id: 69, name: 'Bellsprout', probability: 7 } // Very rare (2%)
     ]
   },
   'cerulean-cave (10-15)': {
@@ -30,7 +30,9 @@ const regions = {
       { id: 74, name: 'Geodude', probability: 25 },    // Common (25%)
       { id: 75, name: 'Graveler', probability: 15 },   // Uncommon (15%)
       { id: 95, name: 'Onix', probability: 10 },       // Rare (10%)
-      { id: 104, name: 'Cubone', probability: 5 }      // Very rare (5%)
+      { id: 104, name: 'Cubone', probability: 5 },      // Very rare (5%)
+      { id: 12, name: 'Butterfree', probability: 5 },  // Rare (5%)
+      { id: 15, name: 'Beedrill', probability: 5 }    // Rare (5%)
     ]
   },
   'beach-zone (15-25)': {

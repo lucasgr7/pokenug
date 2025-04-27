@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type { InventoryItem, ItemType } from '@/types/pokemon'
+import { itemFactory } from '@/services/itemFactory'
 
 interface InventoryState {
   items: Record<string, InventoryItem>;
@@ -22,8 +23,8 @@ export const useInventoryStore = defineStore('inventory', {
         }))
     },
     
-    getPokeballs: (state) => {
-      return Object.values(state.items).filter(item => item.type === ItemType.Pokeball)
+    getItemById: (state) => (itemId: string) => {
+      return state.items[itemId] || null
     },
     
     getItemQuantity: (state) => (itemId: string) => {
@@ -70,8 +71,13 @@ export const useInventoryStore = defineStore('inventory', {
         return false
       }
 
-      // Remove one from quantity
-      return this.removeItem(itemId, 1)
+      // For consumable items, remove one from quantity
+      if (this.items[itemId].consumable) {
+        return this.removeItem(itemId, 1)
+      }
+      
+      // For non-consumable items, just return true to indicate successful use
+      return true
     },
 
     initializeInventory() {
@@ -83,17 +89,34 @@ export const useInventoryStore = defineStore('inventory', {
           items: state.items || {}
         })
       } else {
-        // Add default starter items
-        this.addItem({
-          id: 'crappy-pokeball',
-          name: 'Crappy Pokeball',
-          description: 'A poorly made Pokeball. Has a low catch rate.',
-          type: 'pokeball',
-          quantity: 5,
-          icon: '/images/crappyball.png',
-          rarity: 'common',
-          usable: true
-        })
+        // Add default starter items using the new item definitions
+        const starterPokeball = itemFactory.createFromDefinition('crappy-pokeball', 5);
+        const starterPotion = itemFactory.createFromDefinition('simple-potion', 2);
+        
+        if (starterPokeball) {
+          this.addItem(starterPokeball);
+        } else {
+          // Fallback to direct creation if definition doesn't exist
+          this.addItem({
+            id: 'crappy-pokeball',
+            name: 'Crappy Pokeball',
+            description: 'A poorly made Pokeball. Has a low catch rate.',
+            type: 'pokeball',
+            quantity: 5,
+            icon: '/images/crappyball.png',
+            rarity: 'common',
+            usable: true,
+            consumable: true,
+            effect: {
+              type: 'catch',
+              catchRate: 0.1
+            }
+          })
+        }
+        
+        if (starterPotion) {
+          this.addItem(starterPotion);
+        }
       }
     },
 

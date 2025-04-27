@@ -37,19 +37,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import TeamList from './components/TeamList.vue'
 import QuickInventory from './components/QuickInventory.vue'
-import NotificationSystem from './components/NotificationSystem.vue'
+import NotificationSystem from '@/components/NotificationSystem.vue'
 import { useInventory } from './composables/useInventory'
 
 const routes = [
   { path: '/', name: 'Explore' },
   { path: '/idle-jobs', name: 'Idle Jobs' },
   { path: '/inventory', name: 'Inventory' },
-  { path: '/pokedex', name: 'Pokédex' }
+  { path: '/pokedex', name: 'Pokédex' },
+  { path: '/collection', name: 'Collection' },
 ]
 
+if(import.meta.env.MODE === 'development') {
+  routes.push({ path: '/debug', name: 'debug' })
+} else {
+  console.log('Production mode')
+}
 // Use the inventory composable
 const inventory = useInventory()
 

@@ -2,39 +2,49 @@
   A reusable Pokemon slot component with type-based styling and a card layout.
   The component shows a Pokemon's image, name, level, health, and experience.
   It supports drag and drop functionality and type-based theming.
+  Now supports vertical mode for a more compact display.
 -->
 <template>
   <div
     class="w-full h-full bg-white rounded-lg shadow-md p-2 hover:shadow-lg transition-shadow duration-200"
     :class="{ 
       'border-2 border-red-500': isParty && isSelected,
-      'cursor-pointer': true
+      'cursor-pointer': true,
+      'p-1': verticalMode
     }"
     draggable="true"
-    @dragstart="$emit('dragstart', $event)"
+    @dragstart="handleDragStart"
   >
-    <div class="flex flex-col items-center">
+    <div class="flex" :class="verticalMode ? 'flex-row items-center' : 'flex-col items-center'">
       <img
         :src="pokemon.sprite"
         :alt="pokemon.name"
-        class="w-20 h-20 object-contain"
+        :class="verticalMode ? 'w-10 h-10 mr-2' : 'w-20 h-20'"
+        class="object-contain"
       />
-      <div class="text-center mt-2">
-        <div class="font-semibold capitalize">{{ pokemon.name }}</div>
-        <div class="text-sm text-gray-500">Lvl {{ pokemon.level }}</div>
-        <div class="flex justify-center space-x-1 mt-1">
+      <div :class="verticalMode ? 'flex-1' : 'text-center mt-2'">
+        <div class="font-semibold capitalize text-sm" :class="verticalMode ? 'text-left' : ''">{{ pokemon.name }}</div>
+        <div class="text-sm text-gray-500" :class="verticalMode ? 'text-xs' : ''">Lvl {{ pokemon.level }}</div>
+        <div :class="[
+          'flex space-x-1', 
+          verticalMode ? 'mt-0.5 justify-start' : 'mt-1 justify-center'
+        ]">
           <span
             v-for="type in pokemon.types"
             :key="type"
-            class="px-2 py-0.5 rounded-full text-xs text-white"
-            :class="getTypeColor(type)"
+            class="rounded-full text-white"
+            :class="[
+              getTypeColor(type),
+              verticalMode ? 'px-1 py-0 text-[10px]' : 'px-2 py-0.5 text-xs'
+            ]"
           >
             {{ type }}
           </span>
         </div>
       </div>
-      <!-- Health Bar -->
-      <div class="w-full mt-2">
+      
+      <!-- Health Bar - only shown in standard mode -->
+      <div v-if="!verticalMode" class="w-full mt-2">
         <div class="flex justify-between items-center text-xs text-gray-600">
           <span>HP</span>
           <span>{{ Math.floor(pokemon.currentHP || 0) }}/{{ pokemon.maxHP }}</span>
@@ -77,11 +87,28 @@ const emits = defineEmits(['dragstart'])
 const props = defineProps<{
   pokemon: Pokemon
   isParty: boolean
+  verticalMode?: boolean
 }>()
 
 const isSelected = computed(() => {
   return props.isParty && gameStore.playerPokemon[gameStore.activePokemonIndex] === props.pokemon
 })
+
+// Handle drag start event with uniqueId
+function handleDragStart(event: DragEvent) {
+  if (!event.dataTransfer) return
+  
+  // Create data object including uniqueId when available
+  const data = {
+    name: props.pokemon.name,
+    level: props.pokemon.level,
+    isParty: props.isParty,
+    uniqueId: props.pokemon.uniqueId // Add uniqueId to properly identify individual Pokémon 
+  }
+  
+  event.dataTransfer.setData('application/json', JSON.stringify(data))
+  emits('dragstart', event)
+}
 
 // Calculate HP percentage for display
 const hpPercentage = computed(() => {
@@ -92,7 +119,7 @@ const hpPercentage = computed(() => {
 
 // Calculate recovery time left
 const recoveryTimeLeft = ref('--:--')
-const recoveryInterval = ref<number | null>(null)
+const recoveryInterval = ref<ReturnType<typeof setInterval> | null>(null)
 
 const updateRecoveryTime = () => {
   if (props.pokemon.recoveryEndTime) {

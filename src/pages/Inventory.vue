@@ -61,10 +61,10 @@ function useItem(item: InventoryItem) {
       >
         <div class="w-16 h-16 flex-shrink-0 mr-4 bg-gray-100 rounded-lg overflow-hidden">
           <img 
-            :src="item.icon" 
+            :src="`/images/${item.id}.png`"
             :alt="item.name"
             class="w-full h-full object-contain"
-            @error="$event.target.src = '/images/crappyball.png'"
+            @error="$event.target.src = '/images/not-found.png'"
           >
         </div>
         

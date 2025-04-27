@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { Pokemon, PokemonType } from '@/types/pokemon.js'
+import { Pokemon, PokemonType, InventoryItem, ItemEffect } from '@/types/pokemon.js'
 import { IdleJob, DEFAULT_IDLE_JOBS } from '@/types/idleJobs.js'
 import { itemFactory } from '@/services/itemFactory'
 import { useInventoryStore } from './inventoryStore'
@@ -13,14 +13,12 @@ interface BattleState {
   isEnemyAttacking: boolean;
   isTryingCatch: boolean;
   battleLogs: Array<{ message: string; type: 'damage' | 'heal' | 'system' }>;
-
-
 }
 
 interface Notification {
   id: string;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
   timestamp: number;
 }
 
@@ -36,7 +34,7 @@ interface GameState {
     pokemon: {
       [key: string]: {
         count: number;
-        data: Pokemon;
+        instances: Pokemon[]; // Store all individual Pokémon instances instead of just a data reference
       }
     }
   };
@@ -63,7 +61,7 @@ export const useGameStore = defineStore('game', {
     playerPokemon: [],
     availablePokemon: [],
     activePokemonIndex: 0,
-    pokeballs: 0,
+    pokeballs: 10,
     currentRegion: 'viridian-forest',
     battle: {
       wildPokemon: null,
@@ -133,6 +131,7 @@ export const useGameStore = defineStore('game', {
       
       return Math.max(1000, job.baseTime - totalReduction); // Minimum 1 second
     },
+    
     getJobSuccessChance: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
@@ -346,11 +345,14 @@ export const useGameStore = defineStore('game', {
 
       const key = pokemon.name;
       if (this.inventory.pokemon[key]) {
+        // Add this specific Pokemon instance to the instances array
         this.inventory.pokemon[key].count++;
+        this.inventory.pokemon[key].instances.push(pokemon);
       } else {
+        // Create a new entry with this Pokemon as the first instance
         this.inventory.pokemon[key] = {
           count: 1,
-          data: pokemon
+          instances: [pokemon]
         };
       }
 
@@ -447,11 +449,19 @@ export const useGameStore = defineStore('game', {
       if (!this.activePokemon) return null
       
       const currentIndex = this.playerPokemon.indexOf(this.activePokemon)
-      const nextPokemon = this.playerPokemon.find((pokemon, index) => 
+      // First try to find a healthy pokemon after the current index
+      let nextPokemon = this.playerPokemon.find((pokemon, index) => 
         index > currentIndex && 
         pokemon.currentHP! > 0 && 
-        !pokemon.faintedAt // Make sure pokemon is not fainted
+        !pokemon.faintedAt
       )
+
+      // If none found after current index, look from beginning up to current index
+      nextPokemon ??= this.playerPokemon.find((pokemon, index) => 
+          index < currentIndex && 
+          pokemon.currentHP! > 0 && 
+          !pokemon.faintedAt
+        );
       
       return nextPokemon || null
     },
@@ -497,6 +507,141 @@ export const useGameStore = defineStore('game', {
         
         this.saveState()
       }
+    },
+
+    // New method to handle item effects
+    applyItemEffect(item: InventoryItem, targetPokemon?: Pokemon) {
+      // If no target specified, use active Pokemon
+      const target = targetPokemon || this.activePokemon;
+      if (!target) {
+        this.addNotification('No active Pokémon to use item on!', 'error');
+        return false;
+      }
+      
+      // Handle different effect types
+      if (item.effect) {
+        switch (item.effect.type) {
+          case 'heal':
+            // Apply healing effect
+            if (target.currentHP === undefined || target.maxHP === undefined) {
+              return false;
+            }
+            
+            // Calculate new HP after healing
+            const newHP = Math.min(target.maxHP, target.currentHP + item.effect.value);
+            this.updatePokemonHP(target, newHP);
+            
+            // Add healing notification
+            const healAmount = newHP - target.currentHP;
+            this.addNotification(
+              `Used ${item.name} on ${target.name}! Healed ${healAmount} HP.`,
+              'success'
+            );
+            
+            // Add to battle log if in battle
+            if (this.battle.battleLogs) {
+              this.addBattleLog(
+                `Used ${item.name} on ${target.name}! Healed ${healAmount} HP.`,
+                'heal'
+              );
+            }
+            return true;
+            
+          case 'catch':
+            // Replaced original pokeball logic with this effect-based approach
+            if (!this.battle.wildPokemon) {
+              this.addNotification('No wild Pokémon to catch!', 'error');
+              return false;
+            }
+            
+            // Use the item's catch rate instead of the simple pokeball algorithm
+            this.addBattleLog(`Threw a ${item.name} at ${this.battle.wildPokemon.name}!`, 'system');
+            
+            const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100;
+            let catchChance = item.effect.catchRate;
+            
+            // Modify catch chance based on HP percentage
+            if (hpPercentage > 50) {
+              catchChance *= 0.5;  // Harder to catch at high HP
+            } else if (hpPercentage < 10) {
+              catchChance *= 3.0;  // Much easier when almost fainted
+            } else if (hpPercentage < 25) {
+              catchChance *= 2.0;  // Easier when low HP
+            }
+            
+            if (Math.random() < catchChance) {
+              this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'system');
+              // Create a copy of the wild Pokemon and add a unique identifier to it
+              const caughtPokemon = { 
+                ...this.battle.wildPokemon,
+                uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+              };
+              this.addPokemonToInventory(caughtPokemon);
+              this.battle.wildPokemon = null;
+              this.startSpawnTimer();
+            } else {
+              this.addBattleLog(`${this.battle.wildPokemon.name} broke free!`, 'system');
+            }
+            return true;
+            
+          case 'status':
+            // Status effect handling placeholder
+            this.addNotification(
+              `Used ${item.name} on ${target.name}! Status effect applied.`,
+              'success'
+            );
+            return true;
+            
+          case 'boost':
+            // Stat boost handling placeholder
+            if (item.effect.stat === 'attack' && target.attack) {
+              target.attack += item.effect.value;
+              this.addNotification(
+                `Used ${item.name} on ${target.name}! Attack increased by ${item.effect.value}.`,
+                'success'
+              );
+              return true;
+            } else if (item.effect.stat === 'defense' && target.defense) {
+              target.defense += item.effect.value;
+              this.addNotification(
+                `Used ${item.name} on ${target.name}! Defense increased by ${item.effect.value}.`,
+                'success'
+              );
+              return true;
+            }
+            return false;
+            
+          default:
+            this.addNotification(`Item effect type not supported: ${(item.effect as any).type}`, 'error');
+            return false;
+        }
+      }
+      
+      return false;
+    },
+
+    // New method to use items from inventory
+    useInventoryItem(item: InventoryItem) {
+      const inventoryStore = useInventoryStore();
+      
+      // First check if item can be used
+      if (!item.usable) {
+        this.addNotification(`${item.name} cannot be used!`, 'error');
+        return false;
+      }
+      
+      // Apply the item effect
+      const effectApplied = this.applyItemEffect(item);
+      
+      if (effectApplied) {
+        // Remove the item from inventory if it's consumable
+        if (item.consumable) {
+          inventoryStore.removeItem(item.id, 1);
+        }
+        return true;
+      }
+      
+      return false;
     },
 
     regenHP() {
@@ -725,32 +870,64 @@ export const useGameStore = defineStore('game', {
     },
 
     async tryCapture() {
-      if (!this.battle.wildPokemon || !this.usePokeball()) return
-
-      this.battle.isTryingCatch = true
-      this.addBattleLog(`Threw a Pokéball at ${this.battle.wildPokemon.name}!`, 'system')
-
-      const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100
-      let catchChance = 0
-
-      if (hpPercentage > 50) {
-        catchChance = Math.max(5 - this.battle.wildPokemon.level!, 1)
-      } else if (hpPercentage < 10) {
-        catchChance = Math.max(55 - this.battle.wildPokemon.level!, 10)
-      } else if (hpPercentage < 25) {
-        catchChance = Math.max(35 - this.battle.wildPokemon.level!, 5)
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      this.battle.isTryingCatch = false
-
-      if (Math.random() * 100 <= catchChance) {
-        this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'system')
-        this.addPokemonToInventory({ ...this.battle.wildPokemon })
-        this.battle.wildPokemon = null
-        this.startSpawnTimer()
+      if (!this.battle.wildPokemon) return;
+      
+      // Get pokeballs from inventory
+      const inventoryStore = useInventoryStore();
+      const pokeballs = inventoryStore.getItemsByType('pokeball');
+      
+      if (pokeballs.length === 0) {
+        // Fall back to legacy pokeball system
+        if (!this.usePokeball()) {
+          this.addNotification("You don't have any Pokéballs!", 'error');
+          return;
+        }
+        
+        this.battle.isTryingCatch = true;
+        this.addBattleLog(`Threw a Pokéball at ${this.battle.wildPokemon.name}!`, 'system');
+        
+        const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100;
+        let catchChance = 0;
+        
+        if (hpPercentage > 50) {
+          catchChance = Math.max(5 - this.battle.wildPokemon.level!, 1);
+        } else if (hpPercentage < 10) {
+          catchChance = Math.max(55 - this.battle.wildPokemon.level!, 10);
+        } else if (hpPercentage < 25) {
+          catchChance = Math.max(35 - this.battle.wildPokemon.level!, 5);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        this.battle.isTryingCatch = false;
+        
+        if (Math.random() * 100 <= catchChance) {
+          this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'system');
+          // Create a copy of the wild Pokemon and add a unique identifier to it
+          const caughtPokemon = { 
+            ...this.battle.wildPokemon,
+            uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+          };
+          this.addPokemonToInventory(caughtPokemon);
+          this.battle.wildPokemon = null;
+          this.startSpawnTimer();
+        } else {
+          this.addBattleLog(`${this.battle.wildPokemon.name} broke free!`, 'system');
+        }
       } else {
-        this.addBattleLog(`${this.battle.wildPokemon.name} broke free!`, 'system')
+        // Use the first pokeball from inventory
+        const pokeball = pokeballs[0];
+        this.battle.isTryingCatch = true;
+        
+        // Apply the item effect which handles the catch logic
+        const result = this.applyItemEffect(pokeball);
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        this.battle.isTryingCatch = false;
+        
+        if (result) {
+          // Remove the pokeball if successful
+          inventoryStore.removeItem(pokeball.id, 1);
+        }
       }
     },
 
@@ -932,6 +1109,7 @@ export const useGameStore = defineStore('game', {
       
       this.saveState();
     },
+    
     moveToParty(pokemon: Pokemon, targetSlotIndex?: number) {
       if (this.playerPokemon.length >= 6) {
         return false; // Party is full
@@ -985,7 +1163,7 @@ export const useGameStore = defineStore('game', {
     },
 
     // Notification methods
-    addNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+    addNotification(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
       const notification: Notification = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         message,
