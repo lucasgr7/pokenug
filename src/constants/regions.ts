@@ -53,7 +53,8 @@ const regions = {
       { id: 90, name: 'Shellder', probability: 1 },      // Super rare (1%)
       { id: 43, name: 'Oddish', probability: 15 },       // Common (15%)
       { id: 69, name: 'Bellsprout', probability: 15 },   // Common (15%)
-      { id: 114, name: 'Tangela', probability: 5 }       // Rare (5%)
+      { id: 114, name: 'Tangela', probability: 5 },       // Rare (5%)
+      { id: 1, name: 'Bulbasaur', probability: 4 }, // Super rare (1%)
     ]
   }
 } as const;

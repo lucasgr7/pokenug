@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import { Pokemon, PokemonType } from '../types/pokemon.js'
-import { IdleJob, DEFAULT_IDLE_JOBS } from '../types/idleJobs.js'
-import { itemFactory } from '../services/itemFactory'
+import { Pokemon, PokemonType } from '@/types/pokemon.js'
+import { IdleJob, DEFAULT_IDLE_JOBS } from '@/types/idleJobs.js'
+import { itemFactory } from '@/services/itemFactory'
 import { useInventoryStore } from './inventoryStore'
-import regions from '../constants/regions.js'
+import regions from '@/constants/regions.js'
 
 interface BattleState {
   wildPokemon: Pokemon | null;
@@ -63,7 +63,7 @@ export const useGameStore = defineStore('game', {
     playerPokemon: [],
     availablePokemon: [],
     activePokemonIndex: 0,
-    pokeballs: 50,
+    pokeballs: 0,
     currentRegion: 'viridian-forest',
     battle: {
       wildPokemon: null,

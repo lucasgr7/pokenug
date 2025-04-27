@@ -222,14 +222,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useGameStore } from '../stores/gameStore'
-import { usePokemon } from '../composables/usePokemon'
-import { useInventory } from '../composables/useInventory'
-import { tickSystem } from '../services/tickSystem'
-import BattleLog from '../components/BattleLog.vue'
-import XPBar from '../components/XPBar.vue'
-import type { Pokemon, InventoryItem } from '../types/pokemon'
-import regions from '../constants/regions'
+import { useGameStore } from '@/stores/gameStore'
+import { usePokemon } from '@/composables/usePokemon'
+import { useInventory } from '@/composables/useInventory'
+import { tickSystem } from '@/services/tickSystem'
+import BattleLog from '@/components/BattleLog.vue'
+import XPBar from '@/components/XPBar.vue'
+import type { Pokemon, InventoryItem } from '@/types/pokemon'
+import regions from '@/constants/regions'
 
 // Store and Pokemon data
 const gameStore = useGameStore()

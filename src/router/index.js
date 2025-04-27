@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Explore from '../pages/Explore.vue'
-import IdleJobs from '../pages/IdleJobs.vue'
-import Inventory from '../pages/Inventory.vue'
-import Pokedex from '../pages/Pokedex.vue'
-import PokemonDebug from '../components/PokemonDebug.vue'
+import Explore from '@/pages/Explore.vue'
+import IdleJobs from '@/pages/IdleJobs.vue'
+import Inventory from '@/pages/Inventory.vue'
+import Pokedex from '@/pages/Pokedex.vue'
+import PokemonDebug from '@/components/PokemonDebug.vue'
 
 const routes = [
   {

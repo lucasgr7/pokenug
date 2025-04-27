@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { InventoryItem, ItemType } from '../types/pokemon'
+import type { InventoryItem, ItemType } from '@/types/pokemon'
 
 interface InventoryState {
   items: Record<string, InventoryItem>;
@@ -23,7 +23,7 @@ export const useInventoryStore = defineStore('inventory', {
     },
     
     getPokeballs: (state) => {
-      return Object.values(state.items).filter(item => item.type === 'pokeball')
+      return Object.values(state.items).filter(item => item.type === ItemType.Pokeball)
     },
     
     getItemQuantity: (state) => (itemId: string) => {

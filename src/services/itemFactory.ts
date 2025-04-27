@@ -1,4 +1,4 @@
-import type { InventoryItem, ItemFactory, ItemRarity, ItemType } from '../types/pokemon';
+import type { InventoryItem, ItemFactory, ItemRarity, ItemType } from '@/types/pokemon';
 
 // Utility to generate unique IDs
 function generateId(prefix: string): string {

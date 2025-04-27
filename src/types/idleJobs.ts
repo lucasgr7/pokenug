@@ -1,5 +1,5 @@
 // filepath: c:\GIT\pokengu\src\src\types\idleJobs.ts
-import { Pokemon, PokemonType } from './pokemon';
+import { Pokemon, PokemonType } from './pokemon.js';
 
 export interface IdleJob {
   id: string;
@@ -72,7 +72,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     successfulCompletions: 0,
     icon: '/images/crappyball.png',
     backgroundColor: TYPE_COLORS[PokemonType.Bug],
-    percentualProgressWithAdditionalPokemon: 0.06 // 5% progress per additional Pokemon
+    percentualProgressWithAdditionalPokemon: 0.10 // 5% progress per additional Pokemon
   },
   'potion-brewing': {
     id: 'potion-brewing',
@@ -82,10 +82,10 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 3,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 50000, // 50 seconds in milliseconds
+    baseTime: 1200000, // 50 seconds in milliseconds
     reward: {
       type: 'potion',
-      chance: 0.25, // 25% chance
+      chance: 0.05, // 25% chance
       itemDetails: {
         name: 'Simple Potion',
         description: 'A basic potion that restores a small amount of HP',
@@ -100,16 +100,16 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
   },
   'berry-gathering': {
     id: 'berry-gathering',
-    type: PokemonType.Normal,
+    type: PokemonType.Flying,
     name: 'Gather Berries',
     description: 'Normal Pokemon gather berries from nearby areas',
     maxSlots: 4,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 45000, // 45 seconds in milliseconds
+    baseTime: 120000, // 45 seconds in milliseconds
     reward: {
       type: 'berry',
-      chance: 0.4, // 40% chance
+      chance: 0.25, // 40% chance
       itemDetails: {
         name: 'Pecha Berry',
         description: 'A sweet berry that can heal poison',
@@ -119,7 +119,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     completions: 0,
     successfulCompletions: 0,
     icon: '/public/images/berry.png', // You'll need to add this image
-    backgroundColor: TYPE_COLORS[PokemonType.Normal],
+    backgroundColor: TYPE_COLORS[PokemonType.Flying],
     percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
     
   },
@@ -131,7 +131,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 3,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 70000, // 70 seconds in milliseconds
+    baseTime: 360000, // 70 seconds in milliseconds
     reward: {
       type: 'material',
       chance: 0.35, // 35% chance

@@ -1,6 +1,6 @@
-import { useInventoryStore } from '../stores/inventoryStore'
-import { itemFactory } from '../services/itemFactory'
-import type { InventoryItem, ItemType } from '../types/pokemon'
+import { useInventoryStore } from '@/stores/inventoryStore'
+import { itemFactory } from '@/services/itemFactory'
+import type { InventoryItem, ItemType } from '@/types/pokemon'
 
 export function useInventory() {
   const inventoryStore = useInventoryStore()

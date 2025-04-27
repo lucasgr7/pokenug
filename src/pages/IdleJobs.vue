@@ -227,7 +227,7 @@ function getTotalLevels(jobId: string): number {
                 @mouseout="hideTooltip"
               >
                 <span class="font-bold">
-                  Current: {{ formatPercent(gameStore.getJobSuccessChance(String(id))) }}
+                  Success rate: {{ formatPercent(gameStore.getJobSuccessChance(String(id))) }}
                 </span>
               </div>
             </div>
