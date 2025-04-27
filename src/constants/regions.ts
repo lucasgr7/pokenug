@@ -69,7 +69,14 @@ const regions = {
     pool: [
       //bulbasaur
       {id: 1, name: 'Bulbasaur', probability: 5},
-      {id: 2, name: 'Ivysaur', probability: 2.5}
+      {id: 2, name: 'Ivysaur', probability: 2.5},
+      {id: 147, name: 'Dratini', probability: 1},
+      {id: 148, name: 'Dragonair', probability: 0.5},
+      {id: 4, name: 'Charmander', probability: 5},
+      {id: 5, name: 'Charmeleon', probability: 2.5},
+      {id: 58, name: 'Growlithe', probability: 10},
+      {id: 59, name: 'Arcanine', probability: 5},
+      {id: 126, name: 'Magmar', probability: 7.5}
     ]
   },
 } as const;

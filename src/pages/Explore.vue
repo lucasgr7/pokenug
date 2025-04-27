@@ -135,17 +135,20 @@
             alt="Region Background"
             class="absolute inset-0 w-full h-full object-cover opacity-80"
           />
-          <!-- Pokemon image on top of background -->
-          <img
-            :src="wildPokemon.sprite"
-            alt="Wild Pokemon"
-            class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 transition-transform duration-200 z-10"
-            :class="{ 
-              'animate-damage': isWildPokemonHurt, 
-              'animate-enemy-attack': isEnemyAttacking,
-              'animate-catch': isTryingCatch 
-            }"
-          >
+          <!-- Pokemon container with fixed position -->
+          <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 z-10">
+            <!-- Pokemon image inside container -->
+            <img
+              :src="wildPokemon.sprite"
+              alt="Wild Pokemon"
+              class="w-full h-full transition-transform duration-200"
+              :class="{ 
+                'animate-damage': isWildPokemonHurt, 
+                'animate-enemy-attack': isEnemyAttacking,
+                'animate-catch': isTryingCatch 
+              }"
+            >
+          </div>
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2 absolute bottom-2 left-0 right-0">
             <span
