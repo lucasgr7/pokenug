@@ -13,9 +13,10 @@ const regions = {
       { id: 14, name: 'Kakuna', probability: 15 },     // Uncommon (15%)
       { id: 25, name: 'Pikachu', probability: 0.5 },     // Very rare (3%)
       { id: 133, name: 'Eevee', probability: 0.5 },     // Very rare (3%)
-      { id: 16, name: 'Pidgey', probability: 7 },       // Uncommon (7%)
-      { id: 43, name: 'oddish', probability: 7 }, // Very rare (2%)
-      { id: 69, name: 'Bellsprout', probability: 7 } // Very rare (2%)
+      { id: 16, name: 'Pidgey', probability: 5 },       // Uncommon (7%)
+      { id: 43, name: 'oddish', probability: 5 }, // Very rare (2%)
+      { id: 69, name: 'Bellsprout', probability: 7 }, // Very rare (2%)
+      { id: 102, name: 'exeggcute', probability: 7 }, // Very rare (2%)
     ]
   },
   'cerulean-cave (10-15)': {
@@ -56,8 +57,20 @@ const regions = {
       { id: 43, name: 'Oddish', probability: 15 },       // Common (15%)
       { id: 69, name: 'Bellsprout', probability: 15 },   // Common (15%)
       { id: 114, name: 'Tangela', probability: 5 },       // Rare (5%)
-      { id: 1, name: 'Bulbasaur', probability: 4 }, // Super rare (1%)
+      { id: 1, name: 'Squirtle', probability: 4 }, // Super rare (1%)
     ]
-  }
+  },
+  'Mountains (30-50)': {
+    name: 'Mountains (Lvl 30-50)',
+    minLevel: 30,
+    maxLevel: 50,
+    encounterRate: 20,
+    spawnTimer: 14, // 30 seconds
+    pool: [
+      //bulbasaur
+      {id: 1, name: 'Bulbasaur', probability: 5},
+      {id: 2, name: 'Ivysaur', probability: 2.5}
+    ]
+  },
 } as const;
 export default regions;

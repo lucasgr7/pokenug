@@ -128,11 +128,18 @@
       <!-- Wild Pokemon Panel -->
       <div v-if="wildPokemon" class="bg-red-50 p-4 rounded-lg shadow">
         <div class="text-center mb-2 font-bold">Wild Pokémon</div>
-        <div class="relative">
+        <div class="relative h-48 overflow-hidden rounded-lg mb-2">
+          <!-- Background image based on region -->
+          <img 
+            :src="getRegionBackgroundImage(gameStore.currentRegion)"
+            alt="Region Background"
+            class="absolute inset-0 w-full h-full object-cover opacity-80"
+          />
+          <!-- Pokemon image on top of background -->
           <img
             :src="wildPokemon.sprite"
             alt="Wild Pokemon"
-            class="w-32 h-32 mx-auto transition-transform duration-200"
+            class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 transition-transform duration-200 z-10"
             :class="{ 
               'animate-damage': isWildPokemonHurt, 
               'animate-enemy-attack': isEnemyAttacking,
@@ -140,7 +147,7 @@
             }"
           >
           <!-- Type Tags -->
-          <div class="flex justify-center gap-2 my-2">
+          <div class="flex justify-center gap-2 my-2 absolute bottom-2 left-0 right-0">
             <span
               v-for="type in wildPokemon.types"
               :key="type"
@@ -150,26 +157,26 @@
               {{ type }}
             </span>
           </div>
-          <!-- HP Bar -->
-          <div class="mt-2">
-            <div class="text-sm text-gray-700 flex justify-between items-center">
-              <div>
-                <span class="capitalize">{{ wildPokemon.name }}</span>
-                <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">Lvl {{ wildPokemon.level }}</span>
-              </div>
-              <span>{{ wildPokemon.currentHP }}/{{ wildPokemon.maxHP }}</span>
+        </div>
+        <!-- HP Bar -->
+        <div class="mt-2">
+          <div class="text-sm text-gray-700 flex justify-between items-center">
+            <div>
+              <span class="capitalize">{{ wildPokemon.name }}</span>
+              <span class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full">Lvl {{ wildPokemon.level }}</span>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                class="h-2.5 rounded-full transition-all duration-300"
-                :class="{
-                  'bg-green-600': (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 25,
-                  'bg-yellow-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 25 && (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 10,
-                  'bg-red-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 10
-                }"
-                :style="{ width: (wildPokemon.currentHP / wildPokemon.maxHP * 100) + '%' }"
-              ></div>
-            </div>
+            <span>{{ wildPokemon.currentHP }}/{{ wildPokemon.maxHP }}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              class="h-2.5 rounded-full transition-all duration-300"
+              :class="{
+                'bg-green-600': (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 25,
+                'bg-yellow-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 25 && (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 10,
+                'bg-red-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 10
+              }"
+              :style="{ width: (wildPokemon.currentHP / wildPokemon.maxHP * 100) + '%' }"
+            ></div>
           </div>
         </div>
       </div>
@@ -687,6 +694,18 @@ const getTypeColor = (type: string) => {
     fairy: 'bg-pink-400'
   }
   return colors[type.toLowerCase()] || 'bg-gray-400'
+}
+
+// Add this function to map regions to background images
+const getRegionBackgroundImage = (regionId: string) => {
+  const backgroundMap: Record<string, string> = {
+    'viridian-forest': '/images/backgrounds/viridian-palace.png',
+    'cerulean-cave (10-15)': '/images/backgrounds/cave.png',
+    // Default to viridian for other regions until more backgrounds are available
+    'beach-zone (15-25)': '/images/backgrounds/beach.png'
+  }
+  
+  return backgroundMap[regionId] || '/images/backgrounds/viridian-palace.png'
 }
 </script>
 
