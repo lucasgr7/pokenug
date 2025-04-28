@@ -118,6 +118,27 @@ function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+// Format remaining time in a human-readable format (dd hh:mm:ss)
+function formatTimeRemaining(milliseconds: number): string {
+  const totalSeconds = Math.round(milliseconds / 1000);
+  
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  // Build the time string based on what values are non-zero
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  } else if (minutes > 0) {
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
 // Calculate level-based speed boost for a job
 function getLevelSpeedBoost(jobId: string): number {
   const job = gameStore.idleJobs[jobId];
@@ -332,7 +353,7 @@ function getTotalLevels(jobId: string): number {
                       @mouseout="hideTooltip"
                     >
                       <span class="font-bold">
-                        Time: {{ Math.round((gameStore.getJobRemainingTime(String(id)) / 1000)) }}s
+                        Time: {{ formatTimeRemaining(gameStore.getJobRemainingTime(String(id))) }}
                       </span>
                     </div>
                   </div>

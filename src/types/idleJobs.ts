@@ -107,7 +107,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     type: PokemonType.Poison,
     name: 'Toxic Emblem Training',
     description: 'Train your Poison Pokemon to enhance your battle skills. Increases XP gained per attack.',
-    maxSlots: 6,
+    maxSlots: 4,
     assignedPokemon: [],
     progress: 0,
     baseTime: 300000, // 5 minutes in milliseconds
