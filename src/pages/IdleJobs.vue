@@ -11,6 +11,20 @@ const verticalMode = ref(true)
 const columnSize = ref(2)
 const showParty = ref(true)
 
+// Filtrar apenas os jobs com tipos de Pokémon que o jogador possui
+const availableJobs = computed(() => {
+  const allJobs = gameStore.idleJobs;
+  const filteredJobs: Record<string, typeof allJobs[keyof typeof allJobs]> = {};
+  
+  Object.entries(allJobs).forEach(([id, job]) => {
+    if (gameStore.hasAnyPokemonOfType(job.type)) {
+      filteredJobs[id] = job;
+    }
+  });
+  
+  return filteredJobs;
+});
+
 // Tooltip functionality
 const showTooltip = ref(false)
 const tooltipContent = ref('')
@@ -176,7 +190,7 @@ function getTotalLevels(jobId: string): number {
           <!-- Jobs Area - Grid Layout with Type-Based Colors -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
             <div 
-              v-for="(job, id) in gameStore.idleJobs" 
+              v-for="(job, id) in availableJobs" 
               :key="id" 
               class="rounded-lg shadow-md overflow-hidden transition-transform hover:scale-102"
               :style="{ 

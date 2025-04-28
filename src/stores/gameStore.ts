@@ -92,6 +92,17 @@ export const useGameStore = defineStore('game', {
     getAllPokemon: (state) => [...state.playerPokemon, ...state.availablePokemon],
     getAvailablePokemonCount: (state) => state.availablePokemon.length,
     getPartyCount: (state) => state.playerPokemon.length,
+    hasAnyPokemonOfType: (state) => (type: PokemonType) => {
+      // Check in player party
+      const inParty = state.playerPokemon.some(pokemon => 
+        pokemon.types && pokemon.types.includes(type));
+      
+      // Check in available Pokémon
+      const inAvailable = state.availablePokemon.some(pokemon => 
+        pokemon.types && pokemon.types.includes(type));
+        
+      return inParty || inAvailable;
+    },
     getJobTimeReduction: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
