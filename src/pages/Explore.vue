@@ -47,6 +47,79 @@
       </div>
     </div>
 
+    <!-- Berry Tasks Display - Grid layout -->
+    <div v-if="activeTasks.length > 0" class="mb-4 bg-green-50 p-3 rounded-lg">
+      <h3 class="font-semibold text-green-700 mb-2">Active Berry Tasks</h3>
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+        <div 
+          v-for="task in activeTasks" 
+          :key="task.id" 
+          class="border border-green-100 rounded-md p-2 bg-white"
+        >
+          <!-- Berry header with icon and info -->
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center">
+              <BerryIcon
+                :berry="task.berryId"
+                size="sm"
+                :name="task.berryName"
+                with-border
+              />
+              <div class="ml-2">
+                <div class="font-medium text-sm">{{ task.berryName }}</div>
+                <div class="text-xs text-gray-500">{{ getRegionName(task.regionId) }}</div>
+              </div>
+            </div>
+            <button 
+              @click="cancelBerryTask(task.id)" 
+              class="text-red-400 hover:text-red-600 text-sm p-1"
+              title="Cancel task"
+            >
+              &times;
+            </button>
+          </div>
+          
+          <!-- Progress bar and time -->
+          <div class="space-y-1">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-amber-700 font-medium">{{ formatRemainingTime(getRemainingTime(task.id)) }}</span>
+              <span class="text-gray-500">{{ Math.round(getProgressPercentage(task)) }}%</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+              <div
+                class="bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                :style="{ width: getProgressPercentage(task) + '%' }"
+              ></div>
+            </div>
+          </div>
+          
+          <!-- Potential catches - collapsible section -->
+          <div class="mt-2">
+            <details class="text-xs">
+              <summary class="text-gray-600 cursor-pointer">Potential catches</summary>
+              <div class="pt-1 flex flex-wrap gap-1">
+                <span 
+                  v-for="pokemon in getPotentialPokemon(task.regionId).slice(0, 5)" 
+                  :key="pokemon.id"
+                  class="px-1.5 py-0.5 bg-gray-100 rounded-full inline-flex items-center"
+                >
+                  {{ pokemon.name }}
+                  <span class="ml-1 text-gray-500 text-[10px]">({{ Math.round(pokemon.probability) }}%)</span>
+                </span>
+                <span 
+                  v-if="getPotentialPokemon(task.regionId).length > 5" 
+                  class="px-1.5 py-0.5 bg-gray-100 rounded-full text-gray-500"
+                >
+                  +{{ getPotentialPokemon(task.regionId).length - 5 }} more
+                </span>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Battle Area -->
     <div class="grid grid-cols-3 gap-4">
       <!-- Player Pokemon Panel -->
@@ -122,6 +195,13 @@
           class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
         >
           Try Capture
+        </button>
+        <!-- New Berry Button -->
+        <button
+          @click="openBerrySelector"
+          class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+        >
+          Use Berry
         </button>
       </div>
 
@@ -225,6 +305,47 @@
       </div>
     </div>
 
+    <!-- Berry Selector Modal -->
+    <div v-if="showBerrySelector" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">Select a Berry</h3>
+        
+        <div v-if="availableBerries.length === 0" class="text-center py-4 text-gray-500">
+          You don't have any berry items that can catch Pokémon automatically.
+        </div>
+
+        <div v-else class="grid grid-cols-1 gap-3">
+          <div 
+            v-for="berry in availableBerries" 
+            :key="berry.id"
+            class="border rounded-lg p-3 flex items-center hover:bg-gray-100 cursor-pointer"
+            @click="selectBerry(berry)"
+          >
+            <div class="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded-lg overflow-hidden">
+              <img 
+                :src="berry.icon" 
+                :alt="berry.name"
+                class="w-full h-full object-contain"
+                @error="$event.target.src = '/images/berry.png'"
+              >
+            </div>
+            
+            <div class="flex-1">
+              <div class="font-medium">{{ berry.name }} <span class="text-sm text-gray-500">({{ berry.quantity }})</span></div>
+              <div class="text-xs text-gray-600">{{ berry.description }}</div>
+            </div>
+          </div>
+        </div>
+        
+        <button 
+          @click="showBerrySelector = false"
+          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+
     <!-- Battle Log -->
     <BattleLog :logs="battleLogs" />
   </div>
@@ -235,17 +356,22 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { usePokemon } from '@/composables/usePokemon'
 import { useInventory } from '@/composables/useInventory'
+import { usePokemonCapture } from '@/composables/usePokemonCapture'
 import { tickSystem } from '@/services/tickSystem'
+import { berryService } from '@/services/berryService'
 import BattleLog from '@/components/BattleLog.vue'
 import XPBar from '@/components/XPBar.vue'
+import BerryIcon from '@/components/BerryIcon.vue'
 import type { Pokemon, InventoryItem } from '@/types/pokemon'
 import regions from '@/constants/regions'
+import items from '@/constants/items'
 import { useRouter } from 'vue-router'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
 const { findById } = usePokemon()
 const inventory = useInventory()
+const { attemptCapture, isTryingCatch } = usePokemonCapture()
 
 // Battle state
 const wildPokemon = ref<Pokemon | null>(null)
@@ -256,14 +382,25 @@ const isRecovering = ref(false)
 const recoveryProgress = ref(0)
 const battleLogs = ref<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>([])
 const isEnemyAttacking = ref(false)
-const isTryingCatch = ref(false)
 const showPokeballSelector = ref(false)
 const selectedPokeball = ref<InventoryItem | null>(null)
 const router = useRouter()
 
+// Berry system state
+const showBerrySelector = ref(false)
+const activeTasks = ref<any[]>([])
+
 // Get available pokeballs from inventory
 const availablePokeballs = computed(() => {
   return inventory.getItemsByType('pokeball')
+})
+
+// Get available berries from inventory
+const availableBerries = computed(() => {
+  return inventory.getItemsByType('berries').filter(berry => {
+    const definition = inventory.getItemDefinition(berry.id)
+    return definition?.effect?.type === 'auto-catch'
+  })
 })
 
 // Total pokeball count
@@ -273,7 +410,9 @@ const totalPokeballs = computed(() => {
 
 // Add computed property for HP percentage
 const hpPercentage = computed(() => {
-  if (!gameStore.activePokemon) return 0
+  if (!gameStore.activePokemon || gameStore.activePokemon.currentHP === undefined || gameStore.activePokemon.maxHP === undefined) {
+    return 0
+  }
   return Math.floor((gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100)
 })
 
@@ -306,63 +445,84 @@ function openPokeballSelector() {
   showPokeballSelector.value = true
 }
 
+// Handle showing the berry selector
+function openBerrySelector() {
+  showBerrySelector.value = true
+}
+
+// Select a berry to use
+function selectBerry(berry: InventoryItem) {
+  showBerrySelector.value = false
+  
+  const berryDefinition = inventory.getItemDefinition(berry.id)
+  if (!berryDefinition) {
+    gameStore.addNotification(`Error: Could not find the berry definition`, 'error')
+    return
+  }
+  
+  // Use the berry in the current region
+  berryService.startBerryTask(berryDefinition, gameStore.currentRegion)
+  
+  // Update the active tasks list
+  updateActiveTasks()
+}
+
+// Get remaining time for a berry task
+function getRemainingTime(taskId: string) {
+  return berryService.getRemainingTime(taskId)
+}
+
+// Format remaining time to human-readable string
+function formatRemainingTime(ms: number) {
+  const minutes = Math.floor(ms / (1000 * 60))
+  const seconds = Math.floor((ms % (1000 * 60)) / 1000)
+  
+  return `${minutes}m ${seconds}s`
+}
+
+// Cancel a berry task
+function cancelBerryTask(taskId: string) {
+  berryService.cancelTask(taskId)
+  updateActiveTasks()
+}
+
+// Update the active tasks list
+function updateActiveTasks() {
+  activeTasks.value = berryService.getActiveTasksForRegion(gameStore.currentRegion)
+}
+
 // Perform the actual capture attempt with the selected pokeball
 async function performCapture(ball: InventoryItem) {
   if (!wildPokemon.value) return
   
-  // Extract catch rate from the pokeball (default to 0.1 if not found)
-  const catchRate = (ball as any)?.catchRate || 0.1
+  // Get the item definition for the ball from constants
+  const ballDefinition = inventory.getItemDefinition(ball.id)
   
-  isTryingCatch.value = true
+  if (!ballDefinition) {
+    battleLogs.value.push({
+      message: `Error: Could not find the ball definition`,
+      type: 'system'
+    })
+    return
+  }
+  
   battleLogs.value.push({
     message: `Threw a ${ball.name} at ${wildPokemon.value.name}!`,
     type: 'system'
   })
+  // Use the capture composable to attempt the capture
+  const result = await attemptCapture(wildPokemon.value, ballDefinition)
   
-  // Use the item from inventory
-  if (!inventory.useItem(ball.id)) {
-    battleLogs.value.push({
-      message: `No ${ball.name}s left!`,
-      type: 'system'
-    })
-    isTryingCatch.value = false
-    return
-  }
-
-  // Calculate catch chance based on HP percentage and the pokeball's catch rate
-  const hpPercentage = (wildPokemon.value.currentHP! / wildPokemon.value.maxHP!) * 100
-  let baseCatchChance = 0
-
-  if (hpPercentage > 50) {
-    baseCatchChance = Math.max(5 - wildPokemon.value.level!, 1)
-  } else if (hpPercentage < 10) {
-    baseCatchChance = Math.max(55 - wildPokemon.value.level!, 10)
-  } else if (hpPercentage < 25) {
-    baseCatchChance = Math.max(35 - wildPokemon.value.level!, 5)
-  }
+  // Add the result message to battle logs
+  battleLogs.value.push({
+    message: result.message,
+    type: 'system'
+  })
   
-  // Apply the pokeball's catch rate modifier
-  const finalCatchChance = baseCatchChance * (1 + catchRate * 10)
-
-  // Wait for animation
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  isTryingCatch.value = false
-
-  // Check if catch successful
-  if (Math.random() * 100 <= finalCatchChance) {
-    battleLogs.value.push({
-      message: `Caught ${wildPokemon.value.name}!`,
-      type: 'system'
-    })
-    
-    gameStore.addPokemonToInventory({ ...wildPokemon.value })
+  // If the capture was successful, clear the wild Pokemon and restart spawn timer
+  if (result.success) {
     wildPokemon.value = null
     startSpawnTimer()
-  } else {
-    battleLogs.value.push({
-      message: `${wildPokemon.value.name} broke free!`,
-      type: 'system'
-    })
   }
 }
 
@@ -656,6 +816,25 @@ onMounted(() => {
       gameStore.pokeballs = 0 // Reset the old counter
     }
   }
+
+  // Add some test berries if in development mode
+  if (IS_DEVELOPMENT) {
+    const existingBerries = inventory.getItemsByType('berries')
+    const hasLureBerries = existingBerries.some(berry => berry.id === 'lure-berry')
+    if (!hasLureBerries) {
+      inventory.addItem({
+        ...items['lure-berry'],
+        quantity: 5
+      })
+      inventory.addItem({
+        ...items['great-lure-berry'],
+        quantity: 2
+      })
+    }
+  }
+
+  // Update active berry tasks for the current region
+  updateActiveTasks()
   
   // Subscribe to tick system
   unsubscribe = tickSystem.subscribe((elapsed) => {
@@ -665,6 +844,9 @@ onMounted(() => {
         tryPokemonRun()
       }
     }
+    
+    // Update active tasks list every tick
+    updateActiveTasks()
   })
 })
 
@@ -705,10 +887,65 @@ const getRegionBackgroundImage = (regionId: string) => {
     'viridian-forest': '/images/backgrounds/viridian-palace.png',
     'cerulean-cave (10-15)': '/images/backgrounds/cave.png',
     // Default to viridian for other regions until more backgrounds are available
-    'beach-zone (15-25)': '/images/backgrounds/beach.png'
+    'beach-zone (15-25)': '/images/backgrounds/beach.png',
+    'Mountains (30-50)': '/images/backgrounds/mountains.png',
+
   }
   
   return backgroundMap[regionId] || '/images/backgrounds/viridian-palace.png'
+}
+
+// Add the handleRegionChange function
+const handleRegionChange = () => {
+  // Reset encounter when region changes
+  wildPokemon.value = null
+  startSpawnTimer()
+  
+  // Update logs
+  battleLogs.value.push({
+    message: `Moved to ${gameStore.currentRegionData.name}`,
+    type: 'system'
+  })
+
+  // Update active berry tasks when region changes
+  updateActiveTasks()
+}
+
+// Get the berry icon URL
+function getBerryIcon(berryId: string) {
+  const berryDefinition = inventory.getItemDefinition(berryId)
+  return berryDefinition?.icon || '/images/berry.png'
+}
+
+// Get region name from region ID
+function getRegionName(regionId: string) {
+  return regions[regionId as keyof typeof regions]?.name || regionId
+}
+
+// Calculate progress percentage for a task
+function getProgressPercentage(task: any) {
+  const totalDuration = task.endTime - task.startTime
+  const elapsed = Date.now() - task.startTime
+  return Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
+}
+
+// Get potential Pokémon that could be caught from a region's berry pool
+function getPotentialPokemon(regionId: string) {
+  const region = regions[regionId as keyof typeof regions]
+  if (!region) return []
+  
+  // Use the berry pool if available, otherwise use the regular pool
+  const pool = region.berryPool || region.pool
+  
+  // Calculate total probability for percentage calculation
+  const totalProbability = pool.reduce((sum, pokemon) => sum + (pokemon.probability || 1), 0)
+  
+  // Return formatted list with percentages
+  return pool.map(pokemon => ({
+    id: pokemon.id,
+    name: pokemon.name,
+    probability: (pokemon.probability / totalProbability) * 100
+  }))
 }
 </script>
 

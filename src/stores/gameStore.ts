@@ -611,6 +611,12 @@ export const useGameStore = defineStore('game', {
             }
             return false;
             
+          case 'auto-catch':
+            // Auto-catch berries are handled by the berryService
+            // Just return true to indicate the item was used successfully
+            this.addNotification(`You used a ${item.name}. It will attract Pokémon over time.`, 'success');
+            return true;
+            
           default:
             this.addNotification(`Item effect type not supported: ${(item.effect as any).type}`, 'error');
             return false;

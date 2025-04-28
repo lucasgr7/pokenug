@@ -17,6 +17,13 @@ const regions = {
       { id: 43, name: 'oddish', probability: 5 }, // Very rare (2%)
       { id: 69, name: 'Bellsprout', probability: 7 }, // Very rare (2%)
       { id: 102, name: 'exeggcute', probability: 7 }, // Very rare (2%)
+    ],
+    berryPool: [
+      { id: 19, name: 'rattata', probability: 10 }, // Common with berry (30%)
+      { id: 20, name: 'raticate', probability: 8 },     // Common with berry (25%) 
+      { id: 133, name: 'Eevee', probability: 5 },     // Very rare (3%)
+      { id: 25, name: 'Pikachu', probability: 5 },    // Uncommon with berry (15%)
+      { id: 143, name: 'snorlax', probability: 2 }       // Rare with berry (5%)
     ]
   },
   'cerulean-cave (10-15)': {
@@ -34,6 +41,13 @@ const regions = {
       { id: 104, name: 'Cubone', probability: 5 },      // Very rare (5%)
       { id: 12, name: 'Butterfree', probability: 5 },  // Rare (5%)
       { id: 15, name: 'Beedrill', probability: 5 }    // Rare (5%)
+    ],
+    berryPool: [
+      { id: 92, name: 'gastly', probability: 30 },       // Common with berry (30%)
+      { id: 93, name: 'haunter', probability: 25 },    // Common with berry (25%)
+      { id: 23, name: 'ekans', probability: 15 }, // Common with berry (25%)
+      { id: 24, name: 'arbok', probability: 8 },    // Common with berry (20%)
+      { id: 109, name: 'koffing', probability: 8 }    // Common with berry (20%)
     ]
   },
   'beach-zone (15-25)': {
@@ -44,7 +58,6 @@ const regions = {
     spawnTimer: 10, // 30 seconds
     pool: [
       { id: 15, name: 'Beedrill', probability: 5 },     // Rare (5%)
-      { id: 25, name: 'Pikachu', probability: 5 },      // Rare (5%)
       { id: 16, name: 'Pidgey', probability: 10 },      // Uncommon (10%)
       { id: 41, name: 'Zubat', probability: 10 },       // Uncommon (10%)
       { id: 42, name: 'Golbat', probability: 5 },       // Rare (5%)
@@ -57,11 +70,20 @@ const regions = {
       { id: 43, name: 'Oddish', probability: 15 },       // Common (15%)
       { id: 69, name: 'Bellsprout', probability: 15 },   // Common (15%)
       { id: 114, name: 'Tangela', probability: 5 },       // Rare (5%)
-      { id: 1, name: 'Squirtle', probability: 4 }, // Super rare (1%)
+      { id: 118, name: 'Goldeen', probability: 5 },       // Rare (5%)
+      
+    ],
+    berryPool: [
+      { id: 1, name: 'Squirtle', probability: 10 }, // Super rare (1%)
+      { id: 8, name: 'wartortle', probability: 5 },     // Common with berry (25%)
+      { id: 129, name: 'Magikarp', probability: 20 },   // Common with berry (20%)
+      { id: 60, name: 'poliwag', probability: 5 },    // Uncommon with berry (15%)
+      { id: 116, name: 'horsea', probability: 15 },    // Uncommon with berry (15%)
+      { id: 117, name: 'seadra', probability: 5 },    // Uncommon with berry (15%)
     ]
   },
   'Mountains (30-50)': {
-    name: 'Mountains (Lvl 30-50)',
+    name: 'Mountains',
     minLevel: 30,
     maxLevel: 50,
     encounterRate: 20,
@@ -77,6 +99,14 @@ const regions = {
       {id: 58, name: 'Growlithe', probability: 10},
       {id: 59, name: 'Arcanine', probability: 5},
       {id: 126, name: 'Magmar', probability: 7.5}
+    ],
+    berryPool: [
+      {id: 147, name: 'Dratini', probability: 10},
+      {id: 148, name: 'Dragonair', probability: 5},
+      {id: 4, name: 'Charmander', probability: 25},
+      {id: 5, name: 'Charmeleon', probability: 15},
+      {id: 59, name: 'Arcanine', probability: 20},
+      {id: 126, name: 'Magmar', probability: 25}
     ]
   },
 } as const;

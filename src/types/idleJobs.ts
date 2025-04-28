@@ -94,7 +94,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     },
     completions: 0,
     successfulCompletions: 0,
-    icon: '/public/images/potion.png', // You'll need to add this image
+    icon: '/images/potion.png', // You'll need to add this image
     backgroundColor: TYPE_COLORS[PokemonType.Grass],
     percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
   },
@@ -118,7 +118,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     },
     completions: 0,
     successfulCompletions: 0,
-    icon: '/public/images/berry.png', // You'll need to add this image
+    icon: '/images/berry.png', // You'll need to add this image
     backgroundColor: TYPE_COLORS[PokemonType.Flying],
     percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
     
@@ -143,7 +143,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     },
     completions: 0,
     successfulCompletions: 0,
-    icon: '/public/images/stone.png', // You'll need to add this image
+    icon: '/images/stone.png', // You'll need to add this image
     backgroundColor: TYPE_COLORS[PokemonType.Rock],
     percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
   }

@@ -1,6 +1,7 @@
-import { useInventoryStore } from '@/stores/inventoryStore'
-import { itemFactory } from '@/services/itemFactory'
-import type { InventoryItem, ItemType } from '@/types/pokemon'
+import { useInventoryStore } from '../stores/inventoryStore'
+import { itemFactory } from '../services/itemFactory'
+import type { InventoryItem, ItemType } from '../types/pokemon' 
+import items, { type ItemDefinition } from '../constants/items'
 
 export function useInventory() {
   const inventoryStore = useInventoryStore()
@@ -17,6 +18,13 @@ export function useInventory() {
    */
   const getItemsByType = (type: ItemType) => {
     return inventoryStore.getItemsByType(type)
+  }
+
+  /**
+   * Gets the item definition from constants by item id
+   */
+  const getItemDefinition = (itemId: string): ItemDefinition | undefined => {
+    return items[itemId]
   }
 
   /**
@@ -97,6 +105,7 @@ export function useInventory() {
   return {
     getAllItems,
     getItemsByType,
+    getItemDefinition,
     countItemsByType,
     getPokeballCount,
     addItem,

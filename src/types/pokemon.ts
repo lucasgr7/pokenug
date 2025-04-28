@@ -1,3 +1,5 @@
+import { AutoCatchEffect, ItemEffect } from "@/constants/items.js";
+
 // Check if file already contains types, if not create them
 export interface Pokemon {
   id: number;
@@ -64,8 +66,6 @@ export type StatusEffect = {
   status: string;
   duration?: number;
 }
-
-export type ItemEffect = HealEffect | CatchEffect | StatBoostEffect | StatusEffect;
 
 // Inventory type definitions
 export interface InventoryItem {
