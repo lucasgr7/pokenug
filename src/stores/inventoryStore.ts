@@ -90,8 +90,9 @@ export const useInventoryStore = defineStore('inventory', {
         })
       } else {
         // Add default starter items using the new item definitions
-        const starterPokeball = itemFactory.createFromDefinition('crappy-pokeball', 5);
+        const starterPokeball = itemFactory.createFromDefinition('crappy-pokeball', 25);
         const starterPotion = itemFactory.createFromDefinition('simple-potion', 2);
+        const starterLure = itemFactory.createFromDefinition('lure-berry', 5);
         
         if (starterPokeball) {
           this.addItem(starterPokeball);
@@ -116,6 +117,9 @@ export const useInventoryStore = defineStore('inventory', {
         
         if (starterPotion) {
           this.addItem(starterPotion);
+        }
+        if(starterLure) {
+          this.addItem(starterLure);
         }
       }
     },

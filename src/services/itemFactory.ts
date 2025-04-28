@@ -1,9 +1,12 @@
 import type { InventoryItem, ItemFactory, ItemRarity, ItemType } from '@/types/pokemon';
-import items, { ItemDefinition } from '@/constants/items';
+import items from '@/constants/items';
 
-// Utility to generate unique IDs
-function generateId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+// Define berry types for better structure
+export enum BerryType {
+  LURE = 'lure-berry',
+  GREAT_LURE = 'great-lure-berry',
+  ORAN = 'oran-berry',
+  PECHA = 'pecha-berry'
 }
 
 export class GameItemFactory implements ItemFactory {
@@ -30,6 +33,19 @@ export class GameItemFactory implements ItemFactory {
       consumable: definition.consumable,
       effect: definition.effect
     };
+  }
+
+  /**
+   * Create a random lure berry with weight distribution
+   * @param {number} quantity - Quantity of berry to create
+   * @returns {InventoryItem} - The created berry item
+   */
+  createRandomLureBerry(quantity: number = 1): InventoryItem {
+    // Define probability - 70% regular lure berry, 30% great lure berry
+    const isGreatBerry = Math.random() < 0.3;
+    const berryId = isGreatBerry ? BerryType.GREAT_LURE : BerryType.LURE;
+    
+    return this.createFromDefinition(berryId, quantity) as InventoryItem;
   }
 
   // Legacy methods for backward compatibility
@@ -108,13 +124,40 @@ export class GameItemFactory implements ItemFactory {
   }
 
   createBerry(name: string, description: string, effect: string): InventoryItem {
-    // Try to find a matching berry in definitions
+    // Check for specific berry keywords to match to predefined berries
+    const lcName = name.toLowerCase();
+    
+    // Match to lure berries
+    if (lcName.includes('lure')) {
+      if (lcName.includes('great')) {
+        return this.createFromDefinition(BerryType.GREAT_LURE) as InventoryItem;
+      } else {
+        return this.createFromDefinition(BerryType.LURE) as InventoryItem;
+      }
+    }
+    
+    // Match healing berries
+    if (lcName.includes('oran')) {
+      return this.createFromDefinition(BerryType.ORAN) as InventoryItem;
+    }
+    
+    // Match status berries
+    if (lcName.includes('pecha') || lcName.includes('poison')) {
+      return this.createFromDefinition(BerryType.PECHA) as InventoryItem;
+    }
+    
+    // Try to find a matching berry in definitions by name
     const matchingBerry = Object.values(items).find(
-      item => item.type === 'berries' && item.name.toLowerCase() === name.toLowerCase()
+      item => item.type === 'berries' && item.name.toLowerCase() === lcName
     );
     
     if (matchingBerry) {
       return this.createFromDefinition(matchingBerry.id) as InventoryItem;
+    }
+    
+    // Default to creating an auto-catch berry if effect contains catch or lure keywords
+    if (effect.toLowerCase().includes('catch') || effect.toLowerCase().includes('lure')) {
+      return this.createRandomLureBerry();
     }
     
     // Create a custom berry if no match found

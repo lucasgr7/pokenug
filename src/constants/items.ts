@@ -149,8 +149,8 @@ const items: Record<string, ItemDefinition> = {
     consumable: true,
     effect: {
       type: 'auto-catch',
-      duration: 3600000, // 1 hour in milliseconds
-      catchRate: 0.2 // 20% base catch rate
+      duration: 1200000, // 1 hour in milliseconds
+      catchRate: 1.0 // 20% base catch rate
     }
   },
   'great-lure-berry': {

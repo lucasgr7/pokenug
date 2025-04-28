@@ -137,7 +137,7 @@ export const useGameStore = defineStore('game', {
       if (!job) return 0;
       
       // Base chance from the job configuration
-      let successChance = job.reward.chance;
+      let successChance = job.chance;
       
       // Additional bonus from extra Pokemon (keep existing functionality)
       if (job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1) {
@@ -188,12 +188,14 @@ export const useGameStore = defineStore('game', {
               
               // Apply completions
               for (let i = 0; i < possibleCompletions; i++) {
-                if (Math.random() < job.reward.chance) {
+                if (Math.random() < job.chance) {
                   job.successfulCompletions++
                   
                   // Handle rewards based on job type
-                  if (job.reward.itemDetails) {
-                    const { name, description, params } = job.reward.itemDetails;
+                  if (job.reward) {
+                    const { name, description, params } = job.reward.itemDetails.length ? 
+                      job.reward.itemDetails[Math.floor(Math.random() * job.reward.itemDetails.length)] :
+                      job.reward.itemDetails;
                     
                     switch (job.reward.type) {
                       case 'pokeball':
@@ -1053,34 +1055,53 @@ export const useGameStore = defineStore('game', {
       
       // Use the enhanced success chance calculation that accounts for additional Pokémon
       const successChance = this.getJobSuccessChance(jobId);
-      
+    
       // Check reward chance with the enhanced calculation
       if (Math.random() < successChance) {
         // Handle the reward based on type
-        if (job.reward.itemDetails) {
-          const { name, description, params } = job.reward.itemDetails;
+        if (job.rewards) {
           
-          switch (job.reward.type) {
+          const selectedReward = job.rewards[Math.floor(Math.random() * job.rewards.length)];
+          if (!selectedReward?.itemDetails) return;
+          
+          const {name, description, params} = Array.isArray(selectedReward.itemDetails) ? 
+            selectedReward.itemDetails[Math.floor(Math.random() * selectedReward.itemDetails.length)] :
+            selectedReward.itemDetails;
+          
+          switch (selectedReward.type) {
             case 'pokeball':
               inventoryStore.addItem(
                 itemFactory.createPokeball(name, description, params.catchRate)
               );
               break;
+              
             case 'potion':
               inventoryStore.addItem(
                 itemFactory.createPotion(name, description, params.healAmount)
               );
               break;
+              
             case 'berry':
-              inventoryStore.addItem(
-                itemFactory.createBerry(name, description, params.effect)
-              );
+              // Special handling for berries - use the new random berry generation
+              if (name.toLowerCase().includes('lure') || 
+                  description.toLowerCase().includes('lure') || 
+                  (params.effect && params.effect.toLowerCase().includes('catch'))) {
+                // Use the weighted random lure berry generator (70% regular, 30% great)
+                inventoryStore.addItem(itemFactory.createRandomLureBerry(1));
+              } else {
+                // For non-lure berries, use the standard method
+                inventoryStore.addItem(
+                  itemFactory.createBerry(name, description, params.effect)
+                );
+              }
               break;
+              
             case 'material':
               inventoryStore.addItem(
                 itemFactory.createMaterial(name, description)
               );
               break;
+              
             default:
               // Legacy fallback for pokeball only system
               if (job.reward.type === 'pokeball') {

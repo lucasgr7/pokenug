@@ -171,42 +171,35 @@ class BerryService {
       const pokemon = pokemonList.find((p: Pokemon) => p.id === selectedPokemon.id)
       
       if (pokemon) {
-        // Determine if catch is successful based on catch rate
-        if (Math.random() < task.catchRate) {
-          // Calculate a level within region boundaries
-          const level = Math.floor(Math.random() * 
-            (regionData.maxLevel - regionData.minLevel + 1)) + regionData.minLevel
-          
-          // Generate stats for this level
-          const stats = gameStore.calculateStats(level)
-          
-          // Create the caught Pokémon with a unique ID
-          const caughtPokemon = { 
-            ...pokemon,
-            level,
-            currentHP: stats.maxHP,
-            maxHP: stats.maxHP,
-            attack: stats.attack,
-            defense: stats.defense,
-            uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            experience: 0,
-            experienceToNextLevel: Math.floor(100 * Math.pow(level, 1.5))
-          }
-          
-          // Add the Pokémon to inventory
-          gameStore.addPokemonToInventory(caughtPokemon)
-          
-          // Add notification
-          gameStore.addNotification(
-            `Your ${task.berryName} caught a wild ${pokemon.name} (Lvl ${level}) in ${regionData.name}!`,
-            'success'
-          )
-        } else {
-          gameStore.addNotification(
-            `Your ${task.berryName} in ${regionData.name} failed to catch a Pokémon.`,
-            'warning'
-          )
+        // Always catch the Pokémon - 100% success rate
+        // Calculate a level within region boundaries
+        const level = Math.floor(Math.random() * 
+          (regionData.maxLevel - regionData.minLevel + 1)) + regionData.minLevel
+        
+        // Generate stats for this level
+        const stats = gameStore.calculateStats(level)
+        
+        // Create the caught Pokémon with a unique ID
+        const caughtPokemon = { 
+          ...pokemon,
+          level,
+          currentHP: stats.maxHP,
+          maxHP: stats.maxHP,
+          attack: stats.attack,
+          defense: stats.defense,
+          uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          experience: 0,
+          experienceToNextLevel: Math.floor(100 * Math.pow(level, 1.5))
         }
+        
+        // Add the Pokémon to inventory
+        gameStore.addPokemonToInventory(caughtPokemon)
+        
+        // Add notification
+        gameStore.addNotification(
+          `Your ${task.berryName} caught a wild ${pokemon.name} (Lvl ${level}) in ${regionData.name}!`,
+          'success'
+        )
       }
     } catch (error) {
       console.error('Error completing berry task:', error)

@@ -233,7 +233,7 @@ function getTotalLevels(jobId: string): number {
                     @mouseover="showInfoTooltip($event, tooltips.baseSuccess)"
                     @mouseout="hideTooltip"
                   >
-                    <span class="font-medium">Base Success: {{ formatPercent(job.reward.chance) }}</span>
+                    <span class="font-medium">Base Success: {{ formatPercent(job.chance) }}</span>
                   </div>
                   
                   <!-- Multi-Pokémon Bonus -->

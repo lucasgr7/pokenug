@@ -1,5 +1,19 @@
-// filepath: c:\GIT\pokengu\src\src\types\idleJobs.ts
 import { Pokemon, PokemonType } from './pokemon.js';
+
+// Define the possible reward types
+export type RewardType = 'pokeball' | 'potion' | 'berry' | 'material';
+
+// Define a new interface for reward options
+export interface RewardOption {
+  type: RewardType;
+  chance: number;
+  weight: number;
+  itemDetails?: {
+    name: string;
+    description: string;
+    params: Record<string, any>;
+  }
+}
 
 export interface IdleJob {
   id: string;
@@ -10,20 +24,13 @@ export interface IdleJob {
   assignedPokemon: Pokemon[];
   progress: number;
   baseTime: number; // in milliseconds
-  reward: {
-    type: string;
-    chance: number;
-    itemDetails?: {
-      name: string;
-      description: string;
-      params: Record<string, any>;
-    }
-  };
+  rewards: RewardOption[]; // Array of possible rewards
   completions: number;
   successfulCompletions: number;
   icon: string;
   backgroundColor: string; // Background color based on Pokemon type
   percentualProgressWithAdditionalPokemon?: number; // Optional property for additional progress calculation
+  chance: number; // Optional property for success chance
 }
 
 // Type color mapping for job backgrounds
@@ -59,15 +66,19 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     assignedPokemon: [],
     progress: 0,
     baseTime: 60000, // 1 minute in milliseconds
-    reward: {
-      type: 'pokeball',
-      chance: 0.3, // 30% chance
-      itemDetails: {
-        name: 'Crappy Pokeball',
-        description: 'A poorly made Pokeball. Has a low catch rate.',
-        params: { catchRate: 0.08 }
+    chance: 0.25, // 25% chance of success
+    rewards: [
+      {
+        chance: 0.3, // 30% chance
+        weight: 100, // Only option, so 100% weight
+        type: 'pokeball',
+        itemDetails: {
+          name: 'Crappy Pokeball',
+          description: 'A poorly made Pokeball. Has a low catch rate.',
+          params: { catchRate: 0.08 }
+        }
       }
-    },
+    ],
     completions: 0,
     successfulCompletions: 0,
     icon: '/images/crappyball.png',
@@ -83,15 +94,19 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     assignedPokemon: [],
     progress: 0,
     baseTime: 120000, // 50 seconds in milliseconds
-    reward: {
-      type: 'potion',
-      chance: 0.05, // 25% chance
-      itemDetails: {
-        name: 'Simple Potion',
-        description: 'A basic potion that restores a small amount of HP',
-        params: { healAmount: 20 }
+    chance: 0.15, // 25% chance of success
+    rewards: [
+      {
+        type: 'potion',
+        chance: 0.05, // 25% chance
+        weight: 100, // Only option, so 100% weight
+        itemDetails: {
+          name: 'Simple Potion',
+          description: 'A basic potion that restores a small amount of HP',
+          params: { healAmount: 20 }
+        }
       }
-    },
+    ],
     completions: 0,
     successfulCompletions: 0,
     icon: '/images/potion.png', // You'll need to add this image
@@ -100,22 +115,36 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
   },
   'berry-gathering': {
     id: 'berry-gathering',
-    type: PokemonType.Flying,
+    type: PokemonType.Normal,
     name: 'Gather Berries',
     description: 'Normal Pokemon gather berries from nearby areas',
     maxSlots: 4,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 120000, // 45 seconds in milliseconds
-    reward: {
-      type: 'berry',
-      chance: 0.25, // 40% chance
-      itemDetails: {
-        name: 'Pecha Berry',
-        description: 'A sweet berry that can heal poison',
-        params: { effect: 'Cures poison status' }
+    baseTime: 45000, // 45 seconds in milliseconds
+    chance: 0.15, // 14% chance of success
+    rewards: [
+      {
+        type: 'berry',
+        chance: 0.25, // 40% chance
+        weight: 70, // 70% chance of getting this if successful
+        itemDetails: {
+          name: 'Great Lure Berry',
+          description: 'A special berry that attracts Pokémon over time',
+          params: { effect: 'Auto-catch' }
+        }
+      },
+      {
+        type: 'berry',
+        chance: 0.25, // Same base chance
+        weight: 30, // 30% chance of getting this if successful
+        itemDetails: {
+          name: 'Lure Berry',
+          description: 'A special berry that attracts Pokémon over time',
+          params: { effect: 'Auto-catch' }
+        }
       }
-    },
+    ],
     completions: 0,
     successfulCompletions: 0,
     icon: '/images/berry.png', // You'll need to add this image
@@ -132,15 +161,29 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     assignedPokemon: [],
     progress: 0,
     baseTime: 360000, // 70 seconds in milliseconds
-    reward: {
-      type: 'material',
-      chance: 0.35, // 35% chance
-      itemDetails: {
-        name: 'Evolution Stone Fragment',
-        description: 'A small fragment of an evolution stone.',
-        params: {}
+    chance: 0.15, // 25% chance of success
+    rewards: [
+      {
+        type: 'material',
+        chance: 0.35, // 35% chance
+        weight: 80, // 80% weight for regular stone fragments
+        itemDetails: {
+          name: 'Evolution Stone Fragment',
+          description: 'A small fragment of an evolution stone.',
+          params: {}
+        }
+      },
+      {
+        type: 'material',
+        chance: 0.35, // Same base chance
+        weight: 20, // 20% weight for rare stone fragments
+        itemDetails: {
+          name: 'Rare Stone Fragment',
+          description: 'A rare evolution stone fragment with special properties.',
+          params: { rarity: 'rare' }
+        }
       }
-    },
+    ],
     completions: 0,
     successfulCompletions: 0,
     icon: '/images/stone.png', // You'll need to add this image

@@ -19,11 +19,14 @@ const regions = {
       { id: 102, name: 'exeggcute', probability: 7 }, // Very rare (2%)
     ],
     berryPool: [
-      { id: 19, name: 'rattata', probability: 10 }, // Common with berry (30%)
-      { id: 20, name: 'raticate', probability: 8 },     // Common with berry (25%) 
-      { id: 133, name: 'Eevee', probability: 5 },     // Very rare (3%)
-      { id: 25, name: 'Pikachu', probability: 5 },    // Uncommon with berry (15%)
-      { id: 143, name: 'snorlax', probability: 2 }       // Rare with berry (5%)
+      { id: 19, name: 'rattata', probability: 10 }, 
+      { id: 20, name: 'raticate', probability: 8 }, 
+      { id: 133, name: 'Eevee', probability: 5 },   
+      { id: 25, name: 'Pikachu', probability: 5 },  
+      { id: 143, name: 'snorlax', probability: 2 }, 
+      { id: 12, name: 'butterfree', probability: 5 },
+      { id: 15, name: 'beedrill', probability: 10 },
+      { id: 48, name: 'venonat', probability: 8 },
     ]
   },
   'cerulean-cave (10-15)': {
