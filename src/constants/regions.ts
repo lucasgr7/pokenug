@@ -114,5 +114,31 @@ const regions = {
       {id: 126, name: 'Magmar', probability: 25}
     ]
   },
+  'ironworks-zone': {
+  name: 'Ironworks Facility',
+  minLevel: 80,
+  maxLevel: 120,
+  encounterRate: 15,
+  spawnTimer: 18,
+  pool: [
+    { id: 81, name: 'Magnemite', probability: 30 },
+    { id: 82, name: 'Magneton', probability: 15 },
+    { id: 95, name: 'Onix', probability: 20 },
+    { id: 208, name: 'Steelix', probability: 5 },
+    { id: 100, name: 'Voltorb', probability: 15 },
+    { id: 101, name: 'Electrode', probability: 10 },
+    { id: 125, name: 'Electabuzz', probability: 5 }
+  ],
+  berryPool: [
+    { id: 81, name: 'Magnemite', probability: 25 },
+    { id: 82, name: 'Magneton', probability: 15 },
+    { id: 100, name: 'Voltorb', probability: 20 },
+    { id: 101, name: 'Electrode', probability: 10 },
+    { id: 125, name: 'Electabuzz', probability: 10 },
+    { id: 89, name: 'Muk', probability: 10 },
+    { id: 109, name: 'Koffing', probability: 10 }
+  ]
+}
+
 } as const;
 export default regions;

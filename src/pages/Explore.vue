@@ -1065,6 +1065,7 @@ const getRegionBackgroundImage = (regionId: string) => {
     // Default to viridian for other regions until more backgrounds are available
     'beach-zone (15-25)': '/images/backgrounds/beach.png',
     'Mountains (30-50)': '/images/backgrounds/mountains.png',
+    'ironworks-zone (80-120)': '/images/backgrounds/ironworks.png',
 
   }
   
