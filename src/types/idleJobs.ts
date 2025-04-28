@@ -87,7 +87,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
         itemDetails: {
           name: 'Fire Emblem',
           description: 'Increases XP gain with consecutive attacks. Build up fire rate to multiply XP gain up to 3 tiers.',
-          params: { 
+          params: {
             buffId: 'fire-emblem',
             buffType: 'fire-rate',
             imageUrl: '/images/fire-emblem.png'
@@ -99,9 +99,9 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     successfulCompletions: 0,
     icon: '/images/fire-emblem.png',
     backgroundColor: TYPE_COLORS[PokemonType.Fire],
-    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+    // 15% progress per additional Pokemon
   },
-  
+
   'toxic-emblem': {
     id: 'toxic-emblem',
     type: PokemonType.Poison,
@@ -110,7 +110,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 4,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 300000, // 5 minutes in milliseconds
+    baseTime: 1800000, // 30 minutes in milliseconds
     chance: 0.75, // 100% chance of success - this is a guaranteed buff
     rewards: [
       {
@@ -120,7 +120,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
         itemDetails: {
           name: 'Toxic Emblem',
           description: 'Increases XP gained per attack by 1',
-          params: { 
+          params: {
             buffId: 'toxic-emblem',
             buffType: 'xp-boost',
             imageUrl: '/images/toxic-emblem.png'  // You'll need to add this image
@@ -134,7 +134,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     backgroundColor: TYPE_COLORS[PokemonType.Poison],
     percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
   },
-  
+
   'pokeball-production': {
     id: 'pokeball-production',
     type: PokemonType.Bug,
@@ -161,7 +161,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     successfulCompletions: 0,
     icon: '/images/crappyball.png',
     backgroundColor: TYPE_COLORS[PokemonType.Bug],
-    percentualProgressWithAdditionalPokemon: 0.10 // 5% progress per additional Pokemon
+    // 5% progress per additional Pokemon
   },
   'potion-brewing': {
     id: 'potion-brewing',
@@ -171,8 +171,8 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 3,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 120000, // 50 seconds in milliseconds
-    chance: 0.15, // 25% chance of success
+    baseTime: 300000, // 5 minutes in milliseconds
+    chance: 0.25, // 25% chance of success
     rewards: [
       {
         type: 'potion',
@@ -189,7 +189,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     successfulCompletions: 0,
     icon: '/images/potion.png', // You'll need to add this image
     backgroundColor: TYPE_COLORS[PokemonType.Grass],
-    percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
+    // 5% progress per additional Pokemon
   },
   'berry-gathering': {
     id: 'berry-gathering',
@@ -199,7 +199,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 4,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 45000, // 45 seconds in milliseconds
+    baseTime: 900000, // 15 minutes in milliseconds
     chance: 0.15, // 14% chance of success
     rewards: [
       {
@@ -228,7 +228,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     icon: '/images/berry.png', // You'll need to add this image
     backgroundColor: TYPE_COLORS[PokemonType.Flying],
     percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
-    
+
   },
   'material-mining': {
     id: 'material-mining',
