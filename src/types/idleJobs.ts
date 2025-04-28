@@ -77,8 +77,8 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 6,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 300, // 5 minutes in milliseconds
-    chance: 1.0, // 100% chance of success - this is a guaranteed buff
+    baseTime: 300000, // 5 minutes in milliseconds
+    chance: 0.75, // 100% chance of success - this is a guaranteed buff
     rewards: [
       {
         type: 'buff',
