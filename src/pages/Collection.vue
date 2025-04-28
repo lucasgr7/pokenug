@@ -5,6 +5,7 @@ import { ref } from 'vue'
 const showParty = ref(true)
 const verticalMode = ref(false)
 const columnSize = ref(6)
+const itemsPerPage = ref(12) // Added itemsPerPage with default value of 12
 </script>
 <template>
     <div>
@@ -48,6 +49,23 @@ const columnSize = ref(6)
                         <option v-for="n in 12" :key="n" :value="n">{{ n }}</option>
                     </select>
                 </div>
+                
+                <!-- Add Items Per Page selector when in vertical mode -->
+                <div class="flex items-center space-x-2" v-if="verticalMode">
+                    <label for="items-per-page" class="block text-sm text-gray-700">
+                        Items Per Page:
+                    </label>
+                    <select 
+                        id="items-per-page" 
+                        v-model="itemsPerPage"
+                        class="mt-1 block w-full pl-3 pr-10 py-1 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                    >
+                        <option :value="12">12</option>
+                        <option :value="24">24</option>
+                        <option :value="36">36</option>
+                        <option :value="48">48</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -56,6 +74,7 @@ const columnSize = ref(6)
             :show-party="showParty" 
             :vertical-mode="verticalMode"
             :column-size="columnSize"
+            :items-per-page="itemsPerPage"
         />
     </div>
 </template>

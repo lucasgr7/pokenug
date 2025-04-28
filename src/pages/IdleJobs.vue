@@ -10,6 +10,7 @@ const gameStore = useGameStore()
 const verticalMode = ref(true)
 const columnSize = ref(2)
 const showParty = ref(true)
+const itemsPerPage = ref(8) // Added itemsPerPage with default value
 
 // Filtrar apenas os jobs com tipos de Pokémon que o jogador possui
 const availableJobs = computed(() => {
@@ -180,6 +181,7 @@ function getTotalLevels(jobId: string): number {
             :vertical-mode="verticalMode"
             :column-size="columnSize"
             :filter-type="''"
+            :items-per-page="itemsPerPage"
           />
         </div>
       </div>

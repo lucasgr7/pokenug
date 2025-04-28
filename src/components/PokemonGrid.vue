@@ -20,11 +20,16 @@ const props = defineProps({
   columnSize: {
     type: Number,
     default: 6
+  },
+  itemsPerPage: {
+    type: Number,
+    default: 12
   }
 })
 
 const gameStore = useGameStore()
 const isDraggingOver = ref<number | 'available' | null>(null)
+const currentPage = ref(1)
 
 // Get party Pokemon (those in active battle team) - without any filtering
 const partyPokemon = computed(() => {
@@ -32,7 +37,7 @@ const partyPokemon = computed(() => {
 })
 
 // Get all Pokemon from inventory that aren't in the team or working
-const availablePokemon = computed(() => {
+const allAvailablePokemon = computed(() => {
   return [...gameStore.availablePokemon].filter(pokemon => {
     
     // When filtering by type for idle jobs, only show matching types
@@ -42,6 +47,46 @@ const availablePokemon = computed(() => {
     return true;
   });
 })
+
+// Paginated available Pokemon when in vertical mode
+const availablePokemon = computed(() => {
+  if (!props.verticalMode) {
+    return allAvailablePokemon.value;
+  }
+
+  const startIndex = (currentPage.value - 1) * props.itemsPerPage;
+  const endIndex = startIndex + props.itemsPerPage;
+  return allAvailablePokemon.value.slice(startIndex, endIndex);
+})
+
+// Calculate total number of pages
+const totalPages = computed(() => {
+  if (!props.verticalMode) {
+    return 1;
+  }
+  return Math.ceil(allAvailablePokemon.value.length / props.itemsPerPage);
+})
+
+// Move to next page
+function nextPage() {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+  }
+}
+
+// Move to previous page
+function prevPage() {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+  }
+}
+
+// Go to specific page
+function goToPage(page: number) {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page;
+  }
+}
 
 function isWorkingInJob(pokemon: Pokemon): boolean {
   // Check if this Pokemon is currently assigned to any job
@@ -170,7 +215,14 @@ function handleDrop(event: DragEvent, toParty: boolean, targetSlotIndex?: number
 
     <!-- Available Pokemon Section -->
     <div class="bg-gray-100 p-4 rounded-lg">
-      <h3 class="text-lg font-semibold mb-4">Available Pokemon</h3>
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">Available Pokemon</h3>
+        <!-- Pagination info for vertical mode -->
+        <div v-if="verticalMode && allAvailablePokemon.length > 0" class="text-sm text-gray-500">
+          Showing {{ (currentPage - 1) * itemsPerPage + 1 }}-{{ Math.min(currentPage * itemsPerPage, allAvailablePokemon.length) }} of {{ allAvailablePokemon.length }}
+        </div>
+      </div>
+      
       <div class="grid gap-4" 
            :class="verticalMode ? `grid-cols-${columnSize}` : 'grid-cols-6'"
            @dragover.prevent="handleDragOver($event, 'available')"
@@ -201,7 +253,8 @@ function handleDrop(event: DragEvent, toParty: boolean, targetSlotIndex?: number
         </div>
         
         <!-- Display empty placeholder slots (minimum 3 slots or more if needed) -->
-        <div v-for="index in Math.max(3, 6 - availablePokemon.length)" 
+        <div v-if="availablePokemon.length === 0" 
+             v-for="index in Math.max(3, 6 - availablePokemon.length)" 
              :key="'empty-available-' + index"
              class="border-2 border-dashed border-gray-300 rounded-lg h-full flex items-center justify-center transition-colors duration-200"
              :class="{ 
@@ -214,6 +267,70 @@ function handleDrop(event: DragEvent, toParty: boolean, targetSlotIndex?: number
              @drop="handleDrop($event, false)">
           <span class="text-gray-400" :class="{'text-xs': verticalMode}">Available Slot</span>
         </div>
+      </div>
+      
+      <!-- Pagination Controls (only shown in vertical mode with multiple pages) -->
+      <div v-if="verticalMode && totalPages > 1" class="flex items-center justify-center space-x-2 mt-4">
+        <button 
+          @click="prevPage" 
+          class="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="currentPage === 1"
+        >
+          &laquo; Prev
+        </button>
+        
+        <!-- Page numbers - show max 5 pages with ellipsis -->
+        <div class="flex space-x-1">
+          <!-- Always show first page -->
+          <button 
+            v-if="totalPages > 4" 
+            @click="goToPage(1)" 
+            class="px-3 py-1 rounded-md"
+            :class="currentPage === 1 ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300'"
+          >
+            1
+          </button>
+          
+          <!-- Ellipsis if needed -->
+          <span v-if="totalPages > 4 && currentPage > 3" class="px-1">...</span>
+          
+          <!-- Pages around current page -->
+          <button 
+            v-for="page in totalPages" 
+            :key="page"
+            v-show="(totalPages <= 5) || 
+                   (page >= Math.max(2, currentPage - 1) && 
+                    page <= Math.min(totalPages - 1, currentPage + 1)) ||
+                   (totalPages <= 7 && page <= 5 && currentPage <= 3) ||
+                   (totalPages <= 7 && page >= totalPages - 4 && currentPage >= totalPages - 2)"
+            @click="goToPage(page)" 
+            class="px-3 py-1 rounded-md"
+            :class="currentPage === page ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300'"
+          >
+            {{ page }}
+          </button>
+          
+          <!-- Ellipsis if needed -->
+          <span v-if="totalPages > 4 && currentPage < totalPages - 2" class="px-1">...</span>
+          
+          <!-- Always show last page if there are many pages -->
+          <button 
+            v-if="totalPages > 4" 
+            @click="goToPage(totalPages)" 
+            class="px-3 py-1 rounded-md"
+            :class="currentPage === totalPages ? 'bg-red-500 text-white' : 'bg-gray-200 hover:bg-gray-300'"
+          >
+            {{ totalPages }}
+          </button>
+        </div>
+        
+        <button 
+          @click="nextPage" 
+          class="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="currentPage === totalPages"
+        >
+          Next &raquo;
+        </button>
       </div>
     </div>
   </div>
