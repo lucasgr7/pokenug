@@ -13,6 +13,7 @@ const regions = {
       { id: 14, name: 'Kakuna', probability: 15 },     // Uncommon (15%)
       { id: 25, name: 'Pikachu', probability: 0.5 },     // Very rare (3%)
       { id: 133, name: 'Eevee', probability: 0.5 },     // Very rare (3%)
+      { id: 37, name: 'vulpix', probability: 1.5 }, // Very rare (2%)
       { id: 16, name: 'Pidgey', probability: 5 },       // Uncommon (7%)
       { id: 43, name: 'oddish', probability: 5 }, // Very rare (2%)
       { id: 69, name: 'Bellsprout', probability: 7 }, // Very rare (2%)
@@ -27,6 +28,7 @@ const regions = {
       { id: 12, name: 'butterfree', probability: 5 },
       { id: 15, name: 'beedrill', probability: 10 },
       { id: 48, name: 'venonat', probability: 8 },
+      { id: 37, name: 'vulpix', probability: 1.5 }, // Very rare (2%)
     ]
   },
   'cerulean-cave (10-15)': {

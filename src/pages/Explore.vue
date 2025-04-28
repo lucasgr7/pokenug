@@ -184,15 +184,39 @@
         </div>
       </div>
 
-      <!-- Battle Controls -->
-      <div class="flex flex-col justify-center items-center space-y-4">
+      <!-- Battle Controls with Fire Rate Effects -->
+      <div class="flex flex-col justify-center items-center space-y-4 relative">
+        <!-- Attack Button with Fire Effects -->
         <button
           @click="attack"
           :disabled="!wildPokemon"
-          class="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          class="relative px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 overflow-hidden"
+          :class="{
+            'fire-rate-button-tier-1': fireRateState.active && fireRateState.tier === 1,
+            'fire-rate-button-tier-2': fireRateState.active && fireRateState.tier === 2,
+            'fire-rate-button-tier-3': fireRateState.active && fireRateState.tier === 3
+          }"
         >
-          Attack
+          <span class="relative z-10">Attack</span>
+          <!-- Fire Effect Overlay -->
+          <div v-if="fireRateState.active" class="fire-button-overlay"></div>
         </button>
+        
+        <!-- Fire Rate Counter with dynamic time display and milliseconds -->
+        <div v-if="fireRateState.active" class="fire-rate-counter absolute -top-8 left-1/2 transform -translate-x-1/2">
+          <div class="flex items-center justify-center px-2 py-1 rounded-full text-xs font-bold shadow-lg"
+            :class="{
+              'bg-yellow-100 text-yellow-800': fireRateState.tier === 1,
+              'bg-red-100 text-red-800': fireRateState.tier === 2,
+              'bg-blue-100 text-blue-800': fireRateState.tier === 3
+            }">
+            <span>Fire Rate: {{ fireRateState.count }}</span>
+            <span class="ml-1">
+              ({{ formatTimeWithMs(fireRateState.timeAllowed - (Date.now() - fireRateState.lastAttackTime)) }})
+            </span>
+          </div>
+        </div>
+
         <button
           @click="openPokeballSelector"
           :disabled="!wildPokemon || totalPokeballs <= 0"
@@ -200,6 +224,7 @@
         >
           Try Capture
         </button>
+        
         <!-- New Berry Button -->
         <button
           @click="openBerrySelector"
@@ -356,7 +381,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { usePokemon } from '@/composables/usePokemon'
 import { useInventory } from '@/composables/useInventory'
@@ -486,6 +511,16 @@ function formatRemainingTime(ms: number) {
   return `${minutes}m ${seconds}s`
 }
 
+// Format time with milliseconds, preventing negative values
+function formatTimeWithMs(ms: number) {
+  // Ensure we don't have negative values
+  ms = Math.max(0, ms);
+  
+  const seconds = Math.floor((ms / 1000) % 60)
+  const milliseconds = Math.floor(ms % 1000)
+  return `${seconds}s ${milliseconds}ms`
+}
+
 // Cancel a berry task
 function cancelBerryTask(taskId: string) {
   berryService.cancelTask(taskId)
@@ -542,7 +577,7 @@ const calculateStats = (level: number) => {
   // Calculate attack to achieve desired number of hits to defeat
   const baseAttack = Math.floor(baseHP / BASE_HITS_TO_DEFEAT)
   const attackPerLevel = baseAttack * 0.2 // 20% increase per level
-  const attack = Math.floor(baseAttack + (attackPerLevel * (level - 1)))
+  const attack = Math.floor(baseHP + (attackPerLevel * (level - 1)))
   
   // Defense scales similarly to attack but slightly lower
   const baseDefense = Math.floor(baseAttack * 0.8)
@@ -572,7 +607,7 @@ const calculateDamage = (attack: number, defense: number, attackerLevel: number,
 }
 
 const calculateXPGain = (playerLevel: number, enemyLevel: number) => {
-  return Math.floor(10 * (enemyLevel / playerLevel)) * (IS_DEVELOPMENT ? 200 : 20)
+  return Math.floor(10 * (enemyLevel / playerLevel)) * (IS_DEVELOPMENT ? 20 : 20)
 }
 
 const calculateXPForNextLevel = (currentLevel: number) => {
@@ -635,13 +670,16 @@ const handleXPGain = (playerPokemon: Pokemon, defeatedPokemon: Pokemon) => {
     type: 'system'
   })
   
+  // Register the defeated Pokémon in the buff store counter
+  buffStore.registerPokemonDefeat(gameStore.currentRegion)
+  
   // Check for level up
   if (playerPokemon.experience >= nextLevelXP) {
     gameStore.levelUpPokemon(playerPokemon)
   }
 }
 
-// Update attack function to use handleXPGain
+// Update attack function to pass Pokemon level and region ID to the fire rate system
 const attack = () => {
   if (!wildPokemon.value || !gameStore.activePokemon) return
   
@@ -650,13 +688,35 @@ const attack = () => {
   // Import the buff store to get XP boosts
   const buffStore = useBuffStore();
   
+  // Register attack for fire rate feature with Pokemon ID, level, and region ID
+  buffStore.registerFireRateAttack(
+    gameStore.activePokemon.id,
+    gameStore.activePokemon.level || 1,
+    gameStore.currentRegion
+  );
+  
+  // Get fire rate state for effects
+  const fireRateState = buffStore.getFireRateState;
+  
   // Get XP boost from buffs (especially from Toxic Emblem)
   const xpBoost = buffStore.getTotalXPBonus;
   
-  // Add 1 XP per attack + any XP boost from buffs
+  // Get fire rate multiplier
+  const fireRateMultiplier = buffStore.getFireRateMultiplier;
+  
+  // Add 1 XP per attack + any XP boost from buffs, then apply fire rate multiplier
   const baseXpPerAttack = 1;
-  const totalXpPerAttack = baseXpPerAttack + xpBoost;
+  const boostedXp = baseXpPerAttack + xpBoost;
+  const totalXpPerAttack = Math.floor(boostedXp * fireRateMultiplier);
+  
+  // Apply XP gain
   gameStore.activePokemon.experience = (gameStore.activePokemon.experience || 0) + totalXpPerAttack;
+  
+  // check for level up
+  const nextLevelXP = gameStore.activePokemon.experienceToNextLevel || calculateXPForNextLevel(gameStore.activePokemon.level!)
+  if (gameStore.activePokemon!.experience! >= nextLevelXP) {
+    gameStore.levelUpPokemon(gameStore.activePokemon)
+  }
   
   setTimeout(() => {
     isPlayerAttacking.value = false
@@ -676,10 +736,29 @@ const attack = () => {
       type: 'damage'
     })
     
-    // Add a log message for XP boost if applicable
+    // Add xp logs based on which buffs are active
+    let xpLogMessage = '';
+    
+    // Base XP message
+    if (baseXpPerAttack > 0) {
+      xpLogMessage = `+${baseXpPerAttack} base XP`;
+    }
+    
+    // Add Toxic Emblem message if active
     if (xpBoost > 0) {
+      xpLogMessage += (xpLogMessage ? ', ' : '') + `+${xpBoost} XP from Toxic Emblem`;
+    }
+    
+    // Add fire rate multiplier message if active
+    if (fireRateState.active && fireRateMultiplier > 1) {
+      xpLogMessage += (xpLogMessage ? ', ' : '') + `x${fireRateMultiplier.toFixed(1)} Fire Rate`;
+      xpLogMessage += ` (tier ${fireRateState.tier})`;
+    }
+    
+    // Log total XP gain
+    if (xpLogMessage) {
       battleLogs.value.push({
-        message: `Toxic Emblem gives +${xpBoost} bonus XP!`,
+        message: `${xpLogMessage} = ${totalXpPerAttack} total XP gained!`,
         type: 'system'
       });
     }
@@ -799,30 +878,61 @@ const tryPokemonRun = () => {
   }
 }
 
-// Spawn system with region-specific timer
+// Spawn system with region-specific timer and defeat count delay
 const startSpawnTimer = () => {
-  // Use the region-specific spawnTimer
-  const regionTimer = gameStore.currentRegionData.spawnTimer || 10
-  spawnTimer.value = regionTimer
+  // Get the buff store to check for defeated count
+  const buffStore = useBuffStore();
+  
+  // Check if we need to delay spawn based on defeat count
+  const shouldDelay = buffStore.shouldDelaySpawn;
+  
+  // Use the region-specific spawnTimer or a 10-second delay if needed
+  const regionTimer = gameStore.currentRegionData.spawnTimer || DEFAULT_SPAWN_TIMER;
+  spawnTimer.value = shouldDelay ? 10 : regionTimer;
+  
+  // If a delay was applied, reset the counter to the next 10
+  if (shouldDelay) {
+    buffStore.resetDefeatCounter();
+    battleLogs.value.push({
+      message: `The area seems quiet after defeating many Pokémon...`,
+      type: 'system'
+    });
+  }
   
   const interval = setInterval(() => {
-    spawnTimer.value--
+    spawnTimer.value--;
     if (spawnTimer.value <= 0) {
-      clearInterval(interval)
+      clearInterval(interval);
       
       // Always spawn a Pokémon when the timer ends
-      spawnWildPokemon()
+      spawnWildPokemon();
     }
-  }, 1000)
+  }, 1000);
 }
 
 
 // Lifecycle
 let unsubscribe: (() => void) | null = null
 
+// Fire rate state from buff store
+const buffStore = useBuffStore()
+const fireRateState = computed(() => buffStore.getFireRateState)
+
+// Create an element for the cursor counter
+let cursorCounter: HTMLElement | null = null
+
 onMounted(() => {
   gameStore.initializeGame()
   startSpawnTimer()
+  
+  // Initialize cursor counter for fire rate
+  cursorCounter = document.createElement('div')
+  cursorCounter.id = 'fire-rate-cursor-counter'
+  cursorCounter.style.display = 'none'
+  document.body.appendChild(cursorCounter)
+  
+  // Add mouse move listener for cursor counter
+  document.addEventListener('mousemove', updateCursorCounterPosition)
   
   // Create default pokeballs if needed
   const existingPokeballs = inventory.getItemsByType('pokeball')
@@ -876,7 +986,51 @@ onUnmounted(() => {
   if (unsubscribe) {
     unsubscribe()
   }
+  
+  // Clean up cursor counter
+  document.removeEventListener('mousemove', updateCursorCounterPosition)
+  if (cursorCounter && document.body.contains(cursorCounter)) {
+    document.body.removeChild(cursorCounter)
+  }
 })
+
+// Update the cursor counter position and content
+function updateCursorCounterPosition(e: MouseEvent) {
+  if (!cursorCounter) return
+  
+  // Only show counter when fire rate is active
+  if (fireRateState.value.active) {
+    const x = e.clientX
+    const y = e.clientY
+    
+    cursorCounter.style.display = 'block'
+    cursorCounter.style.left = `${x}px`
+    cursorCounter.style.top = `${y}px`
+    
+    // Update content with count and tier
+    let counterContent = `<div class="px-2 py-1 rounded-full text-xs font-bold shadow-lg `
+    
+    // Add tier-specific styling
+    if (fireRateState.value.tier === 1) {
+      counterContent += `bg-yellow-100 text-yellow-800">`
+      counterContent += `<span>🔥 ${fireRateState.value.count}</span>`
+    } else if (fireRateState.value.tier === 2) {
+      counterContent += `bg-red-100 text-red-800">`
+      counterContent += `<span>🔥🔥 ${fireRateState.value.count}</span>`
+    } else if (fireRateState.value.tier === 3) {
+      counterContent += `bg-blue-100 text-blue-800">`
+      counterContent += `<span>🔥🔥🔥 ${fireRateState.value.count}</span>`
+    } else {
+      counterContent += `bg-gray-100 text-gray-800">`
+      counterContent += `<span>${fireRateState.value.count}</span>`
+    }
+    
+    counterContent += `</div>`
+    cursorCounter.innerHTML = counterContent
+  } else {
+    cursorCounter.style.display = 'none'
+  }
+}
 
 // Type colors function
 const getTypeColor = (type: string) => {
@@ -969,6 +1123,15 @@ function getPotentialPokemon(regionId: string) {
     probability: (pokemon.probability / totalProbability) * 100
   }))
 }
+
+// Watch the fire rate state to detect when it becomes inactive
+// Place this after the fireRateState computed property in the script section
+watch(() => fireRateState.value.active, (isActive) => {
+  // When fire rate becomes inactive, ensure the cursor counter is hidden
+  if (!isActive && cursorCounter) {
+    cursorCounter.style.display = 'none';
+  }
+})
 </script>
 
 <style scoped>
@@ -1014,5 +1177,62 @@ function getPotentialPokemon(regionId: string) {
   50% { transform: scale(0.8) translateX(100px); }
   75% { transform: scale(0.6) translateX(0); }
   100% { transform: scale(1) translateX(0); }
+}
+
+/* Fire rate button tier styles */
+.fire-rate-button-tier-1 {
+  background: linear-gradient(to bottom, #f59e0b, #d97706);
+  box-shadow: 0 0 15px rgba(252, 211, 77, 0.7);
+  border: 1px solid #f59e0b;
+}
+
+.fire-rate-button-tier-1 .fire-button-overlay {
+  background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 25%, rgba(252, 211, 77, 0.5) 75%, rgba(252, 211, 77, 0) 100%);
+  animation: fire-effect 1.2s infinite;
+}
+
+.fire-rate-button-tier-2 {
+  background: linear-gradient(to bottom, #ef4444, #b91c1c);
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+  border: 1px solid #ef4444;
+}
+
+.fire-rate-button-tier-2 .fire-button-overlay {
+  background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 25%, rgba(239, 68, 68, 0.6) 75%, rgba(239, 68, 68, 0) 100%);
+  animation: fire-effect 0.9s infinite;
+}
+
+.fire-rate-button-tier-3 {
+  background: linear-gradient(to bottom, #2563eb, #1d4ed8);
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.8);
+  border: 1px solid #2563eb;
+}
+
+.fire-rate-button-tier-3 .fire-button-overlay {
+  background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 25%, rgba(96, 165, 250, 0.7) 75%, rgba(96, 165, 250, 0) 100%);
+  animation: fire-effect 0.6s infinite;
+}
+
+/* Fire rate counter styles */
+.fire-rate-counter {
+  animation: pulse 1s infinite alternate;
+  z-index: 10;
+}
+
+@keyframes pulse {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.1); }
+}
+
+/* Cursor counter for fire rate */
+#fire-rate-cursor-counter {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  margin-top: -15px;
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5);
+  transition: opacity 0.2s ease;
 }
 </style>

@@ -69,6 +69,39 @@ export const TYPE_COLORS = {
 
 // Default idle jobs configuration
 export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
+  'fire-emblem': {
+    id: 'fire-emblem',
+    type: PokemonType.Fire,
+    name: 'Fire Emblem Training',
+    description: 'Train your Fire Pokemon to increase attack speed. Consecutive attacks build up fire rate multiplier for XP gain.',
+    maxSlots: 4,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 1800000, // 30 minutes in milliseconds
+    chance: 0.8, // 80% chance of success
+    rewards: [
+      {
+        type: 'buff',
+        chance: 0.5,
+        weight: 100,
+        itemDetails: {
+          name: 'Fire Emblem',
+          description: 'Increases XP gain with consecutive attacks. Build up fire rate to multiply XP gain up to 3 tiers.',
+          params: { 
+            buffId: 'fire-emblem',
+            buffType: 'fire-rate',
+            imageUrl: '/images/fire-emblem.png'
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/fire-emblem.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Fire],
+    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+  },
+  
   'toxic-emblem': {
     id: 'toxic-emblem',
     type: PokemonType.Poison,

@@ -122,6 +122,25 @@
                 <div class="text-sm">+{{ selectedBuff.value * 5 }}% chance of finding items</div>
               </div>
             </div>
+            <!-- Fire Rate Buff Display -->
+            <div v-else-if="selectedBuff.type === 'fire-rate'" class="flex items-center bg-gradient-to-r from-yellow-50 to-red-50 p-3 rounded-lg">
+              <div class="w-8 h-8 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full flex items-center justify-center text-white mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium">Fire Rate Boost</div>
+                <div class="text-sm">Consecutive attacks build fire rate, multiplying XP gain by up to x{{ (1.3 + (0.1 * (selectedBuff.value - 1))).toFixed(1) }}</div>
+                <div class="flex items-center mt-1">
+                  <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">Tier 1: x1.1</span>
+                  <span class="mx-1">→</span>
+                  <span class="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">Tier 2: x1.2</span>
+                  <span class="mx-1">→</span>
+                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">Tier 3: x{{ (1.3 + (0.1 * (selectedBuff.value - 1))).toFixed(1) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
           
           <!-- Close Button -->
@@ -169,7 +188,8 @@ const getBuffBorderClass = (type: string) => {
     'attack-boost': 'border-red-500',
     'defense-boost': 'border-blue-500',
     'catch-rate': 'border-green-500',
-    'loot-chance': 'border-yellow-500'
+    'loot-chance': 'border-yellow-500',
+    'fire-rate': 'border-orange-500'
   }
   
   return typeClasses[type] || 'border-gray-400'
