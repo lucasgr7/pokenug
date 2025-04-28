@@ -1,7 +1,7 @@
 import { Pokemon, PokemonType } from './pokemon.js';
 
 // Define the possible reward types
-export type RewardType = 'pokeball' | 'potion' | 'berry' | 'material';
+export type RewardType = 'pokeball' | 'potion' | 'berry' | 'material' | 'buff';
 
 // Define a new interface for reward options
 export interface RewardOption {
@@ -13,6 +13,18 @@ export interface RewardOption {
     description: string;
     params: Record<string, any>;
   }
+}
+
+// Add a new interface for buff effects
+export interface BuffEffect {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  type: string; // Type of buff (e.g., 'attack', 'defense', 'xp')
+  value: number; // Current value/level of the buff
+  maxValue?: number; // Maximum level (if applicable)
+  effect: (value: number) => any; // Function that returns the buff effect based on level
 }
 
 export interface IdleJob {
@@ -57,6 +69,39 @@ export const TYPE_COLORS = {
 
 // Default idle jobs configuration
 export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
+  'toxic-emblem': {
+    id: 'toxic-emblem',
+    type: PokemonType.Poison,
+    name: 'Toxic Emblem Training',
+    description: 'Train your Poison Pokemon to enhance your battle skills. Increases XP gained per attack.',
+    maxSlots: 6,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 300, // 5 minutes in milliseconds
+    chance: 1.0, // 100% chance of success - this is a guaranteed buff
+    rewards: [
+      {
+        type: 'buff',
+        chance: 0.5,
+        weight: 100,
+        itemDetails: {
+          name: 'Toxic Emblem',
+          description: 'Increases XP gained per attack by 1',
+          params: { 
+            buffId: 'toxic-emblem',
+            buffType: 'xp-boost',
+            imageUrl: '/images/toxic-emblem.png'  // You'll need to add this image
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/toxic-emblem.png', // You'll need to add this image
+    backgroundColor: TYPE_COLORS[PokemonType.Poison],
+    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+  },
+  
   'pokeball-production': {
     id: 'pokeball-production',
     type: PokemonType.Bug,

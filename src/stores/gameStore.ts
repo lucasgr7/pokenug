@@ -4,6 +4,7 @@ import { IdleJob, DEFAULT_IDLE_JOBS } from '@/types/idleJobs.js'
 import { itemFactory } from '@/services/itemFactory'
 import { useInventoryStore } from './inventoryStore'
 import regions from '@/constants/regions.js'
+import { useBuffStore } from './buffStore'
 
 interface BattleState {
   wildPokemon: Pokemon | null;
@@ -100,8 +101,15 @@ export const useGameStore = defineStore('game', {
       // Check in available Pokémon
       const inAvailable = state.availablePokemon.some(pokemon => 
         pokemon.types && pokemon.types.includes(type));
+
+      // Check for pokemon in idleJobs
+      const inIdleJobs = Object.values(state.idleJobs).some(job => 
+        job.assignedPokemon.some(pokemon => 
+          pokemon.types && pokemon.types.includes(type)
+        )
+      );
         
-      return inParty || inAvailable;
+      return inParty || inAvailable || inIdleJobs;
     },
     getJobTimeReduction: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
@@ -1059,6 +1067,7 @@ export const useGameStore = defineStore('game', {
     completeJob(jobId: string) {
       const job = this.idleJobs[jobId];
       const inventoryStore = useInventoryStore();
+      const buffStore = useBuffStore();
       
       if (!job) return;
       
@@ -1070,14 +1079,25 @@ export const useGameStore = defineStore('game', {
       // Check reward chance with the enhanced calculation
       if (Math.random() < successChance) {
         // Handle the reward based on type
-        if (job.rewards) {
+        if (job.rewards && job.rewards.length > 0) {
+          // Filter rewards by their weight/probability
+          const totalWeight = job.rewards.reduce((sum, reward) => sum + reward.weight, 0);
+          const randomValue = Math.random() * totalWeight;
           
-          const selectedReward = job.rewards[Math.floor(Math.random() * job.rewards.length)];
+          let cumulativeWeight = 0;
+          let selectedReward = null;
+          
+          for (const reward of job.rewards) {
+            cumulativeWeight += reward.weight;
+            if (randomValue <= cumulativeWeight) {
+              selectedReward = reward;
+              break;
+            }
+          }
+          
           if (!selectedReward?.itemDetails) return;
           
-          const {name, description, params} = Array.isArray(selectedReward.itemDetails) ? 
-            selectedReward.itemDetails[Math.floor(Math.random() * selectedReward.itemDetails.length)] :
-            selectedReward.itemDetails;
+          const {name, description, params} = selectedReward.itemDetails;
           
           switch (selectedReward.type) {
             case 'pokeball':
@@ -1113,18 +1133,32 @@ export const useGameStore = defineStore('game', {
               );
               break;
               
+            case 'buff':
+              // Handle buff rewards - add or upgrade buff
+              const buffId = params.buffId || name.toLowerCase().replace(/\s+/g, '-');
+              buffStore.addBuff({
+                id: buffId,
+                name: name,
+                description: description,
+                icon: params.imageUrl || '/images/not-found.png',
+                type: params.buffType,
+                value: 1,
+                effect: (value) => value // Default effect function
+              });
+              break;
+              
             default:
               // Legacy fallback for pokeball only system
-              if (job.reward.type === 'pokeball') {
+              if (selectedReward.type === 'pokeball') {
                 this.pokeballs++;
               }
               break;
           }
-          
-          job.successfulCompletions++;
-          // Add success notification
-          this.addNotification(`${job.name} complete! Received ${name}.`, 'success');
         }
+        
+        job.successfulCompletions++;
+        // Add success notification
+        this.addNotification(`${job.name} complete! Received ${name}.`, 'success');
       } else {
         // Add failure notification - job completed but no reward
         this.addNotification(`${job.name} complete, but no reward found.`, 'error');

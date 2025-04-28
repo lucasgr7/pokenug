@@ -1,18 +1,30 @@
 <template>
-  <div class="relative w-[180px]">
-    <!-- XP Bar -->
-    <div class="relative h-3 bg-orange-100 rounded-full overflow-hidden">
+  <div class="relative w-full">
+    <!-- XP Bar Container with enhanced design -->
+    <div class="relative h-6 bg-gradient-to-r from-orange-100 to-orange-200 rounded-lg overflow-hidden shadow-inner border border-orange-300">
+      <!-- XP Progress -->
       <div
-        class="h-full bg-orange-500 transition-all duration-600 ease-out rounded-full glow-effect"
+        class="h-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-600 ease-out rounded-full glow-effect"
         :class="{ 'animate-level-up': isLevelingUp }"
         :style="{
           width: `${(experience / experienceToNextLevel) * 100}%`,
-          boxShadow: isGainingXP ? '0 0 10px rgba(249, 115, 22, 0.8)' : 'none'
+          boxShadow: isGainingXP ? '0 0 15px rgba(249, 115, 22, 0.8)' : 'none'
         }"
-      ></div>
+      >
+        <!-- Shimmer effect -->
+        <div class="shimmer-effect"></div>
+      </div>
+
+      <!-- XP Text with enhanced styling -->
+      <div class="absolute top-0 left-0 right-0 bottom-0 flex justify-center items-center">
+        <div class="px-3 py-0.5 bg-white bg-opacity-30 rounded-full backdrop-filter backdrop-blur-sm">
+          <span class="text-sm text-orange-800 font-bold drop-shadow-sm">{{ Math.floor(experience) }}/{{ experienceToNextLevel }}</span>
+          <span class="ml-2 text-xs bg-orange-700 text-white px-2 py-0.5 rounded-full font-semibold">Lv.{{ level }}</span>
+        </div>
+      </div>
     </div>
 
-    <!-- Floating XP Numbers -->
+    <!-- Floating XP Numbers with enhanced animation -->
     <TransitionGroup 
       name="float-up" 
       tag="div" 
@@ -22,17 +34,16 @@
       <div
         v-for="xpGain in recentXPGains"
         :key="xpGain.id"
-        class="absolute text-orange-500 font-bold text-sm animate-float-up glow-text"
-        :style="{ left: `${xpGain.x}%`, bottom: '0' }"
+        class="absolute text-amber-400 font-bold text-sm animate-float-up"
+        :style="{ 
+          left: `${xpGain.x}%`, 
+          bottom: '0',
+          textShadow: '0 0 8px rgba(251, 191, 36, 0.8), 0 0 5px rgba(251, 191, 36, 0.5), 0 0 3px rgba(251, 191, 36, 0.3)'
+        }"
       >
-        +{{ xpGain.amount }}
+        +{{ xpGain.amount }} XP
       </div>
     </TransitionGroup>
-
-    <!-- XP Text -->
-    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 text-xs text-orange-700 font-bold">
-      {{ Math.floor(experience) }}/{{ experienceToNextLevel }}
-    </div>
   </div>
 </template>
 
@@ -75,17 +86,13 @@ const triggerGlowEffect = () => {
   isGainingXP.value = true
   setTimeout(() => {
     isGainingXP.value = false
-  }, 600)
+  }, 1000)
 }
 </script>
 
 <style scoped>
 .glow-effect {
-  filter: drop-shadow(0 0 5px rgba(249, 115, 22, 0.5));
-}
-
-.glow-text {
-  text-shadow: 0 0 5px rgba(249, 115, 22, 0.8);
+  filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.7));
 }
 
 .float-up-enter-active {
@@ -99,14 +106,21 @@ const triggerGlowEffect = () => {
 @keyframes float-up {
   0% {
     transform: translateY(0);
+    opacity: 0;
+    scale: 0.8;
+  }
+  20% {
     opacity: 1;
+    scale: 1.2;
   }
   60% {
     opacity: 1;
+    scale: 1;
   }
   100% {
-    transform: translateY(-50px);
+    transform: translateY(-60px);
     opacity: 0;
+    scale: 0.8;
   }
 }
 
@@ -115,12 +129,37 @@ const triggerGlowEffect = () => {
 }
 
 .animate-level-up {
-  animation: levelUp 0.6s ease-out;
+  animation: levelUp 0.8s ease-out;
 }
 
 @keyframes levelUp {
   0% { transform: scaleY(1); }
-  50% { transform: scaleY(1.5); filter: brightness(1.5); }
+  50% { transform: scaleY(1.8); filter: brightness(1.5); }
   100% { transform: scaleY(1); }
+}
+
+/* Shimmer effect */
+.shimmer-effect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 </style>

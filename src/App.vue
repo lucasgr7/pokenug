@@ -42,6 +42,7 @@ import TeamList from './components/TeamList.vue'
 import QuickInventory from './components/QuickInventory.vue'
 import NotificationSystem from '@/components/NotificationSystem.vue'
 import { useInventory } from './composables/useInventory'
+import { useBuffStore } from './stores/buffStore'
 
 const routes = [
   { path: '/', name: 'Explore' },
@@ -58,10 +59,15 @@ if(import.meta.env.MODE === 'development') {
 }
 // Use the inventory composable
 const inventory = useInventory()
+// Use the buff store
+const buffStore = useBuffStore()
 
 onMounted(() => {
   // Initialize inventory
   const inventoryStore = inventory.getInventoryStore()
   inventoryStore.initializeInventory()
+  
+  // Initialize buff store to load saved buffs
+  buffStore.initializeBuffStore()
 })
 </script>

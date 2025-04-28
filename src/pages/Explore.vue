@@ -1,12 +1,16 @@
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
-    <!-- XP Bar -->
-    <div v-if="gameStore.activePokemon" class="mb-4 flex justify-center">
+    <!-- XP Bar and Buffs Section - Modified layout -->
+    <div v-if="gameStore.activePokemon" class="mb-4 flex flex-col gap-2">
+      <!-- XP Bar with full width -->
       <XPBar
+        class="w-full"
         :experience="gameStore.activePokemon.experience!"
         :experienceToNextLevel="gameStore.activePokemon.experienceToNextLevel!"
         :level="gameStore.activePokemon.level!"
       />
+      <!-- BuffDisplay positioned below XPBar -->
+      <BuffDisplay class="w-full" />
     </div>
 
     <!-- Add warning message -->
@@ -366,6 +370,8 @@ import type { Pokemon, InventoryItem } from '@/types/pokemon'
 import regions from '@/constants/regions'
 import items from '@/constants/items'
 import { useRouter } from 'vue-router'
+import { useBuffStore } from '@/stores/buffStore'
+import BuffDisplay from '@/components/BuffDisplay.vue'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
@@ -641,8 +647,16 @@ const attack = () => {
   
   isPlayerAttacking.value = true
   
-  // Add 1 XP per attack
-  gameStore.activePokemon.experience = (gameStore.activePokemon.experience || 0) + 1
+  // Import the buff store to get XP boosts
+  const buffStore = useBuffStore();
+  
+  // Get XP boost from buffs (especially from Toxic Emblem)
+  const xpBoost = buffStore.getTotalXPBonus;
+  
+  // Add 1 XP per attack + any XP boost from buffs
+  const baseXpPerAttack = 1;
+  const totalXpPerAttack = baseXpPerAttack + xpBoost;
+  gameStore.activePokemon.experience = (gameStore.activePokemon.experience || 0) + totalXpPerAttack;
   
   setTimeout(() => {
     isPlayerAttacking.value = false
@@ -661,6 +675,14 @@ const attack = () => {
       message: `${gameStore.activePokemon.name} attacks ${wildPokemon.value.name} for ${damage} damage!`,
       type: 'damage'
     })
+    
+    // Add a log message for XP boost if applicable
+    if (xpBoost > 0) {
+      battleLogs.value.push({
+        message: `Toxic Emblem gives +${xpBoost} bonus XP!`,
+        type: 'system'
+      });
+    }
     
     setTimeout(() => {
       isWildPokemonHurt.value = false

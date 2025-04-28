@@ -21,6 +21,13 @@
         </button>
       </div>
     </div>
+    <!-- State Display -->
+    <div class="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+      <h3 class="text-lg font-semibold mb-2">Game State</h3>
+      <pre class="bg-gray-800 text-white p-4 rounded overflow-auto max-h-96">
+        {{ JSON.stringify(gameStore.$state, null, 2) }}
+      </pre>
+    </div>
 
     
   </div>
