@@ -225,11 +225,11 @@ export const useBuffStore = defineStore('buff', {
       if (!fireEmblemBuff || !this.fireRateState.active) return;
       
       // Check count thresholds for tier upgrades
-      if (this.fireRateState.count >= 125 && this.fireRateState.tier < 3) {
+      if (this.fireRateState.count >= 75 && this.fireRateState.tier < 3) {
         this.fireRateState.tier = 3; // Max tier
         this.updateTimeAllowed(); // Update time allowed
         this.updateFireRateMultiplier();
-      } else if (this.fireRateState.count >= 50 && this.fireRateState.tier < 2) {
+      } else if (this.fireRateState.count >= 20 && this.fireRateState.tier < 2) {
         this.fireRateState.tier = 2;
         this.updateTimeAllowed(); // Update time allowed
         this.updateFireRateMultiplier();
