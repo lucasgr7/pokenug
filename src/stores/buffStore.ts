@@ -168,7 +168,7 @@ export const useBuffStore = defineStore('buff', {
       this.updateTimeAllowed();
       
       // If we haven't activated fire rate yet, check if we've hit 25 attacks
-      if (!this.fireRateState.active && this.fireRateState.count >= 25) {
+      if (!this.fireRateState.active && this.fireRateState.count >= 20) {
         this.activateFireRate();
       }
       // Update tiers based on consecutive attacks
@@ -225,11 +225,11 @@ export const useBuffStore = defineStore('buff', {
       if (!fireEmblemBuff || !this.fireRateState.active) return;
       
       // Check count thresholds for tier upgrades
-      if (this.fireRateState.count >= 75 && this.fireRateState.tier < 3) {
+      if (this.fireRateState.count >= 80 && this.fireRateState.tier < 3) {
         this.fireRateState.tier = 3; // Max tier
         this.updateTimeAllowed(); // Update time allowed
         this.updateFireRateMultiplier();
-      } else if (this.fireRateState.count >= 20 && this.fireRateState.tier < 2) {
+      } else if (this.fireRateState.count >= 40 && this.fireRateState.tier < 2) {
         this.fireRateState.tier = 2;
         this.updateTimeAllowed(); // Update time allowed
         this.updateFireRateMultiplier();
