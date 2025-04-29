@@ -347,7 +347,7 @@ export const useBuffStore = defineStore('buff', {
       } else if (this.fireRateState.tier === 3) {
         this.fireRateState.multiplier = tier3Multiplier;
       } else {
-        this.fireRateState.multiplier = 1.0;
+        this.fireRateState.multiplier = 1.1;
       }
     }
   }
