@@ -16,6 +16,12 @@ interface BuffState {
   pokemonDefeatedCount: number; // Track defeated Pokemon count for spawn delay
   lastRegionId: string | null; // Track the region ID to reset count on region change
   stunResistanceProgress: number; // Track stun resistance progress (0.01% per completion)
+  autoAttackState: {
+    active: boolean;
+    lastAttackTime: number;
+    interval: number;
+    triggerAttack: boolean; // New reactive property to trigger auto-attacks
+  };
 }
 
 export const useBuffStore = defineStore('buff', {
@@ -32,7 +38,13 @@ export const useBuffStore = defineStore('buff', {
     },
     pokemonDefeatedCount: 0,
     lastRegionId: null,
-    stunResistanceProgress: 0 // Initialize at 0%
+    stunResistanceProgress: 0, // Initialize at 0%
+    autoAttackState: {
+      active: false,
+      lastAttackTime: 0,
+      interval: 5000, // Default interval (5 seconds)
+      triggerAttack: false // Initialize as false
+    }
   }),
 
   getters: {
@@ -79,7 +91,35 @@ export const useBuffStore = defineStore('buff', {
     // Check if Rock Emblem is active
     hasRockEmblem: (state) => {
       return state.buffs['rock-emblem'] !== undefined;
-    }
+    },
+    
+    // Check if Electric Emblem (auto-attack) is active
+    hasElectricEmblem: (state) => {
+      return state.buffs['electric-emblem'] !== undefined;
+    },
+    
+    // Get auto-attack state
+    getAutoAttackState: (state) => state.autoAttackState,
+    
+    // Calculate auto-attack interval based on buff level
+    getAutoAttackInterval: (state) => {
+      const electricEmblem = state.buffs['electric-emblem'];
+      if (!electricEmblem) return 5000; // Default 5 seconds if no buff
+      
+      const level = electricEmblem.value;
+      // Formula: auto_attack_interval = 0.5 + (5.0 - 0.5) * exp(-0.003 * level)
+      // This gives approximately 5s at level 1, and approaches 0.5s as level increases
+      const interval = 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
+      
+      // Convert to milliseconds
+      return Math.round(interval * 1000);
+    },
+    
+    // Check if auto-attack is available (has buff and level > 0)
+    canAutoAttack: (state) => {
+      const electricEmblem = state.buffs['electric-emblem'];
+      return electricEmblem !== undefined && electricEmblem.value > 0;
+    },
   },
 
   actions: {
@@ -90,9 +130,7 @@ export const useBuffStore = defineStore('buff', {
     },
     
     // Check if stun should be resisted based on current progress
-    shouldResistStun() {
-      // Get random number between 0-1
-      const roll = Math.random();
+    shouldResistStun(roll: number) {
       // Check if roll is less than current resistance chance
       return roll < this.stunResistanceProgress;
     },
@@ -313,6 +351,69 @@ export const useBuffStore = defineStore('buff', {
       this.saveState();
     },
 
+    // Toggle auto-attack on/off
+    toggleAutoAttack() {
+      // If user doesn't have the Electric Emblem buff, do nothing
+      if (!this.hasElectricEmblem) return false;
+      
+      // Toggle active state
+      this.autoAttackState.active = !this.autoAttackState.active;
+      
+      // If turning on, update interval and lastAttackTime
+      if (this.autoAttackState.active) {
+        // Fix: Calculate the interval as a numeric value instead of using the getter reference
+        const electricEmblem = this.buffs['electric-emblem'];
+        const level = electricEmblem?.value || 1;
+        const intervalSeconds = 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
+        this.autoAttackState.interval = Math.round(intervalSeconds * 1000);
+        
+        // Set the last attack time to now
+        this.autoAttackState.lastAttackTime = Date.now();
+        
+        console.log(`Auto-attack activated with interval: ${this.autoAttackState.interval}ms (${intervalSeconds.toFixed(2)}s)`);
+      } else {
+        console.log('Auto-attack deactivated');
+      }
+      
+      this.saveState();
+      return this.autoAttackState.active;
+    },
+    
+    // Record an auto-attack
+    recordAutoAttack() {
+      this.autoAttackState.lastAttackTime = Date.now();
+      
+      // Only reset triggerAttack if it was true
+      if (this.autoAttackState.triggerAttack) {
+        this.autoAttackState.triggerAttack = false;
+      }
+      
+      this.saveState();
+    },
+    
+    // Check if it's time for an auto-attack
+    shouldAutoAttack() {
+      if (!this.autoAttackState.active) return false;
+      
+      const now = Date.now();
+      const elapsed = now - this.autoAttackState.lastAttackTime;
+      
+      // Check if enough time has passed since the last attack
+      if (elapsed >= this.autoAttackState.interval) {
+        // Set the reactive property to trigger the attack
+        this.autoAttackState.triggerAttack = true;
+        return true;
+      }
+      
+      return false;
+    },
+    
+    // Update auto-attack interval (should be called when buff level changes)
+    updateAutoAttackInterval() {
+      this.autoAttackState.interval = this.getAutoAttackInterval;
+      this.saveState();
+    },
+    
     initializeBuffStore() {
       const savedState = localStorage.getItem('buffState');
       
@@ -330,7 +431,12 @@ export const useBuffStore = defineStore('buff', {
             timeAllowed: 5000
           },
           pokemonDefeatedCount: state.pokemonDefeatedCount || 0,
-          lastRegionId: state.lastRegionId || null
+          lastRegionId: state.lastRegionId || null,
+          autoAttackState: state.autoAttackState || {
+            active: false,
+            lastAttackTime: 0,
+            interval: 5000
+          }
         });
       }
     },
@@ -340,7 +446,8 @@ export const useBuffStore = defineStore('buff', {
         buffs: JSON.parse(JSON.stringify(this.buffs)),
         fireRateState: this.fireRateState,
         pokemonDefeatedCount: this.pokemonDefeatedCount,
-        lastRegionId: this.lastRegionId
+        lastRegionId: this.lastRegionId,
+        autoAttackState: this.autoAttackState
       };
       
       localStorage.setItem('buffState', JSON.stringify(state));

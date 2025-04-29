@@ -70,6 +70,38 @@ export const TYPE_COLORS = {
 
 // Default idle jobs configuration
 export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
+  'electric-emblem': {
+    id: 'electric-emblem',
+    type: PokemonType.Electric,
+    name: 'Electric Emblem Training',
+    description: 'Train your Electric Pokemon to enable auto-attack capability. Higher levels reduce the auto-attack interval.',
+    maxSlots: 4,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 0.01, // 6 hours in milliseconds
+    chance: 0.8, // 80% chance of success
+    rewards: [
+      {
+        type: 'buff',
+        chance: 0.5,
+        weight: 100,
+        itemDetails: {
+          name: 'Electric Emblem',
+          description: 'Enables auto-attack capability. Higher levels reduce the auto-attack interval.',
+          params: {
+            buffId: 'electric-emblem',
+            buffType: 'auto-attack',
+            imageUrl: '/images/eletric-emblem.png'
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/eletric-emblem.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Electric],
+    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+  },
   'fire-emblem': {
     id: 'fire-emblem',
     type: PokemonType.Fire,

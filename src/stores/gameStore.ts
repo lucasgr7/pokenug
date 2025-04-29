@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
-import { Pokemon, PokemonType, InventoryItem, ItemEffect } from '@/types/pokemon.js'
+import { Pokemon, PokemonType, InventoryItem } from '@/types/pokemon.js'
 import { IdleJob, DEFAULT_IDLE_JOBS } from '@/types/idleJobs.js'
-import { itemFactory } from '@/services/itemFactory'
-import { useInventoryStore } from './inventoryStore'
+import { itemFactory } from '@/services/itemFactory.js'
+import { useInventoryStore } from './inventoryStore.js'
 import regions from '@/constants/regions.js'
-import { useBuffStore } from './buffStore'
+import { tickSystem } from '@/services/tickSystem.js'
+import { useBuffStore } from './buffStore.js'
 
 interface BattleState {
   wildPokemon: Pokemon | null;
@@ -13,7 +14,7 @@ interface BattleState {
   isWildPokemonHurt: boolean;
   isEnemyAttacking: boolean;
   isTryingCatch: boolean;
-  battleLogs: Array<{ message: string; type: 'damage' | 'heal' | 'system' }>;
+  battleLogs: Array<{ message: string; type: 'damage' | 'heal' | 'system' }> ;
 }
 
 interface Notification {
@@ -277,6 +278,10 @@ export const useGameStore = defineStore('game', {
           })
         }
 
+        // Initialize buff store for auto-attack functionality
+        const buffStore = useBuffStore();
+        buffStore.initializeBuffStore();
+
         this.$patch({
           playerPokemon: state.playerPokemon ?? [],
           availablePokemon: state.availablePokemon ?? [],  // Load available Pokemon from localStorage
@@ -287,11 +292,22 @@ export const useGameStore = defineStore('game', {
           idleWorking: state.idleWorking ?? [],
           inventory: state.inventory ?? { pokemon: {} }
         })
+
+        // Set up game systems including auto-attack with the tickSystem
+        this.setupGameSystems();
       } else {
         // Initialize the inventory store with defaults
         const inventoryStore = useInventoryStore();
         inventoryStore.initializeInventory();
+
+        // Initialize buff store
+        const buffStore = useBuffStore();
+        buffStore.initializeBuffStore();
+        
         this.selectRandomStarter()
+
+        // Set up the auto-attack processing with the tickSystem
+        this.setupGameSystems();
       }
     },
 
@@ -754,81 +770,183 @@ export const useGameStore = defineStore('game', {
     },
 
     async spawnWildPokemon() {
-      const region = this.currentRegionData
-      const poolPokemon = region.pool[Math.floor(Math.random() * region.pool.length)]
+      const region = this.currentRegionData;
       
-      const response = await fetch('/pokemon-data.json')
-      const pokemonList = await response.json()
-      const pokemon = pokemonList.find((p: Pokemon) => p.id === poolPokemon.id)
+      // Use probability-based selection
+      const weightedPool: Array<{id: number, name: string}> = [];
       
-      if (pokemon) {
-        const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel
-        const stats = this.calculateStats(level)
-        
-        this.battle.wildPokemon = {
-          ...pokemon,
-          level,
-          currentHP: stats.maxHP,
-          maxHP: stats.maxHP,
-          attack: stats.attack,
-          defense: stats.defense,
-          lastAttackTime: Date.now(),
-          isRunning: false
+      region.pool.forEach((pokemon: { probability: number; id: any; name: any }) => {
+        // Add Pokémon to the pool multiple times based on its probability
+        const count = pokemon.probability || 1;
+        for (let i = 0; i < count; i++) {
+          weightedPool.push({ id: pokemon.id, name: pokemon.name });
         }
+      });
+      
+      // Select a random Pokémon from the weighted pool
+      const selectedPokemon = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+      
+      try {
+        const response = await fetch('/pokemon-data.json');
+        const pokemonList = await response.json();
+        const pokemon = pokemonList.find((p: Pokemon) => p.id === selectedPokemon.id);
+        
+        if (pokemon) {
+          const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel;
+          const stats = this.calculateStats(level);
+          
+          this.battle.wildPokemon = {
+            ...pokemon,
+            level,
+            currentHP: stats.maxHP,
+            maxHP: stats.maxHP,
+            attack: stats.attack,
+            defense: stats.defense,
+            lastAttackTime: Date.now(),
+            isRunning: false
+          };
 
-        this.addBattleLog(`A wild ${pokemon.name} (Lvl ${level}) appeared!`, 'system')
+          this.addBattleLog(`A wild ${pokemon.name} (Lvl ${level}) appeared!`, 'system');
+        }
+      } catch (error) {
+        console.error('Failed to spawn wild Pokemon:', error);
       }
       
-      this.battle.spawnTimer = 10
+      this.battle.spawnTimer = 10;
     },
 
+    // Start spawn timer with region and defeat count consideration
     startSpawnTimer() {
-      this.battle.spawnTimer = 1
+      const buffStore = useBuffStore();
+      
+      // Check if we need to delay spawn based on defeat count
+      const shouldDelay = buffStore.shouldDelaySpawn;
+      
+      // Use the region-specific spawnTimer or default
+      const regionTimer = this.currentRegionData.spawnTimer || 10;
+      this.battle.spawnTimer = shouldDelay ? 10 : regionTimer;
+      
+      // If a delay was applied, reset the counter to the next 10
+      if (shouldDelay) {
+        buffStore.resetDefeatCounter();
+        this.addBattleLog(`The area seems quiet after defeating many Pokémon...`, 'system');
+      }
+      
       const interval = setInterval(() => {
-        this.battle.spawnTimer--
+        this.battle.spawnTimer--;
         if (this.battle.spawnTimer <= 0) {
-          clearInterval(interval)
-          this.spawnWildPokemon()
+          clearInterval(interval);
+          this.spawnWildPokemon();
         }
-      }, 1000)
+      }, 1000);
     },
 
     async attack() {
-      if (!this.battle.wildPokemon || !this.activePokemon) return
+      if (!this.battle.wildPokemon || !this.activePokemon) return false;
       
-      this.battle.isPlayerAttacking = true
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Set battle state for animations
+      this.battle.isPlayerAttacking = true;
       
-      this.battle.isPlayerAttacking = false
-      this.battle.isWildPokemonHurt = true
+      // Import the buff store to apply buffs
+      const buffStore = useBuffStore();
       
+      // Register attack for fire rate feature
+      buffStore.registerFireRateAttack(
+        this.activePokemon.id,
+        this.activePokemon.level || 1,
+        this.currentRegion
+      );
+      
+      // Get XP boost from buffs
+      const xpBoost = buffStore.getTotalXPBonus;
+      
+      // Get fire rate multiplier
+      const fireRateMultiplier = buffStore.getFireRateMultiplier;
+      
+      // Calculate XP gain with buffs
+      const baseXpPerAttack = 1;
+      const boostedXp = baseXpPerAttack + xpBoost;
+      const totalXpPerAttack = Math.floor(boostedXp * fireRateMultiplier);
+      
+      // Apply XP gain
+      this.activePokemon.experience = (this.activePokemon.experience || 0) + totalXpPerAttack;
+      
+      // Check for level up
+      const nextLevelXP = this.activePokemon.experienceToNextLevel || 
+                        Math.floor(100 * Math.pow(this.activePokemon.level || 1, 1.5));
+                        
+      if (this.activePokemon.experience >= nextLevelXP) {
+        this.levelUpPokemon(this.activePokemon);
+      }
+      
+      // Short delay for animation
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Reset player attack animation and start enemy hurt animation
+      this.battle.isPlayerAttacking = false;
+      this.battle.isWildPokemonHurt = true;
+      
+      // Calculate damage
       const damage = this.calculateDamage(
         this.activePokemon.attack!,
         this.battle.wildPokemon.defense!,
         this.activePokemon.level!,
         this.battle.wildPokemon.level!
-      )
+      );
       
-      this.battle.wildPokemon.currentHP = Math.max(0, this.battle.wildPokemon.currentHP! - damage)
+      // Apply damage to wild Pokemon
+      this.battle.wildPokemon.currentHP = Math.max(0, this.battle.wildPokemon.currentHP! - damage);
       
+      // Add battle log
       this.addBattleLog(
         `${this.activePokemon.name} attacks ${this.battle.wildPokemon.name} for ${damage} damage!`,
         'damage'
-      )
+      );
       
-      await new Promise(resolve => setTimeout(resolve, 300))
-      this.battle.isWildPokemonHurt = false
-      
-      if (this.battle.wildPokemon.currentHP === 0) {
-        const defeatedPokemon = { ...this.battle.wildPokemon }
-        this.handleXPGain(this.activePokemon, defeatedPokemon)
+      // Add XP log if applicable
+      if (totalXpPerAttack > 0) {
+        let xpLogMessage = '';
         
-        this.addBattleLog(`${defeatedPokemon.name} fainted!`, 'system')
-        this.battle.wildPokemon = null
-        this.startSpawnTimer()
+        // Base XP message
+        if (baseXpPerAttack > 0) {
+          xpLogMessage = `+${baseXpPerAttack} base XP`;
+        }
+        
+        // Add Toxic Emblem message if active
+        if (xpBoost > 0) {
+          xpLogMessage += (xpLogMessage ? ', ' : '') + `+${xpBoost} XP from Toxic Emblem`;
+        }
+        
+        // Add fire rate multiplier message if active
+        const fireRateState = buffStore.getFireRateState;
+        if (fireRateState.active && fireRateMultiplier > 1) {
+          xpLogMessage += (xpLogMessage ? ', ' : '') + `x${fireRateMultiplier.toFixed(1)} Fire Rate`;
+          xpLogMessage += ` (tier ${fireRateState.tier})`;
+        }
+        
+        // Log total XP gain
+        this.addBattleLog(
+          `${xpLogMessage} = ${totalXpPerAttack} total XP gained!`,
+          'system'
+        );
       }
       
-      this.saveState()
+      // Short delay for hurt animation
+      await new Promise(resolve => setTimeout(resolve, 300));
+      this.battle.isWildPokemonHurt = false;
+      
+      // Check if Pokemon fainted
+      if (this.battle?.wildPokemon?.currentHP === 0) {
+        const defeatedPokemon = { ...this.battle.wildPokemon };
+        this.handleXPGain(this.activePokemon, defeatedPokemon);
+        
+        this.addBattleLog(`${defeatedPokemon.name} fainted!`, 'system');
+        this.battle.wildPokemon = null;
+        this.startSpawnTimer();
+      }
+      
+      this.saveState();
+      return true;
     },
 
     handlePokemonFaint() {
@@ -982,7 +1100,7 @@ export const useGameStore = defineStore('game', {
     tryPokemonRun() {
       if (!this.battle.wildPokemon || this.battle.wildPokemon.isRunning) return
       
-      if (Math.random() < RUN_CHANCE) {
+      if (Math.random() < RUN_CHANCE && this.battle.wildPokemon.currentHP! < this.battle.wildPokemon.maxHP! / 2) {
         this.battle.wildPokemon.isRunning = true
         this.addBattleLog(`Wild ${this.battle.wildPokemon.name} is trying to run away!`, 'system')
         
@@ -1379,5 +1497,34 @@ export const useGameStore = defineStore('game', {
         this.notifications.splice(index, 1);
       }
     },
+
+    // Set up game systems including auto-attack with the tickSystem
+    setupGameSystems() {
+      const buffStore = useBuffStore();
+      
+      // Use the tickSystem to handle auto-attack and other time-based game mechanics
+      tickSystem.subscribe((elapsed: number) => {
+        // Process auto-attack if the conditions are met
+        if (this.battle.wildPokemon && this.activePokemon) {
+          // Check if auto-attack is enabled
+          if (buffStore.autoAttackState.active) {
+            const now = Date.now();
+            const timeSinceLastAttack = now - buffStore.autoAttackState.lastAttackTime;
+            
+            // Only trigger attack if enough time has passed
+            if (timeSinceLastAttack >= buffStore.autoAttackState.interval) {
+              console.log('Auto-attack interval reached:', timeSinceLastAttack);
+              this.attack();
+              buffStore.recordAutoAttack();
+            }
+          }
+        }
+
+        // Update job progress for idle jobs
+        Object.keys(this.idleJobs).forEach(jobId => {
+          this.updateJobProgress(jobId, elapsed);
+        });
+      });
+    }
   }
 });

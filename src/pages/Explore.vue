@@ -186,6 +186,26 @@
 
       <!-- Battle Controls with Fire Rate Effects -->
       <div class="flex flex-col justify-center items-center space-y-4 relative">
+        <!-- Auto-attack toggle button (shown when Electric Emblem is active) -->
+        <button
+          v-if="buffStore.canAutoAttack"
+          @click="toggleAutoAttack"
+          class="relative px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors duration-200 overflow-hidden flex items-center"
+          :class="{
+            'bg-yellow-600': buffStore.autoAttackState.active,
+            'bg-yellow-500': !buffStore.autoAttackState.active
+          }"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+          </svg>
+          <span class="relative z-10">{{ buffStore.autoAttackState.active ? 'Auto-Attack: ON' : 'Auto-Attack: OFF' }}</span>
+          <!-- If auto-attack is active, show the interval -->
+          <span v-if="buffStore.autoAttackState.active" class="ml-2 text-xs bg-yellow-400 px-2 py-0.5 rounded-full text-yellow-900">
+            {{ (buffStore.getAutoAttackInterval / 1000).toFixed(1) }}s
+          </span>
+        </button>
+        
         <!-- Attack Button with Fire Effects -->
         <button
           @click="attack"
@@ -376,7 +396,7 @@
     </div>
 
     <!-- Battle Log -->
-    <BattleLog :logs="battleLogs" />
+    <BattleLog :logs="gameStore.battle.battleLogs" />
   </div>
 </template>
 
@@ -400,26 +420,34 @@ import BuffDisplay from '@/components/BuffDisplay.vue'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
+const buffStore = useBuffStore()
 const { findById } = usePokemon()
 const inventory = useInventory()
-const { attemptCapture, isTryingCatch } = usePokemonCapture()
-
-// Battle state
-const wildPokemon = ref<Pokemon | null>(null)
-const spawnTimer = ref(0)
-const isPlayerAttacking = ref(false)
-const isWildPokemonHurt = ref(false)
-const isRecovering = ref(false)
-const recoveryProgress = ref(0)
-const battleLogs = ref<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>([])
-const isEnemyAttacking = ref(false)
+const { attemptCapture } = usePokemonCapture()
 const showPokeballSelector = ref(false)
-const selectedPokeball = ref<InventoryItem | null>(null)
-const router = useRouter()
-
-// Berry system state
 const showBerrySelector = ref(false)
 const activeTasks = ref<any[]>([])
+const wildPokemon = computed(() => gameStore.battle.wildPokemon)
+const isPlayerAttacking = computed(() => gameStore.battle.isPlayerAttacking)
+const isWildPokemonHurt = computed(() => gameStore.battle.isWildPokemonHurt)
+const isEnemyAttacking = computed(() => gameStore.battle.isEnemyAttacking)
+const isTryingCatch = computed(() => gameStore.battle.isTryingCatch)
+
+const selectedPokeball = ref<InventoryItem | null>(null)
+
+const spawnTimer = computed(() => {
+  return gameStore.battle.spawnTimer
+})
+
+const isRecovering = ref(false)
+
+// Total pokeball count
+const totalPokeballs = computed(() => {
+  return inventory.getPokeballCount()
+})
+
+
+
 
 // Get available pokeballs from inventory
 const availablePokeballs = computed(() => {
@@ -434,27 +462,15 @@ const availableBerries = computed(() => {
   })
 })
 
-// Total pokeball count
-const totalPokeballs = computed(() => {
-  return inventory.getPokeballCount()
-})
+// Fire rate state from buffStore
+const fireRateState = computed(() => buffStore.getFireRateState)
 
-// Add computed property for HP percentage
+
+// HP calculations
 const hpPercentage = computed(() => {
-  if (!gameStore.activePokemon || gameStore.activePokemon.currentHP === undefined || gameStore.activePokemon.maxHP === undefined) {
-    return 0
-  }
-  return Math.floor((gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100)
+  if (!gameStore.activePokemon?.currentHP || !gameStore.activePokemon?.maxHP) return 0
+  return (gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100
 })
-
-// Constants
-const ENEMY_ATTACK_INTERVAL = 3000 // 3 seconds
-const RUN_CHANCE = 0.15 // 15% chance to run each check
-const RUN_CHECK_INTERVAL = 5000 // Check for running every 5 seconds
-const BASE_HITS_TO_DEFEAT = 10 // Base number of hits needed to defeat same-level enemy
-const LEVEL_SCALING_FACTOR = 1.2 // How much harder it gets per level difference
-const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
-const DEFAULT_SPAWN_TIMER = 10 // Default spawn timer in seconds
 
 // Select a pokeball to use
 function selectPokeball(ball: InventoryItem) {
@@ -527,509 +543,30 @@ function cancelBerryTask(taskId: string) {
   updateActiveTasks()
 }
 
+
+// Add this function to map regions to background images
+const getRegionBackgroundImage = (regionId: string) => {
+  const backgroundMap: Record<string, string> = {
+    'viridian-forest': '/images/backgrounds/viridian-palace.png',
+    'cerulean-cave (10-15)': '/images/backgrounds/cave.png',
+    // Default to viridian for other regions until more backgrounds are available
+    'beach-zone (15-25)': '/images/backgrounds/beach.png',
+    'Mountains (30-50)': '/images/backgrounds/mountains.png',
+    'ironworks-zone (80-120)': '/images/backgrounds/ironworks.png',
+
+  }
+  
+  return backgroundMap[regionId] || '/images/backgrounds/viridian-palace.png'
+}
+
 // Update the active tasks list
 function updateActiveTasks() {
   activeTasks.value = berryService.getActiveTasksForRegion(gameStore.currentRegion)
 }
-
-// Perform the actual capture attempt with the selected pokeball
-async function performCapture(ball: InventoryItem) {
-  if (!wildPokemon.value) return
-  
-  // Get the item definition for the ball from constants
-  const ballDefinition = inventory.getItemDefinition(ball.id)
-  
-  if (!ballDefinition) {
-    battleLogs.value.push({
-      message: `Error: Could not find the ball definition`,
-      type: 'system'
-    })
-    return
-  }
-  
-  battleLogs.value.push({
-    message: `Threw a ${ball.name} at ${wildPokemon.value.name}!`,
-    type: 'system'
-  })
-  // Use the capture composable to attempt the capture
-  const result = await attemptCapture(wildPokemon.value, ballDefinition)
-  
-  // Add the result message to battle logs
-  battleLogs.value.push({
-    message: result.message,
-    type: 'system'
-  })
-  
-  // If the capture was successful, clear the wild Pokemon and restart spawn timer
-  if (result.success) {
-    wildPokemon.value = null
-    startSpawnTimer()
-  }
-}
-
-const calculateStats = (level: number) => {
-  const baseHP = 100 // Base HP for level 1
-  const hpPerLevel = 20 // HP increase per level
-  
-  // Calculate max HP based on level
-  const maxHP = Math.floor(baseHP + (hpPerLevel * (level - 1)))
-  
-  // Calculate attack to achieve desired number of hits to defeat
-  const baseAttack = Math.floor(baseHP / BASE_HITS_TO_DEFEAT)
-  const attackPerLevel = baseAttack * 0.2 // 20% increase per level
-  const attack = Math.floor(baseHP + (attackPerLevel * (level - 1)))
-  
-  // Defense scales similarly to attack but slightly lower
-  const baseDefense = Math.floor(baseAttack * 0.8)
-  const defensePerLevel = baseDefense * 0.2
-  const defense = Math.floor(baseDefense + (defensePerLevel * (level - 1)))
-  
-  return {
-    maxHP,
-    attack,
-    defense
-  }
-}
-
-const calculateDamage = (attack: number, defense: number, attackerLevel: number, defenderLevel: number) => {
-  // Base damage calculation
-  const levelDifference = attackerLevel - defenderLevel
-  const levelScaling = Math.pow(LEVEL_SCALING_FACTOR, levelDifference)
-  
-  // Calculate base damage
-  let baseDamage = (attack * levelScaling) * (1 - (defense / (defense + 100)))
-  
-  // Add randomness (±15% variation)
-  const variation = 0.85 + (Math.random() * 0.3)
-  const finalDamage = Math.max(1, Math.floor(baseDamage * variation))
-  
-  return finalDamage
-}
-
-const calculateXPGain = (playerLevel: number, enemyLevel: number) => {
-  return Math.floor(10 * (enemyLevel / playerLevel)) * (IS_DEVELOPMENT ? 20 : 20)
-}
-
-const calculateXPForNextLevel = (currentLevel: number) => {
-  return Math.floor(100 * Math.pow(currentLevel, 1.5))
-}
-
-// Update the spawnWildPokemon function
-const spawnWildPokemon = async () => {
-  const region = gameStore.currentRegionData
-  
-  // Use probability-based selection instead of random index
-  // Create a weighted array of Pokémon based on their probability
-  const weightedPool: Array<{id: number, name: string}> = []
-  
-  region.pool.forEach((pokemon: { probability: number; id: any; name: any }) => {
-    // Add Pokémon to the pool multiple times based on its probability
-    const count = pokemon.probability || 1
-    for (let i = 0; i < count; i++) {
-      weightedPool.push({ id: pokemon.id, name: pokemon.name })
-    }
-  })
-  
-  // Select a random Pokémon from the weighted pool
-  const selectedPokemon = weightedPool[Math.floor(Math.random() * weightedPool.length)]
-  
-  const pokemon = await findById(selectedPokemon.id)
-  if (pokemon) {
-    const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel
-    const stats = calculateStats(level)
-    
-    wildPokemon.value = {
-      ...pokemon,
-      level,
-      currentHP: stats.maxHP,
-      maxHP: stats.maxHP,
-      attack: stats.attack,
-      defense: stats.defense,
-      lastAttackTime: Date.now(),
-      isRunning: false
-    }
-
-    battleLogs.value.push({
-      message: `A wild ${pokemon.name} (Lvl ${level}) appeared!`,
-      type: 'system'
-    })
-  }
-  
-  spawnTimer.value = DEFAULT_SPAWN_TIMER
-}
-
-const handleXPGain = (playerPokemon: Pokemon, defeatedPokemon: Pokemon) => {
-  const xpGain = calculateXPGain(playerPokemon.level!, defeatedPokemon.level!)
-  const currentXP = playerPokemon.experience || 0
-  const nextLevelXP = playerPokemon.experienceToNextLevel || calculateXPForNextLevel(playerPokemon.level!)
-  
-  playerPokemon.experience = currentXP + xpGain
-  
-  battleLogs.value.push({
-    message: `${playerPokemon.name} gained ${xpGain} XP!`,
-    type: 'system'
-  })
-  
-  // Register the defeated Pokémon in the buff store counter
-  buffStore.registerPokemonDefeat(gameStore.currentRegion)
-  
-  // Check for level up
-  if (playerPokemon.experience >= nextLevelXP) {
-    gameStore.levelUpPokemon(playerPokemon)
-  }
-}
-
-// Update attack function to pass Pokemon level and region ID to the fire rate system
-const attack = () => {
+// Handle attack action
+const attack = async () => {
   if (!wildPokemon.value || !gameStore.activePokemon) return
-  
-  isPlayerAttacking.value = true
-  
-  // Import the buff store to get XP boosts
-  const buffStore = useBuffStore();
-  
-  // Register attack for fire rate feature with Pokemon ID, level, and region ID
-  buffStore.registerFireRateAttack(
-    gameStore.activePokemon.id,
-    gameStore.activePokemon.level || 1,
-    gameStore.currentRegion
-  );
-  
-  // Get fire rate state for effects
-  const fireRateState = buffStore.getFireRateState;
-  
-  // Get XP boost from buffs (especially from Toxic Emblem)
-  const xpBoost = buffStore.getTotalXPBonus;
-  
-  // Get fire rate multiplier
-  const fireRateMultiplier = buffStore.getFireRateMultiplier;
-  
-  // Add 1 XP per attack + any XP boost from buffs, then apply fire rate multiplier
-  const baseXpPerAttack = 1;
-  const boostedXp = baseXpPerAttack + xpBoost;
-  const totalXpPerAttack = Math.floor(boostedXp * fireRateMultiplier);
-  
-  // Apply XP gain
-  gameStore.activePokemon.experience = (gameStore.activePokemon.experience || 0) + totalXpPerAttack;
-  
-  // check for level up
-  const nextLevelXP = gameStore.activePokemon.experienceToNextLevel || calculateXPForNextLevel(gameStore.activePokemon.level!)
-  if (gameStore.activePokemon!.experience! >= nextLevelXP) {
-    gameStore.levelUpPokemon(gameStore.activePokemon)
-  }
-  
-  setTimeout(() => {
-    isPlayerAttacking.value = false
-    isWildPokemonHurt.value = true
-    
-    const damage = calculateDamage(
-      gameStore.activePokemon.attack!,
-      wildPokemon.value.defense!,
-      gameStore.activePokemon.level!,
-      wildPokemon.value.level!
-    )
-    
-    wildPokemon.value.currentHP = Math.max(0, wildPokemon.value.currentHP! - damage)
-    
-    battleLogs.value.push({
-      message: `${gameStore.activePokemon.name} attacks ${wildPokemon.value.name} for ${damage} damage!`,
-      type: 'damage'
-    })
-    
-    // Add xp logs based on which buffs are active
-    let xpLogMessage = '';
-    
-    // Base XP message
-    if (baseXpPerAttack > 0) {
-      xpLogMessage = `+${baseXpPerAttack} base XP`;
-    }
-    
-    // Add Toxic Emblem message if active
-    if (xpBoost > 0) {
-      xpLogMessage += (xpLogMessage ? ', ' : '') + `+${xpBoost} XP from Toxic Emblem`;
-    }
-    
-    // Add fire rate multiplier message if active
-    if (fireRateState.active && fireRateMultiplier > 1) {
-      xpLogMessage += (xpLogMessage ? ', ' : '') + `x${fireRateMultiplier.toFixed(1)} Fire Rate`;
-      xpLogMessage += ` (tier ${fireRateState.tier})`;
-    }
-    
-    // Log total XP gain
-    if (xpLogMessage) {
-      battleLogs.value.push({
-        message: `${xpLogMessage} = ${totalXpPerAttack} total XP gained!`,
-        type: 'system'
-      });
-    }
-    
-    setTimeout(() => {
-      isWildPokemonHurt.value = false
-      if (wildPokemon.value?.currentHP === 0) {
-        const defeatedPokemon = { ...wildPokemon.value }
-        handleXPGain(gameStore.activePokemon!, defeatedPokemon)
-        
-        battleLogs.value.push({
-          message: `${defeatedPokemon.name} fainted!`,
-          type: 'system'
-        })
-        wildPokemon.value = null
-        startSpawnTimer()
-        
-        gameStore.saveState()
-      }
-    }, 300)
-  }, 200)
-}
-
-const handlePokemonFaint = () => {
-  if (!gameStore.activePokemon) return
-  
-  // Set fainted status and recovery timer
-  const now = Date.now()
-  gameStore.activePokemon.faintedAt = now
-  gameStore.activePokemon.recoveryEndTime = now + (60 * 1000) // 60 seconds
-  gameStore.saveState()
-
-  // Find next available Pokemon
-  const nextPokemon = gameStore.findNextAvailablePokemon()
-  
-  if (nextPokemon) {
-    battleLogs.value.push({
-      message: `Go, ${nextPokemon.name}!`,
-      type: 'system'
-    })
-    gameStore.setActivePokemon(nextPokemon)
-  } else if (wildPokemon.value) {
-    battleLogs.value.push({
-      message: `No more Pokemon available! The wild ${wildPokemon.value.name} fled.`,
-      type: 'system'
-    });
-    gameStore.addNotification(
-      `No more Pokemon available! The wild ${wildPokemon.value.name} fled.`,
-      'warning'
-    );
-    router.push('/idle-jobs')
-    wildPokemon.value = null
-    
-    startSpawnTimer()
-  }
-}
-
-// Update the enemyAttack function
-const enemyAttack = () => {
-  if (!wildPokemon.value || !gameStore.activePokemon || wildPokemon.value.isRunning) return
-  
-  const now = Date.now()
-  if (!wildPokemon.value.lastAttackTime || (now - wildPokemon.value.lastAttackTime) >= ENEMY_ATTACK_INTERVAL) {
-    isEnemyAttacking.value = true
-    setTimeout(() => {
-      isEnemyAttacking.value = false
-      const damage = calculateDamage(
-        wildPokemon.value!.attack!,
-        gameStore.activePokemon!.defense!,
-        wildPokemon.value!.level!,
-        gameStore.activePokemon!.level!
-      ) * 5
-      
-      const updatedHP = Math.max(0, gameStore.activePokemon.currentHP! - damage);
-      
-      // Use the new store action to update HP
-      gameStore.updatePokemonHP(gameStore.activePokemon, updatedHP)
-      
-      wildPokemon.value!.lastAttackTime = now
-      
-      battleLogs.value.push({
-        message: `${wildPokemon.value!.name} attacks ${gameStore.activePokemon.name} for ${damage} damage!`,
-        type: 'damage'
-      })
-
-      if (updatedHP === 0) {
-        battleLogs.value.push({
-          message: `${gameStore.activePokemon.name} fainted!`,
-          type: 'system'
-        })
-        handlePokemonFaint()
-      }
-    }, 200)
-  }
-}
-
-const tryPokemonRun = () => {
-  if (!wildPokemon.value || wildPokemon.value.isRunning) return
-  
-  if (Math.random() < RUN_CHANCE) {
-    wildPokemon.value.isRunning = true
-    battleLogs.value.push({
-      message: `Wild ${wildPokemon.value.name} is trying to run away!`,
-      type: 'system'
-    })
-    
-    setTimeout(() => {
-      if (wildPokemon.value) {
-        battleLogs.value.push({
-          message: `Wild ${wildPokemon.value.name} ran away!`,
-          type: 'system'
-        })
-        wildPokemon.value = null
-        startSpawnTimer()
-      }
-    }, 2000)
-  }
-}
-
-// Spawn system with region-specific timer and defeat count delay
-const startSpawnTimer = () => {
-  // Get the buff store to check for defeated count
-  const buffStore = useBuffStore();
-  
-  // Check if we need to delay spawn based on defeat count
-  const shouldDelay = buffStore.shouldDelaySpawn;
-  
-  // Use the region-specific spawnTimer or a 10-second delay if needed
-  const regionTimer = gameStore.currentRegionData.spawnTimer || DEFAULT_SPAWN_TIMER;
-  spawnTimer.value = shouldDelay ? 10 : regionTimer;
-  
-  // If a delay was applied, reset the counter to the next 10
-  if (shouldDelay) {
-    buffStore.resetDefeatCounter();
-    battleLogs.value.push({
-      message: `The area seems quiet after defeating many Pokémon...`,
-      type: 'system'
-    });
-  }
-  
-  const interval = setInterval(() => {
-    spawnTimer.value--;
-    if (spawnTimer.value <= 0) {
-      clearInterval(interval);
-      
-      // Always spawn a Pokémon when the timer ends
-      spawnWildPokemon();
-    }
-  }, 1000);
-}
-
-
-// Lifecycle
-let unsubscribe: (() => void) | null = null
-
-// Fire rate state from buff store
-const buffStore = useBuffStore()
-const fireRateState = computed(() => buffStore.getFireRateState)
-
-// Create an element for the cursor counter
-let cursorCounter: HTMLElement | null = null
-
-onMounted(() => {
-  gameStore.initializeGame()
-  startSpawnTimer()
-  
-  // Initialize cursor counter for fire rate
-  cursorCounter = document.createElement('div')
-  cursorCounter.id = 'fire-rate-cursor-counter'
-  cursorCounter.style.display = 'none'
-  document.body.appendChild(cursorCounter)
-  
-  // Add mouse move listener for cursor counter
-  document.addEventListener('mousemove', updateCursorCounterPosition)
-  
-  // Create default pokeballs if needed
-  const existingPokeballs = inventory.getItemsByType('pokeball')
-  if (existingPokeballs.length === 0) {
-    // Convert the old pokeballs count to inventory items
-    if (gameStore.pokeballs > 0) {
-      inventory.addPokeball(
-        "Crappy Pokeball", 
-        "A poorly made Pokeball. Has a low catch rate.", 
-        0.1, 
-        gameStore.pokeballs
-      )
-      gameStore.pokeballs = 0 // Reset the old counter
-    }
-  }
-
-  // Add some test berries if in development mode
-  if (IS_DEVELOPMENT) {
-    const existingBerries = inventory.getItemsByType('berries')
-    const hasLureBerries = existingBerries.some(berry => berry.id === 'lure-berry')
-    if (!hasLureBerries) {
-      inventory.addItem({
-        ...items['lure-berry'],
-        quantity: 5
-      })
-      inventory.addItem({
-        ...items['great-lure-berry'],
-        quantity: 2
-      })
-    }
-  }
-
-  // Update active berry tasks for the current region
-  updateActiveTasks()
-  
-  // Subscribe to tick system
-  unsubscribe = tickSystem.subscribe((elapsed) => {
-    if (wildPokemon.value) {
-      enemyAttack()
-      if (elapsed >= RUN_CHECK_INTERVAL) {
-        tryPokemonRun()
-      }
-    }
-    
-    // Update active tasks list every tick
-    updateActiveTasks()
-  })
-})
-
-onUnmounted(() => {
-  if (unsubscribe) {
-    unsubscribe()
-  }
-  
-  // Clean up cursor counter
-  document.removeEventListener('mousemove', updateCursorCounterPosition)
-  if (cursorCounter && document.body.contains(cursorCounter)) {
-    document.body.removeChild(cursorCounter)
-  }
-})
-
-// Update the cursor counter position and content
-function updateCursorCounterPosition(e: MouseEvent) {
-  if (!cursorCounter) return
-  
-  // Only show counter when fire rate is active
-  if (fireRateState.value.active) {
-    const x = e.clientX
-    const y = e.clientY
-    
-    cursorCounter.style.display = 'block'
-    cursorCounter.style.left = `${x}px`
-    cursorCounter.style.top = `${y}px`
-    
-    // Update content with count and tier
-    let counterContent = `<div class="px-2 py-1 rounded-full text-xs font-bold shadow-lg `
-    
-    // Add tier-specific styling
-    if (fireRateState.value.tier === 1) {
-      counterContent += `bg-yellow-100 text-yellow-800">`
-      counterContent += `<span>🔥 ${fireRateState.value.count}</span>`
-    } else if (fireRateState.value.tier === 2) {
-      counterContent += `bg-red-100 text-red-800">`
-      counterContent += `<span>🔥🔥 ${fireRateState.value.count}</span>`
-    } else if (fireRateState.value.tier === 3) {
-      counterContent += `bg-blue-100 text-blue-800">`
-      counterContent += `<span>🔥🔥🔥 ${fireRateState.value.count}</span>`
-    } else {
-      counterContent += `bg-gray-100 text-gray-800">`
-      counterContent += `<span>${fireRateState.value.count}</span>`
-    }
-    
-    counterContent += `</div>`
-    cursorCounter.innerHTML = counterContent
-  } else {
-    cursorCounter.style.display = 'none'
-  }
+  await gameStore.attack()
 }
 
 // Type colors function
@@ -1057,82 +594,55 @@ const getTypeColor = (type: string) => {
   return colors[type.toLowerCase()] || 'bg-gray-400'
 }
 
-// Add this function to map regions to background images
-const getRegionBackgroundImage = (regionId: string) => {
-  const backgroundMap: Record<string, string> = {
-    'viridian-forest': '/images/backgrounds/viridian-palace.png',
-    'cerulean-cave (10-15)': '/images/backgrounds/cave.png',
-    // Default to viridian for other regions until more backgrounds are available
-    'beach-zone (15-25)': '/images/backgrounds/beach.png',
-    'Mountains (30-50)': '/images/backgrounds/mountains.png',
-    'ironworks-zone (80-120)': '/images/backgrounds/ironworks.png',
-
+// Handle auto-attack toggle
+const toggleAutoAttack = () => {
+  const isActive = buffStore.toggleAutoAttack()
+  if (isActive) {
+    gameStore.addNotification({
+      type: 'success',
+      message: `Auto-Attack activated! Pokemon will attack every ${(buffStore.getAutoAttackInterval / 1000).toFixed(1)} seconds.`
+    })
   }
-  
-  return backgroundMap[regionId] || '/images/backgrounds/viridian-palace.png'
 }
 
-// Add the handleRegionChange function
+// Handle region change
 const handleRegionChange = () => {
   // Reset encounter when region changes
-  wildPokemon.value = null
-  startSpawnTimer()
+  gameStore.resetBattleState()
+  gameStore.startSpawnTimer()
   
-  // Update logs
-  battleLogs.value.push({
-    message: `Moved to ${gameStore.currentRegionData.name}`,
-    type: 'system'
-  })
-
   // Update active berry tasks when region changes
   updateActiveTasks()
 }
 
-// Get the berry icon URL
-function getBerryIcon(berryId: string) {
-  const berryDefinition = inventory.getItemDefinition(berryId)
-  return berryDefinition?.icon || '/images/berry.png'
-}
-
-// Get region name from region ID
-function getRegionName(regionId: string) {
-  return regions[regionId as keyof typeof regions]?.name || regionId
-}
-
-// Calculate progress percentage for a task
-function getProgressPercentage(task: any) {
-  const totalDuration = task.endTime - task.startTime
-  const elapsed = Date.now() - task.startTime
-  return Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
-}
-
-// Get potential Pokémon that could be caught from a region's berry pool
-function getPotentialPokemon(regionId: string) {
-  const region = regions[regionId as keyof typeof regions]
-  if (!region) return []
-  
-  // Use the berry pool if available, otherwise use the regular pool
-  const pool = region.berryPool || region.pool
-  
-  // Calculate total probability for percentage calculation
-  const totalProbability = pool.reduce((sum, pokemon) => sum + (pokemon.probability || 1), 0)
-  
-  // Return formatted list with percentages
-  return pool.map(pokemon => ({
-    id: pokemon.id,
-    name: pokemon.name,
-    probability: (pokemon.probability / totalProbability) * 100
-  }))
-}
-
-// Watch the fire rate state to detect when it becomes inactive
-// Place this after the fireRateState computed property in the script section
-watch(() => fireRateState.value.active, (isActive) => {
-  // When fire rate becomes inactive, ensure the cursor counter is hidden
-  if (!isActive && cursorCounter) {
-    cursorCounter.style.display = 'none';
+// Watch for auto-attack triggers
+watch(() => buffStore.autoAttackState.triggerAttack, (shouldAttack) => {
+  if (shouldAttack && wildPokemon.value && gameStore.activePokemon) {
+    attack()
+    buffStore.recordAutoAttack()
   }
 })
+
+// Watch for wild Pokemon changes to start enemy attacks
+watch(() => gameStore.battle.wildPokemon, (newPokemon) => {
+  if (newPokemon) {
+    // Start enemy attack interval
+    const attackInterval = setInterval(() => {
+      gameStore.enemyAttack()
+    }, 3000)
+
+    // Start run chance check interval
+    const runInterval = setInterval(() => {
+      gameStore.tryPokemonRun()
+    }, 5000)
+
+  }
+})
+// Clear intervals when Pokemon changes
+// onUnmounted(() => {
+//   clearInterval(attackInterval)
+//   clearInterval(runInterval)
+// })
 </script>
 
 <style scoped>
@@ -1159,11 +669,18 @@ watch(() => fireRateState.value.active, (isActive) => {
 }
 
 @keyframes damage {
-  0% { transform: translateX(0); opacity: 1; }
-  25% { transform: translateX(-10px); opacity: 0.7; }
-  50% { transform: translateX(10px); opacity: 0.7; }
-  75% { transform: translateX(-10px); opacity: 0.7; }
-  100% { transform: translateX(0); opacity: 1; }
+  0% { 
+    transform: translateX(0);
+    filter: none;
+  }
+  50% { 
+    transform: translateX(20px);
+    filter: sepia(1) saturate(100%) hue-rotate(-50deg) opacity(0.5);
+  }
+  100% { 
+    transform: translateX(0);
+    filter: none;
+  }
 }
 
 @keyframes enemy-attack {

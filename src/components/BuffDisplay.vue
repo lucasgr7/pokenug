@@ -159,6 +159,25 @@
                 </div>
               </div>
             </div>
+            
+            <!-- Auto Attack Buff Display (Electric Emblem) -->
+            <div v-else-if="selectedBuff.type === 'auto-attack'" class="flex items-center bg-gradient-to-r from-yellow-50 to-blue-50 p-3 rounded-lg">
+              <div class="w-8 h-8 bg-gradient-to-r from-yellow-400 to-blue-300 rounded-full flex items-center justify-center text-white mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium">Auto Attack</div>
+                <div class="text-sm mb-1">Level {{ selectedBuff.value }}: Automatically attacks every {{ getAutoAttackInterval(selectedBuff.value).toFixed(1) }} seconds</div>
+                <div v-if="buffStore.autoAttackState.active" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  <span>Status: Active</span>
+                </div>
+                <div v-else class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                  <span>Status: Inactive (Click the lightning bolt to activate)</span>
+                </div>
+              </div>
+            </div>
           </div>
           
           <!-- Close Button -->
@@ -207,10 +226,18 @@ const getBuffBorderClass = (type: string) => {
     'defense-boost': 'border-blue-500',
     'catch-rate': 'border-green-500',
     'loot-chance': 'border-yellow-500',
-    'fire-rate': 'border-orange-500'
+    'fire-rate': 'border-orange-500',
+    'auto-attack': 'border-yellow-400',
+    'stun-resistance': 'border-yellow-700'
   }
   
   return typeClasses[type] || 'border-gray-400'
+}
+
+// Calculate auto-attack interval based on buff level
+const getAutoAttackInterval = (level: number) => {
+  // Formula: auto_attack_interval = 0.5 + (5.0 - 0.5) * exp(-0.003 * level)
+  return 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
 }
 </script>
 
