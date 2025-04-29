@@ -449,27 +449,19 @@ export const useGameStore = defineStore('game', {
       const pokemonList = await response.json()
       const starter = pokemonList.find((p: Pokemon) => p.name === pokemonName)
       if (starter) {
-        const starterLevel = 5
-        const baseHP = 100
-        const hpPerLevel = 20
-        const baseAttack = Math.floor(baseHP / 10)
-        const attackPerLevel = baseAttack * 0.2
-        const baseDefense = Math.floor(baseHP * 0.8)
-        const defensePerLevel = baseDefense * 0.2
-
-        const maxHP = Math.floor(baseHP + (hpPerLevel * (starterLevel - 1)))
-        const attack = Math.floor(baseAttack + (attackPerLevel * (starterLevel - 1)))
-        const defense = Math.floor(baseDefense + (defensePerLevel * (starterLevel - 1)))
+        const starterLevel = 8
+        // Use the existing generatePokemonStats function instead of manually calculating
+        const stats = this.generatePokemonStats(starterLevel)
         
         const newPokemon = {
           ...starter,
-          currentHP: maxHP,
-          maxHP,
+          currentHP: stats.maxHP,
+          maxHP: stats.maxHP,
           experience: 0,
           experienceToNextLevel: Math.floor(100 * Math.pow(starterLevel, 1.5)),
           level: starterLevel,
-          attack,
-          defense
+          attack: stats.attack,
+          defense: stats.defense
         }
         
         this.playerPokemon = [newPokemon]
