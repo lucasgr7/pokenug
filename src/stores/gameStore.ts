@@ -1172,13 +1172,19 @@ export const useGameStore = defineStore('game', {
       const job = this.idleJobs[jobId];
       if (!job || job.assignedPokemon.length === 0) return;
       
+      // Calculate the appropriate progress increment based on the remaining time
       const remainingTime = this.getJobRemainingTime(jobId);
-      job.progress += (elapsed / remainingTime) * 100;
+      const progressIncrement = (elapsed / remainingTime) * 100;
       
+      // Update progress
+      job.progress += progressIncrement;
+      
+      // Check if the job is complete
       if (job.progress >= 100) {
         this.completeJob(jobId);
       }
       
+      // Save state to ensure progress persists
       this.saveState();
     },
     

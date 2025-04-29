@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import type { Pokemon } from '../types/pokemon'
 import PokemonGrid from '../components/PokemonGrid.vue'
@@ -11,6 +11,30 @@ const verticalMode = ref(true)
 const columnSize = ref(2)
 const showParty = ref(true)
 const itemsPerPage = ref(8) // Added itemsPerPage with default value
+
+// Timer for updating job progress
+let progressUpdateTimer: number | null = null
+
+// Setup and cleanup for the progress timer
+onMounted(() => {
+  // Start the timer to update job progress every second
+  progressUpdateTimer = window.setInterval(() => {
+    Object.keys(gameStore.idleJobs).forEach(jobId => {
+      // Only update jobs that have assigned Pokémon
+      if (gameStore.idleJobs[jobId].assignedPokemon.length > 0) {
+        gameStore.updateJobProgress(jobId, 1000); // 1000ms = 1 second
+      }
+    });
+  }, 1000);
+})
+
+onUnmounted(() => {
+  // Clear the timer when component is unmounted
+  if (progressUpdateTimer !== null) {
+    clearInterval(progressUpdateTimer);
+    progressUpdateTimer = null;
+  }
+})
 
 // Filtrar apenas os jobs com tipos de Pokémon que o jogador possui
 const availableJobs = computed(() => {
