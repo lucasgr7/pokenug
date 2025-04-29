@@ -279,6 +279,7 @@ export const useGameStore = defineStore('game', {
 
         this.$patch({
           playerPokemon: state.playerPokemon ?? [],
+          availablePokemon: state.availablePokemon ?? [],  // Load available Pokemon from localStorage
           activePokemonIndex: state.activePokemonIndex ?? 0,
           pokeballs: state.pokeballs ?? 50,
           unlocked: state.unlocked ?? { pokedex: false, inventory: false, idleJobs: false },
@@ -517,6 +518,7 @@ export const useGameStore = defineStore('game', {
     saveState() {
       const state = {
         playerPokemon: JSON.parse(JSON.stringify(this.playerPokemon)),
+        availablePokemon: JSON.parse(JSON.stringify(this.availablePokemon)),
         activePokemonIndex: this.activePokemonIndex,
         pokeballs: this.pokeballs,
         unlocked: this.unlocked,
