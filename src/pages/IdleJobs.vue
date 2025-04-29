@@ -20,9 +20,19 @@ onMounted(() => {
   // Start the timer to update job progress every second
   progressUpdateTimer = window.setInterval(() => {
     Object.keys(gameStore.idleJobs).forEach(jobId => {
-      // Only update jobs that have assigned Pokémon
+      // Only update active jobs with assigned Pokémon 
       if (gameStore.idleJobs[jobId].assignedPokemon.length > 0) {
-        gameStore.updateJobProgress(jobId, 1000); // 1000ms = 1 second
+        // Update the UI using the getJobProgressPercent method which uses startTime
+        const currentProgress = gameStore.getJobProgressPercent(jobId);
+        gameStore.idleJobs[jobId].progress = currentProgress;
+        
+        // Check if job has completed
+        if (currentProgress >= 100) {
+          gameStore.completeJob(jobId);
+          
+          // After completion, reset startTime to now for the next cycle
+          gameStore.idleJobs[jobId].startTime = Date.now();
+        }
       }
     });
   }, 1000);

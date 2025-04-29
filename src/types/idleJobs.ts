@@ -43,6 +43,7 @@ export interface IdleJob {
   backgroundColor: string; // Background color based on Pokemon type
   percentualProgressWithAdditionalPokemon?: number; // Optional property for additional progress calculation
   chance: number; // Optional property for success chance
+  startTime?: number; // Timestamp when the job was started
 }
 
 // Type color mapping for job backgrounds

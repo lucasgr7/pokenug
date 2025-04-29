@@ -151,6 +151,26 @@ export const useGameStore = defineStore('game', {
       return Math.max(1000, job.baseTime - totalReduction); // Minimum 1 second
     },
     
+    getJobProgressPercent: (state) => (jobId: string) => {
+      const job = state.idleJobs[jobId];
+      if (!job || job.assignedPokemon.length === 0) return 0;
+      
+      // If the job doesn't have a startTime, it hasn't been properly initialized
+      if (!job.startTime) {
+        job.startTime = Date.now();
+        return 0;
+      }
+      
+      const now = Date.now();
+      const elapsed = now - job.startTime;
+      const jobDuration = state.getJobRemainingTime(jobId);
+      
+      // Calculate progress as a percentage
+      const progressPercent = Math.min(100, (elapsed / jobDuration) * 100);
+      
+      return progressPercent;
+    },
+    
     getJobSuccessChance: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
@@ -869,7 +889,7 @@ export const useGameStore = defineStore('game', {
             const potions = inventoryStore.getItemsByType('potion')
             
             if (potions.length > 0) {
-              // Auto-use the smallest potion that would prevent fainting
+              // Auto-use the smallest potion that can would prevent fainting
               const sortedPotions = [...potions].sort((a, b) => {
                 const healA = a.effect?.type === 'heal' ? a.effect.value : 0
                 const healB = b.effect?.type === 'heal' ? b.effect.value : 0
@@ -1105,6 +1125,11 @@ export const useGameStore = defineStore('game', {
         
         job.assignedPokemon.push(workingPokemon);
         this.idleWorking.push(workingPokemon);
+        
+        // Initialize job startTime if this is the first Pokemon assigned
+        if (job.assignedPokemon.length === 1) {
+          job.startTime = Date.now();
+        }
       } else if (availableIndex !== -1) {
         // Use the actual Pokemon reference from the available collection
         const pokemonToAssign = this.availablePokemon[availableIndex];
@@ -1118,6 +1143,11 @@ export const useGameStore = defineStore('game', {
         
         job.assignedPokemon.push(workingPokemon);
         this.idleWorking.push(workingPokemon);
+        
+        // Initialize job startTime if this is the first Pokemon assigned
+        if (job.assignedPokemon.length === 1) {
+          job.startTime = Date.now();
+        }
       } else {
         // Pokemon not found in either collection
         return false;
@@ -1196,13 +1226,11 @@ export const useGameStore = defineStore('game', {
                 itemFactory.createPokeball(name, description, params.catchRate)
               );
               break;
-              
             case 'potion':
               inventoryStore.addItem(
                 itemFactory.createPotion(name, description, params.healAmount)
               );
               break;
-              
             case 'berry':
               // Special handling for berries - use the new random berry generation
               if (name.toLowerCase().includes('lure') || 
@@ -1217,13 +1245,11 @@ export const useGameStore = defineStore('game', {
                 );
               }
               break;
-              
             case 'material':
               inventoryStore.addItem(
                 itemFactory.createMaterial(name, description)
               );
               break;
-              
             case 'buff':
               // Handle buff rewards - add or upgrade buff
               const buffId = params.buffId || name.toLowerCase().replace(/\s+/g, '-');
@@ -1255,7 +1281,10 @@ export const useGameStore = defineStore('game', {
         this.addNotification(`${job.name} complete, but no reward found.`, 'error');
       }
       
+      // Reset progress and set a new startTime for the next cycle
       job.progress = 0;
+      job.startTime = Date.now();
+      
       this.saveState();
     },
 
