@@ -122,6 +122,24 @@
                 <div class="text-sm">+{{ selectedBuff.value * 5 }}% chance of finding items</div>
               </div>
             </div>
+            <!-- Stun Resistance Buff Display (Rock Emblem) -->
+            <div v-else-if="selectedBuff.type === 'stun-resistance'" class="flex items-center bg-gradient-to-r from-gray-50 to-yellow-50 p-3 rounded-lg">
+              <div class="w-8 h-8 bg-gradient-to-br from-gray-500 to-yellow-700 rounded-full flex items-center justify-center text-white mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium">Stun Resistance</div>
+                <div class="text-sm mb-1">Level {{ selectedBuff.value }}: Prevents fainting, leaving Pokémon at 10% HP</div>
+                <div class="text-xs bg-yellow-50 text-yellow-800 px-2 py-1 rounded">
+                  <span>Base chance: {{ (0.01 * selectedBuff.value).toFixed(2) }}% per level</span>
+                </div>
+                <div class="text-xs text-gray-700 mt-1">
+                  With potions: Automatically uses a potion when taking fatal damage
+                </div>
+              </div>
+            </div>
             <!-- Fire Rate Buff Display -->
             <div v-else-if="selectedBuff.type === 'fire-rate'" class="flex items-center bg-gradient-to-r from-yellow-50 to-red-50 p-3 rounded-lg">
               <div class="w-8 h-8 bg-gradient-to-r from-yellow-500 to-red-500 rounded-full flex items-center justify-center text-white mr-3">

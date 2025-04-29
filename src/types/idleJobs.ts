@@ -21,7 +21,7 @@ export interface BuffEffect {
   name: string;
   description: string;
   icon: string;
-  type: string; // Type of buff (e.g., 'attack', 'defense', 'xp')
+  type: string; // Type of buff (e.g., 'attack', 'defense', 'xp', 'stun-resistance')
   value: number; // Current value/level of the buff
   maxValue?: number; // Maximum level (if applicable)
   effect: (value: number) => any; // Function that returns the buff effect based on level
@@ -234,38 +234,32 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     id: 'material-mining',
     type: PokemonType.Rock,
     name: 'Mine for Materials',
-    description: 'Rock Pokemon mine for valuable crafting materials',
+    description: 'Rock Pokemon mine for valuable crafting materials. Each completion increases chance to prevent Pokemon fainting.',
     maxSlots: 3,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 360000, // 70 seconds in milliseconds
-    chance: 0.15, // 25% chance of success
+    baseTime: 360000, // 6 minutes in milliseconds
+    chance: 0.25, // 25% chance of success
     rewards: [
       {
-        type: 'material',
-        chance: 0.35, // 35% chance
-        weight: 80, // 80% weight for regular stone fragments
+        type: 'buff',
+        chance: 0.5,
+        weight: 100,
         itemDetails: {
-          name: 'Evolution Stone Fragment',
-          description: 'A small fragment of an evolution stone.',
-          params: {}
-        }
-      },
-      {
-        type: 'material',
-        chance: 0.35, // Same base chance
-        weight: 20, // 20% weight for rare stone fragments
-        itemDetails: {
-          name: 'Rare Stone Fragment',
-          description: 'A rare evolution stone fragment with special properties.',
-          params: { rarity: 'rare' }
+          name: 'Rock Emblem',
+          description: 'Prevents Pokemon from fainting, leaving it at 10% HP. Higher levels increase success chance. When potions are available, automatically uses them to prevent fainting.',
+          params: {
+            buffId: 'rock-emblem',
+            buffType: 'stun-resistance',
+            imageUrl: '/images/rock-emblem.png'
+          }
         }
       }
     ],
     completions: 0,
     successfulCompletions: 0,
-    icon: '/images/stone.png', // You'll need to add this image
+    icon: '/images/rock-emblem.png',
     backgroundColor: TYPE_COLORS[PokemonType.Rock],
-    percentualProgressWithAdditionalPokemon: 0.05 // 5% progress per additional Pokemon
+    percentualProgressWithAdditionalPokemon: 0.1 // 10% progress per additional Pokemon
   }
 };

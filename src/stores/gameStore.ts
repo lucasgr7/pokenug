@@ -844,6 +844,8 @@ export const useGameStore = defineStore('game', {
     enemyAttack() {
       const wildPokemon = this.battle.wildPokemon
       const activePokemon = this.activePokemon
+      const buffStore = useBuffStore()
+      const inventoryStore = useInventoryStore()
       
       if (!wildPokemon || !activePokemon || wildPokemon.isRunning) return
       
@@ -859,21 +861,105 @@ export const useGameStore = defineStore('game', {
             activePokemon.level ?? 1
           )
           
-          const updatedHP = Math.max(0, (activePokemon.currentHP ?? 0) - damage)
-          this.updatePokemonHP(activePokemon, updatedHP)
+          // Calculate if damage would cause fainting
+          const wouldFaint = (activePokemon.currentHP ?? 0) <= damage
           
-          if (this.battle.wildPokemon) {
-            this.battle.wildPokemon.lastAttackTime = now
+          if (wouldFaint && buffStore.hasRockEmblem) {
+            // Check if we have potions that can be auto-used
+            const potions = inventoryStore.getItemsByType('potion')
             
-            this.addBattleLog(
-              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-              'damage'
-            )
-          }
+            if (potions.length > 0) {
+              // Auto-use the smallest potion that would prevent fainting
+              const sortedPotions = [...potions].sort((a, b) => {
+                const healA = a.effect?.type === 'heal' ? a.effect.value : 0
+                const healB = b.effect?.type === 'heal' ? b.effect.value : 0
+                return healA - healB // Sort from smallest to largest
+              })
+              
+              const potion = sortedPotions[0] // Get the smallest potion
+              
+              // Use the potion
+              this.addBattleLog(
+                `Rock Emblem activated! Using ${potion.name} to prevent fainting!`,
+                'system'
+              )
+              
+              // Apply the potion effect
+              this.applyItemEffect(potion, activePokemon)
+              
+              // Remove the potion from inventory
+              inventoryStore.removeItem(potion.id, 1)
+              
+              // Calculate new damage after potion was applied
+              const updatedHP = Math.max(0, activePokemon.currentHP! - damage)
+              this.updatePokemonHP(activePokemon, updatedHP)
+              
+              // Log the damage
+              this.addBattleLog(
+                `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
+                'damage'
+              )
+              
+              wildPokemon.lastAttackTime = now
+            } 
+            // No potions but we can try using stun resistance
+            else if (buffStore.shouldResistStun()) {
+              // Calculate 10% of max HP as the minimum HP to leave
+              const minHP = Math.max(1, Math.floor(activePokemon.maxHP! * 0.1))
+              
+              this.addBattleLog(
+                `Rock Emblem protected ${activePokemon.name} from fainting!`,
+                'system'
+              )
+              
+              // Set the Pokemon's HP to 10% instead of fainting
+              this.updatePokemonHP(activePokemon, minHP)
+              
+              // Log the damage but show it was reduced
+              const actualDamage = (activePokemon.currentHP ?? 0) - minHP
+              this.addBattleLog(
+                `${wildPokemon.name} attacks ${activePokemon.name} for ${actualDamage} damage (reduced by Rock Emblem)!`,
+                'damage'
+              )
+              
+              wildPokemon.lastAttackTime = now
+            } 
+            // No resistance triggered, proceed with normal damage
+            else {
+              const updatedHP = Math.max(0, (activePokemon.currentHP ?? 0) - damage)
+              this.updatePokemonHP(activePokemon, updatedHP)
+              
+              wildPokemon.lastAttackTime = now
+              
+              this.addBattleLog(
+                `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
+                'damage'
+              )
 
-          if (updatedHP === 0) {
-            this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
-            this.handlePokemonFaint()
+              if (updatedHP === 0) {
+                this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
+                this.handlePokemonFaint()
+              }
+            }
+          } 
+          // Normal damage without Rock Emblem protection
+          else {
+            const updatedHP = Math.max(0, (activePokemon.currentHP ?? 0) - damage)
+            this.updatePokemonHP(activePokemon, updatedHP)
+            
+            if (this.battle.wildPokemon) {
+              this.battle.wildPokemon.lastAttackTime = now
+              
+              this.addBattleLog(
+                `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
+                'damage'
+              )
+            }
+
+            if (updatedHP === 0) {
+              this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
+              this.handlePokemonFaint()
+            }
           }
         }, 200)
       }
@@ -1072,6 +1158,11 @@ export const useGameStore = defineStore('game', {
       if (!job) return;
       
       job.completions++;
+      
+      // Special handling for material-mining job - increase stun resistance
+      if (jobId === 'material-mining') {
+        buffStore.increaseStunResistance();
+      }
       
       // Use the enhanced success chance calculation that accounts for additional Pokémon
       const successChance = this.getJobSuccessChance(jobId);

@@ -15,6 +15,7 @@ interface BuffState {
   };
   pokemonDefeatedCount: number; // Track defeated Pokemon count for spawn delay
   lastRegionId: string | null; // Track the region ID to reset count on region change
+  stunResistanceProgress: number; // Track stun resistance progress (0.01% per completion)
 }
 
 export const useBuffStore = defineStore('buff', {
@@ -30,7 +31,8 @@ export const useBuffStore = defineStore('buff', {
       timeAllowed: 5000 // Default 5 seconds
     },
     pokemonDefeatedCount: 0,
-    lastRegionId: null
+    lastRegionId: null,
+    stunResistanceProgress: 0 // Initialize at 0%
   }),
 
   getters: {
@@ -67,10 +69,34 @@ export const useBuffStore = defineStore('buff', {
     getDefeatedCount: (state) => state.pokemonDefeatedCount,
     
     // Check if spawn delay is needed (every 10 defeats)
-    shouldDelaySpawn: (state) => state.pokemonDefeatedCount > 0 && state.pokemonDefeatedCount % 10 === 0
+    shouldDelaySpawn: (state) => state.pokemonDefeatedCount > 0 && state.pokemonDefeatedCount % 10 === 0,
+    
+    // Get stun resistance chance - base 0% + 0.01% per material mining completion
+    getStunResistanceChance: (state) => {
+      return state.stunResistanceProgress;
+    },
+    
+    // Check if Rock Emblem is active
+    hasRockEmblem: (state) => {
+      return state.buffs['rock-emblem'] !== undefined;
+    }
   },
 
   actions: {
+    // Increase stun resistance progress by 0.01% (called when material-mining job completes)
+    increaseStunResistance() {
+      this.stunResistanceProgress += 0.0001; // 0.01% in decimal form
+      this.saveState();
+    },
+    
+    // Check if stun should be resisted based on current progress
+    shouldResistStun() {
+      // Get random number between 0-1
+      const roll = Math.random();
+      // Check if roll is less than current resistance chance
+      return roll < this.stunResistanceProgress;
+    },
+    
     addBuff(buff: BuffEffect) {
       // If buff already exists, increase its level
       if (this.buffs[buff.id]) {
