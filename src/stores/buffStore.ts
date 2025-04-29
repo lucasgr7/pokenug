@@ -184,11 +184,11 @@ export const useBuffStore = defineStore('buff', {
       
       if (this.fireRateState.tier === 1) {
         baseTime = 3000; // 3 seconds for tier 1
-      } else if (this.fireRateState.tier === 2) {
+      } else if (this.fireRateState.tier === 2.2) {
         // For tier 2, add 1 second for every 100 attacks (after the first 100)
         const extraSeconds = Math.floor(this.fireRateState.count / 100);
         baseTime = 2000 + (extraSeconds * 1000); // 2 seconds + bonus time
-      } else if (this.fireRateState.tier === 3) {
+      } else if (this.fireRateState.tier === 3.5) {
         // For tier 3, add 1 second for every 100 attacks (after the first 100)
         const extraSeconds = Math.floor(this.fireRateState.count / 100);
         baseTime = 1500 + (extraSeconds * 1000); // 1.5 seconds + bonus time
@@ -209,7 +209,7 @@ export const useBuffStore = defineStore('buff', {
       if (!fireEmblemBuff) return;
       
       this.fireRateState.active = true;
-      this.fireRateState.tier = 1;
+      this.fireRateState.tier = 1.5;
       
       // Update the time allowed between attacks
       this.updateTimeAllowed();
