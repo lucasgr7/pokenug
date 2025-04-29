@@ -36,7 +36,7 @@ const regions = {
     minLevel: 10,
     maxLevel: 15,
     encounterRate: 40,
-    spawnTimer: 4, // 20 seconds
+    spawnTimer: 2, // 20 seconds
     pool: [
       { id: 41, name: 'Zubat', probability: 30 },      // Very common (30%)
       { id: 42, name: 'Golbat', probability: 15 },     // Common (15%)
@@ -60,7 +60,7 @@ const regions = {
     minLevel: 15,
     maxLevel: 25,
     encounterRate: 35,
-    spawnTimer: 10, // 30 seconds
+    spawnTimer: 8, // 30 seconds
     pool: [
       { id: 15, name: 'Beedrill', probability: 5 },     // Rare (5%)
       { id: 16, name: 'Pidgey', probability: 10 },      // Uncommon (10%)
@@ -92,7 +92,7 @@ const regions = {
     minLevel: 30,
     maxLevel: 50,
     encounterRate: 20,
-    spawnTimer: 14, // 30 seconds
+    spawnTimer: 16, // 30 seconds
     pool: [
       //bulbasaur
       {id: 1, name: 'Bulbasaur', probability: 5},
@@ -119,7 +119,7 @@ const regions = {
   minLevel: 80,
   maxLevel: 120,
   encounterRate: 15,
-  spawnTimer: 18,
+  spawnTimer: 32,
   pool: [
     { id: 81, name: 'Magnemite', probability: 30 },
     { id: 82, name: 'Magneton', probability: 15 },
