@@ -51,7 +51,7 @@ export const useBuffStore = defineStore('buff', {
     getAllBuffs: (state) => Object.values(state.buffs),
 
     getBuffById: (state) => (buffId: string) => {
-      return state.buffs[buffId] || null;
+      return state.buffs[buffId] ?? null;
     },
 
     getBuffsByType: (state) => (type: string) => {
@@ -287,7 +287,7 @@ export const useBuffStore = defineStore('buff', {
     // Update fire rate tier
     updateFireRateTier() {
       const fireEmblemBuff = this.getBuffById('fire-emblem');
-      if (!fireEmblemBuff || !this.fireRateState.active) return;
+      if (!fireEmblemBuff ?? !this.fireRateState.active) return;
 
       // Check count thresholds for tier upgrades
       if (this.fireRateState.count >= 80 && this.fireRateState.tier < 3) {
@@ -364,7 +364,7 @@ export const useBuffStore = defineStore('buff', {
       if (this.autoAttackState.active) {
         // Fix: Calculate the interval as a numeric value instead of using the getter reference
         const electricEmblem = this.buffs['electric-emblem'];
-        const level = electricEmblem?.value || 1;
+        const level = electricEmblem?.value ?? 1;
         const intervalSeconds = 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
         this.autoAttackState.interval = Math.round(intervalSeconds * 1000);
 
@@ -421,8 +421,8 @@ export const useBuffStore = defineStore('buff', {
       if (savedState) {
         const state = JSON.parse(savedState);
         this.$patch({
-          buffs: state.buffs || {},
-          fireRateState: state.fireRateState || {
+          buffs: state.buffs ?? {},
+          fireRateState: state.fireRateState ?? {
             active: false,
             tier: 0,
             count: 0,
@@ -431,9 +431,9 @@ export const useBuffStore = defineStore('buff', {
             activePokemonId: null,
             timeAllowed: 5000
           },
-          pokemonDefeatedCount: state.pokemonDefeatedCount || 0,
-          lastRegionId: state.lastRegionId || null,
-          autoAttackState: state.autoAttackState || {
+          pokemonDefeatedCount: state.pokemonDefeatedCount ?? 0,
+          lastRegionId: state.lastRegionId ?? null,
+          autoAttackState: state.autoAttackState ?? {
             active: false,
             lastAttackTime: 0,
             interval: 5000

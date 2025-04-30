@@ -5,7 +5,7 @@ import { imageCache } from '../services/imageCache'
 const props = defineProps<{
   src: string
   alt: string
-  class?: string
+  className?: string
 }>()
 
 const cachedSrc = ref<string>(props.src)
@@ -59,7 +59,7 @@ function handleError() {
   <img 
     :src="cachedSrc" 
     :alt="alt" 
-    :class="class"
+    :class="className"
     @error="handleError"
   />
 </template>

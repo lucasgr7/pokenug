@@ -53,7 +53,7 @@ const availablePokeballs = computed(() => {
 
 // Get available berries from inventory
 const availableBerries = computed(() => {
-  return inventory.getItemsByType('berries').filter(berry => {
+  return inventory.getItemsByType('berries').filter((berry: InventoryItem) => {
     const definition = inventory.getItemDefinition(berry.id)
     return definition?.effect?.type === 'auto-catch'
   })
@@ -289,8 +289,7 @@ watch(() => buffStore.autoAttackState.triggerAttack, (shouldAttack) => {
 // Watch for wild Pokemon changes to start enemy attacks
 watch(() => gameStore.battle.wildPokemon, (newPokemon) => {
   if (newPokemon) {
-    // Start run chance check interval
-    const runInterval = setInterval(() => {
+    setInterval(() => {
     }, 5000)
   }
 })
@@ -453,8 +452,7 @@ tickSystem.subscribe(() => {
           <CachedImage
             :src="gameStore?.activePokemon?.sprite ?? ''"
             :alt="'Player Pokemon'"
-            class="w-32 h-32 mx-auto transition-transform duration-200"
-            :class="{ 'animate-attack': isPlayerAttacking }"
+            :className="`w-32 h-32 mx-auto transition-transform duration-200 ${isPlayerAttacking ? 'animate-attack' : ''}`"
           />
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2">
@@ -586,12 +584,15 @@ tickSystem.subscribe(() => {
             <CachedImage
               :src="wildPokemon.sprite"
               :alt="'Wild Pokemon'"
-              class="w-full h-full transition-transform duration-200"
-              :class="{ 
-                'animate-damage': isWildPokemonHurt, 
-                'animate-enemy-attack': isEnemyAttacking,
-                'animate-catch': isTryingCatch 
-              }"
+              :className="`w-full h-full transition-transform duration-200 ${
+                isWildPokemonHurt ? 'animate-damage' : ''
+              } ${isEnemyAttacking ? 'animate-enemy-attack' : ''} ${
+                isTryingCatch ? 'animate-catch' : ''
+              }`"
+              @error="(e: Event) => { 
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/not-found.png';
+                }"
             />
           </div>
           <!-- Type Tags -->
@@ -619,11 +620,11 @@ tickSystem.subscribe(() => {
             <div
               class="h-2.5 rounded-full transition-all duration-300"
               :class="{
-                'bg-green-600': (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 25,
-                'bg-yellow-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 25 && (wildPokemon.currentHP / wildPokemon.maxHP * 100) > 10,
-                'bg-red-500': (wildPokemon.currentHP / wildPokemon.maxHP * 100) <= 10
+                'bg-green-600': (wildPokemon.currentHP ?? 0) / (wildPokemon.maxHP ?? 1) * 100 > 25,
+                'bg-yellow-500': (wildPokemon.currentHP ?? 0) / (wildPokemon.maxHP ?? 1) * 100 <= 25 && (wildPokemon.currentHP ?? 0) / (wildPokemon.maxHP ?? 1) * 100 > 10,
+                'bg-red-500': (wildPokemon.currentHP ?? 0) / (wildPokemon.maxHP ?? 1) * 100 <= 10
               }"
-              :style="{ width: (wildPokemon.currentHP / wildPokemon.maxHP * 100) + '%' }"
+              :style="{ width: ((wildPokemon.currentHP ?? 0) / (wildPokemon.maxHP ?? 1) * 100) + '%' }"
             ></div>
           </div>
         </div>
@@ -650,7 +651,10 @@ tickSystem.subscribe(() => {
                 :src="ball.icon" 
                 :alt="ball.name"
                 class="w-full h-full object-contain"
-                @error="$event.target.src = '/images/not-found.png'"
+                @error="(e: Event) => { 
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/not-found.png';
+                }"
               >
             </div>
             
@@ -691,7 +695,10 @@ tickSystem.subscribe(() => {
                 :src="berry.icon" 
                 :alt="berry.name"
                 class="w-full h-full object-contain"
-                @error="$event.target.src = '/images/berry.png'"
+                @error="(e: Event) => { 
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/images/berry.png';
+                }"
               >
             </div>
             

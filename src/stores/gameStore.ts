@@ -154,7 +154,7 @@ export const useGameStore = defineStore('game', {
 
     getJobProgressPercent: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
-      if (!job || job.assignedPokemon.length === 0) return 0;
+      if (!job || job.assignedPokemon.length === 0 ) return 0;
 
       // If the job doesn't have a startTime, it hasn't been properly initialized
       if (!job.startTime) {
@@ -164,7 +164,7 @@ export const useGameStore = defineStore('game', {
 
       const now = Date.now();
       const elapsed = now - job.startTime;
-      const jobDuration = state.getJobRemainingTime(jobId);
+      const jobDuration = this.getJobRemainingTime(jobId);
 
       // Calculate progress as a percentage
       const progressPercent = Math.min(100, (elapsed / jobDuration) * 100);

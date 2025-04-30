@@ -316,7 +316,7 @@ function getTotalLevels(jobId: string): number {
                     @mouseout="hideTooltip"
                   >
                     <span class="font-medium">
-                      +{{ formatPercent(job.percentualProgressWithAdditionalPokemon * (job.assignedPokemon.length - 1)) }} (Multi-Pokémon)
+                      +{{ formatPercent((job.percentualProgressWithAdditionalPokemon ?? 0) * (job.assignedPokemon.length - 1)) }} (Multi-Pokémon)
                     </span>
                   </div>
                   
@@ -419,9 +419,8 @@ function getTotalLevels(jobId: string): number {
                         <CachedImage 
                           :src="job.assignedPokemon[i-1].sprite" 
                           :alt="job.assignedPokemon[i-1].name"
-                          class="w-10 h-10 object-contain"
-                        >
-                        </CachedImage>
+                          :className="'w-10 h-10 object-contain'"
+                        />
                         <!-- Show the Pokémon's level in a badge -->
                         <span class="absolute top-0 right-0 bg-white text-black text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                           {{ job.assignedPokemon[i-1].level }}

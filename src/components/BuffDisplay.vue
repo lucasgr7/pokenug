@@ -16,7 +16,7 @@
             :src="buff.icon" 
             :alt="buff.name" 
             class="w-full h-full object-contain p-1"
-            @error="$event.target.src = '/images/not-found.png'"
+            @error="$event.target!.src = '/images/not-found.png'"
           />
           
           <!-- Buff level indicator -->

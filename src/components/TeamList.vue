@@ -84,7 +84,7 @@ onUnmounted(() => {
         <CachedImage 
           :src="gameStore.playerPokemon[index - 1].sprite" 
           :alt="gameStore.playerPokemon[index - 1].name" 
-          class="w-5 h-5 object-contain"
+          :className="'w-5 h-5 object-contain'"
         />
         <div class="ml-2 flex-1">
           <div class="flex justify-between items-center">
