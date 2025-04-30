@@ -309,16 +309,21 @@ export const useGameStore = defineStore('game', {
                           );
                           break;
                         case 'buff':
-                          const buffId = params.buffId || name.toLowerCase().replace(/\s+/g, '-');
-                          buffStore.addBuff({
-                            id: buffId,
-                            name: name,
-                            description: description,
-                            icon: params.imageUrl || '/images/not-found.png',
-                            type: params.buffType,
-                            value: 1,
-                            effect: (value) => value
-                          });
+                          try {
+                            const buffId: string = params.buffId ?? name.toLowerCase().replace(/\s+/g, '-');
+                            buffStore.addBuff({
+                              id: buffId,
+                              name: name,
+                              description: description,
+                              icon: params.imageUrl ?? '/images/not-found.png',
+                              type: params.buffType,
+                              value: 1,
+                              effect: (val: number) => val
+                            });
+                          } catch (error) {
+                            console.error('Error adding buff:', error);
+                            this.addNotification(`Error applying buff reward: ${name}`, 'error');
+                          }
                           break;
                         default:
                           state.pokeballs = (state.pokeballs ?? 0) + 1;
@@ -1364,7 +1369,7 @@ export const useGameStore = defineStore('game', {
     completeJob(jobId: string) {
       const job = this.idleJobs[jobId];
       const inventoryStore = useInventoryStore();
-      const buffStore = useBuffStore();
+      const buffStore = useBuffStore(); // Get fresh instance of buffStore
 
       if (!job) return;
 
@@ -1401,53 +1406,61 @@ export const useGameStore = defineStore('game', {
 
           const { name, description, params } = selectedReward.itemDetails;
 
-          switch (selectedReward.type) {
-            case 'pokeball':
-              inventoryStore.addItem(
-                itemFactory.createPokeball(name, description, params.catchRate)
-              );
-              break;
-            case 'potion':
-              inventoryStore.addItem(
-                itemFactory.createPotion(name, description, params.healAmount)
-              );
-              break;
-            case 'berry':
-              if (name.toLowerCase().includes('lure') ||
-                description.toLowerCase().includes('lure') ||
-                (params.effect && params.effect.toLowerCase().includes('catch'))) {
-                inventoryStore.addItem(itemFactory.createRandomLureBerry(1));
-              } else {
+          try {
+            switch (selectedReward.type) {
+              case 'pokeball':
                 inventoryStore.addItem(
-                  itemFactory.createBerry(name, description, params.effect)
+                  itemFactory.createPokeball(name, description, params.catchRate)
                 );
-              }
-              break;
-            case 'material':
-              inventoryStore.addItem(
-                itemFactory.createMaterial(name, description)
-              );
-              break;
-            case 'buff':
-              // Handle buff rewards - add or upgrade buff
-              const buffId = params.buffId || name.toLowerCase().replace(/\s+/g, '-');
-              buffStore.addBuff({
-                id: buffId,
-                name: name,
-                description: description,
-                icon: params.imageUrl || '/images/not-found.png',
-                type: params.buffType,
-                value: 1,
-                effect: (value) => value // Default effect function
-              });
-              break;
+                break;
+              case 'potion':
+                inventoryStore.addItem(
+                  itemFactory.createPotion(name, description, params.healAmount)
+                );
+                break;
+              case 'berry':
+                if (name.toLowerCase().includes('lure') ||
+                  description.toLowerCase().includes('lure') ||
+                  (params.effect && params.effect.toLowerCase().includes('catch'))) {
+                  inventoryStore.addItem(itemFactory.createRandomLureBerry(1));
+                } else {
+                  inventoryStore.addItem(
+                    itemFactory.createBerry(name, description, params.effect)
+                  );
+                }
+                break;
+              case 'material':
+                inventoryStore.addItem(
+                  itemFactory.createMaterial(name, description)
+                );
+                break;
+              case 'buff':
+                try {
+                  const buffId: string = params.buffId ?? name.toLowerCase().replace(/\s+/g, '-');
+                  buffStore.addBuff({
+                    id: buffId,
+                    name: name,
+                    description: description,
+                    icon: params.imageUrl ?? '/images/not-found.png',
+                    type: params.buffType,
+                    value: 1,
+                    effect: (val: number) => val
+                  });
+                } catch (error) {
+                  console.error('Error adding buff:', error);
+                  this.addNotification(`Error applying buff reward: ${name}`, 'error');
+                }
+                break;
 
-            default:
-              // Legacy fallback for pokeball only system
-              if (selectedReward.type === 'pokeball') {
-                this.pokeballs++;
-              }
-              break;
+              default:
+                // Legacy fallback for pokeball only system
+                if (selectedReward.type === 'pokeball') {
+                  this.pokeballs++;
+                }
+                break;
+            }
+          } catch (error) {
+            console.error('Error handling job reward:', error);
           }
         }
 
