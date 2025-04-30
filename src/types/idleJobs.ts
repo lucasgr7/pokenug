@@ -78,7 +78,7 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     maxSlots: 4,
     assignedPokemon: [],
     progress: 0,
-    baseTime: 0.01, // 6 hours in milliseconds
+    baseTime: 21600000, // 6 hours in milliseconds (6 * 60 * 60 * 1000)
     chance: 0.8, // 80% chance of success
     rewards: [
       {

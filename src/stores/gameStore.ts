@@ -213,6 +213,39 @@ export const useGameStore = defineStore('game', {
         const inventoryStore = useInventoryStore();
         inventoryStore.initializeInventory();
 
+        // Update idle jobs definitions while preserving progress
+        if (state.idleJobs) {
+          const updatedJobs: Record<string, IdleJob> = {};
+          
+          // Process each job from the current DEFAULT_IDLE_JOBS
+          Object.entries(DEFAULT_IDLE_JOBS).forEach(([jobId, defaultJob]) => {
+            const savedJob = state.idleJobs[jobId];
+            
+            if (savedJob) {
+              // Preserve essential player progress
+              const preservedFields = {
+                assignedPokemon: savedJob.assignedPokemon || [],
+                completions: savedJob.completions || 0,
+                successfulCompletions: savedJob.successfulCompletions || 0,
+                progress: savedJob.progress || 0,
+                startTime: savedJob.startTime || now
+              };
+
+              // Merge the default job with preserved progress
+              updatedJobs[jobId] = {
+                ...defaultJob, // Get latest job definition
+                ...preservedFields // Preserve player progress
+              };
+            } else {
+              // This is a new job that didn't exist in player's save
+              updatedJobs[jobId] = defaultJob;
+            }
+          });
+
+          // Update the state with merged jobs
+          state.idleJobs = updatedJobs;
+        }
+
         // Calculate offline progress for idle jobs
         if (state.idleJobs) {
           Object.entries(state.idleJobs).forEach(([jobId, job]: [string, any]) => {
@@ -221,7 +254,6 @@ export const useGameStore = defineStore('game', {
               const jobTime = this.getJobRemainingTime(jobId)
               const possibleCompletions = Math.floor(elapsedTime / jobTime)
               
-              // If jobs were completed while away, show a summary notification
               if (possibleCompletions > 0) {
                 this.addNotification(`While you were away: ${job.name} completed ${possibleCompletions} times!`, 'info');
               }
@@ -231,41 +263,68 @@ export const useGameStore = defineStore('game', {
                 if (Math.random() < job.chance) {
                   job.successfulCompletions++
                   
-                  // Handle rewards based on job type
-                  if (job.reward) {
-                    const { name, description, params } = job.reward.itemDetails.length ? 
-                      job.reward.itemDetails[Math.floor(Math.random() * job.reward.itemDetails.length)] :
-                      job.reward.itemDetails;
+                  if (job.rewards && job.rewards.length > 0) {
+                    const totalWeight = job.rewards.reduce((sum, reward) => sum + reward.weight, 0);
+                    const randomValue = Math.random() * totalWeight;
                     
-                    switch (job.reward.type) {
-                      case 'pokeball':
-                        inventoryStore.addItem(
-                          itemFactory.createPokeball(name, description, params.catchRate)
-                        );
+                    let cumulativeWeight = 0;
+                    let selectedReward = null;
+                    
+                    for (const reward of job.rewards) {
+                      cumulativeWeight += reward.weight;
+                      if (randomValue <= cumulativeWeight) {
+                        selectedReward = reward;
                         break;
-                      case 'potion':
-                        inventoryStore.addItem(
-                          itemFactory.createPotion(name, description, params.healAmount)
-                        );
-                        break;
-                      case 'berry':
-                        inventoryStore.addItem(
-                          itemFactory.createBerry(name, description, params.effect)
-                        );
-                        break;
-                      case 'material':
-                        inventoryStore.addItem(
-                          itemFactory.createMaterial(name, description)
-                        );
-                        break;
-                      default:
-                        // Legacy fallback for pokeball only system
-                        state.pokeballs = (state.pokeballs ?? 0) + 1
-                        break;
+                      }
                     }
-                  } else {
-                    // Legacy fallback for pokeball only system
-                    state.pokeballs = (state.pokeballs ?? 0) + 1
+
+                    if (selectedReward?.itemDetails) {
+                      const {name, description, params} = selectedReward.itemDetails;
+                      
+                      switch (selectedReward.type) {
+                        case 'pokeball':
+                          inventoryStore.addItem(
+                            itemFactory.createPokeball(name, description, params.catchRate)
+                          );
+                          break;
+                        case 'potion':
+                          inventoryStore.addItem(
+                            itemFactory.createPotion(name, description, params.healAmount)
+                          );
+                          break;
+                        case 'berry':
+                          if (name.toLowerCase().includes('lure') || 
+                              description.toLowerCase().includes('lure') || 
+                              (params.effect && params.effect.toLowerCase().includes('catch'))) {
+                            inventoryStore.addItem(itemFactory.createRandomLureBerry(1));
+                          } else {
+                            inventoryStore.addItem(
+                              itemFactory.createBerry(name, description, params.effect)
+                            );
+                          }
+                          break;
+                        case 'material':
+                          inventoryStore.addItem(
+                            itemFactory.createMaterial(name, description)
+                          );
+                          break;
+                        case 'buff':
+                          const buffId = params.buffId || name.toLowerCase().replace(/\s+/g, '-');
+                          buffStore.addBuff({
+                            id: buffId,
+                            name: name,
+                            description: description,
+                            icon: params.imageUrl || '/images/not-found.png',
+                            type: params.buffType,
+                            value: 1,
+                            effect: (value) => value
+                          });
+                          break;
+                        default:
+                          state.pokeballs = (state.pokeballs ?? 0) + 1;
+                          break;
+                      }
+                    }
                   }
                 }
                 job.completions++
@@ -284,11 +343,11 @@ export const useGameStore = defineStore('game', {
 
         this.$patch({
           playerPokemon: state.playerPokemon ?? [],
-          availablePokemon: state.availablePokemon ?? [],  // Load available Pokemon from localStorage
+          availablePokemon: state.availablePokemon ?? [],
           activePokemonIndex: state.activePokemonIndex ?? 0,
           pokeballs: state.pokeballs ?? 50,
           unlocked: state.unlocked ?? { pokedex: false, inventory: false, idleJobs: false },
-          idleJobs: state.idleJobs ?? this.$state.idleJobs,
+          idleJobs: state.idleJobs ?? DEFAULT_IDLE_JOBS,
           idleWorking: state.idleWorking ?? [],
           inventory: state.inventory ?? { pokemon: {} }
         })
@@ -1344,14 +1403,11 @@ export const useGameStore = defineStore('game', {
               );
               break;
             case 'berry':
-              // Special handling for berries - use the new random berry generation
               if (name.toLowerCase().includes('lure') || 
                   description.toLowerCase().includes('lure') || 
                   (params.effect && params.effect.toLowerCase().includes('catch'))) {
-                // Use the weighted random lure berry generator (70% regular, 30% great)
                 inventoryStore.addItem(itemFactory.createRandomLureBerry(1));
               } else {
-                // For non-lure berries, use the standard method
                 inventoryStore.addItem(
                   itemFactory.createBerry(name, description, params.effect)
                 );
