@@ -49,72 +49,72 @@ export const useBuffStore = defineStore('buff', {
 
   getters: {
     getAllBuffs: (state) => Object.values(state.buffs),
-    
+
     getBuffById: (state) => (buffId: string) => {
       return state.buffs[buffId] || null;
     },
-    
+
     getBuffsByType: (state) => (type: string) => {
       return Object.values(state.buffs).filter(buff => buff.type === type);
     },
-    
+
     // Helper for getting total XP gain bonus from all XP buffs
     getTotalXPBonus: (state) => {
       return Object.values(state.buffs)
         .filter(buff => buff.type === 'xp-boost')
         .reduce((total, buff) => total + buff.value, 0);
     },
-    
+
     // Get fire rate state
     getFireRateState: (state) => state.fireRateState,
-    
+
     // Get fire rate multiplier
     getFireRateMultiplier: (state) => {
       // If fire rate isn't active, return 1 (no multiplier)
       if (!state.fireRateState.active) return 1.0;
-      
+
       // Return the current multiplier based on tier
       return state.fireRateState.multiplier;
     },
 
     // Get defeated Pokemon count
     getDefeatedCount: (state) => state.pokemonDefeatedCount,
-    
+
     // Check if spawn delay is needed (every 10 defeats)
     shouldDelaySpawn: (state) => state.pokemonDefeatedCount > 0 && state.pokemonDefeatedCount % 10 === 0,
-    
+
     // Get stun resistance chance - base 0% + 0.01% per material mining completion
     getStunResistanceChance: (state) => {
       return state.stunResistanceProgress;
     },
-    
+
     // Check if Rock Emblem is active
     hasRockEmblem: (state) => {
       return state.buffs['rock-emblem'] !== undefined;
     },
-    
+
     // Check if Electric Emblem (auto-attack) is active
     hasElectricEmblem: (state) => {
       return state.buffs['electric-emblem'] !== undefined;
     },
-    
+
     // Get auto-attack state
     getAutoAttackState: (state) => state.autoAttackState,
-    
+
     // Calculate auto-attack interval based on buff level
     getAutoAttackInterval: (state) => {
       const electricEmblem = state.buffs['electric-emblem'];
       if (!electricEmblem) return 5000; // Default 5 seconds if no buff
-      
+
       const level = electricEmblem.value;
       // Formula: auto_attack_interval = 0.5 + (5.0 - 0.5) * exp(-0.003 * level)
       // This gives approximately 5s at level 1, and approaches 0.5s as level increases
       const interval = 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
-      
+
       // Convert to milliseconds
       return Math.round(interval * 1000);
     },
-    
+
     // Check if auto-attack is available (has buff and level > 0)
     canAutoAttack: (state) => {
       const electricEmblem = state.buffs['electric-emblem'];
@@ -128,21 +128,22 @@ export const useBuffStore = defineStore('buff', {
       this.stunResistanceProgress += 0.0001; // 0.01% in decimal form
       this.saveState();
     },
-    
+
     // Check if stun should be resisted based on current progress
-    shouldResistStun(roll: number) {
-      // Check if roll is less than current resistance chance
-      return roll < this.stunResistanceProgress;
+    shouldResistStun() {
+      const targetFullLevel = 10000;
+      const progress = Math.min(Math.log(this.stunResistanceProgress) / Math.log(targetFullLevel), 1.0);
+      return Math.random() < progress;
     },
-    
+
     addBuff(buff: BuffEffect) {
       // If buff already exists, increase its level
       if (this.buffs[buff.id]) {
         this.buffs[buff.id].value += 1;
-        
+
         // Check if buff has hit its maximum level
-        if (this.buffs[buff.id].maxValue && 
-            this.buffs[buff.id].value >= this.buffs[buff.id].maxValue!) {
+        if (this.buffs[buff.id].maxValue &&
+          this.buffs[buff.id].value >= this.buffs[buff.id].maxValue!) {
           this.buffs[buff.id].value = this.buffs[buff.id].maxValue!;
         }
       } else {
@@ -152,7 +153,7 @@ export const useBuffStore = defineStore('buff', {
           value: 1
         };
       }
-      
+
       this.saveState();
     },
 
@@ -164,7 +165,7 @@ export const useBuffStore = defineStore('buff', {
       }
       return false;
     },
-    
+
     // Update existing buff level
     updateBuffLevel(buffId: string, newLevel: number) {
       if (this.buffs[buffId]) {
@@ -174,27 +175,27 @@ export const useBuffStore = defineStore('buff', {
         } else {
           this.buffs[buffId].value = newLevel;
         }
-        
+
         this.saveState();
         return true;
       }
       return false;
     },
-    
+
     // Fire rate system actions
-    
+
     // Register an attack for fire rate with level restrictions
     registerFireRateAttack(pokemonId: number, pokemonLevel: number, currentRegionId: string) {
       const now = Date.now();
       const fireEmblemBuff = this.getBuffById('fire-emblem');
-      
+
       // If user doesn't have the Fire Emblem buff, do nothing
       if (!fireEmblemBuff) return;
-      
+
       // Get region's max level
       const region = regions[currentRegionId as keyof typeof regions];
       if (!region) return;
-      
+
       // Apply level restriction - disable fire rate if player level exceeds region max level
       if (pokemonLevel > region.maxLevel) {
         // If fire rate was active, reset it
@@ -203,34 +204,34 @@ export const useBuffStore = defineStore('buff', {
         }
         return; // Don't allow fire rate to activate
       }
-      
+
       // If pokemon has changed, reset fire rate
-      if (this.fireRateState.activePokemonId !== null && 
-          this.fireRateState.activePokemonId !== pokemonId) {
+      if (this.fireRateState.activePokemonId !== null &&
+        this.fireRateState.activePokemonId !== pokemonId) {
         this.resetFireRate();
         this.fireRateState.activePokemonId = pokemonId;
         return;
       }
-      
+
       // Set active Pokemon ID if not set
       if (this.fireRateState.activePokemonId === null) {
         this.fireRateState.activePokemonId = pokemonId;
       }
-      
+
       // Check if the time since last attack is within the allowed time
       if (this.fireRateState.active && now - this.fireRateState.lastAttackTime > this.fireRateState.timeAllowed) {
         // Reset if the player took too long between attacks
         this.resetFireRate();
         return;
       }
-      
+
       // Increment attack counter
       this.fireRateState.count++;
       this.fireRateState.lastAttackTime = now;
-      
+
       // Update time allowed based on count (every 100 clicks)
       this.updateTimeAllowed();
-      
+
       // If we haven't activated fire rate yet, check if we've hit 25 attacks
       if (!this.fireRateState.active && this.fireRateState.count >= 20) {
         this.activateFireRate();
@@ -240,12 +241,12 @@ export const useBuffStore = defineStore('buff', {
         this.updateFireRateTier();
       }
     },
-    
+
     // Update the time allowed between attacks based on count
     updateTimeAllowed() {
       // Base time is determined by tier
       let baseTime;
-      
+
       if (this.fireRateState.tier === 1) {
         baseTime = 3000; // 3 seconds for tier 1
       } else if (this.fireRateState.tier === 2.2) {
@@ -259,35 +260,35 @@ export const useBuffStore = defineStore('buff', {
       } else {
         baseTime = 5000; // Default
       }
-      
+
       // Minimum time is 100ms regardless of tier or count
       const reducedTime = Math.max(100, baseTime);
-      
+
       this.fireRateState.timeAllowed = reducedTime;
     },
-    
+
     // Activate fire rate
     activateFireRate() {
       // Get the fire emblem buff to check its level
       const fireEmblemBuff = this.getBuffById('fire-emblem');
       if (!fireEmblemBuff) return;
-      
+
       this.fireRateState.active = true;
       this.fireRateState.tier = 1.5;
-      
+
       // Update the time allowed between attacks
       this.updateTimeAllowed();
-      
+
       // Set initial multiplier based on buff level
       // First tier is always 1.1 (10% bonus) for level 1
       this.updateFireRateMultiplier();
     },
-    
+
     // Update fire rate tier
     updateFireRateTier() {
       const fireEmblemBuff = this.getBuffById('fire-emblem');
       if (!fireEmblemBuff || !this.fireRateState.active) return;
-      
+
       // Check count thresholds for tier upgrades
       if (this.fireRateState.count >= 80 && this.fireRateState.tier < 3) {
         this.fireRateState.tier = 3; // Max tier
@@ -299,7 +300,7 @@ export const useBuffStore = defineStore('buff', {
         this.updateFireRateMultiplier();
       }
     },
-    
+
     // Reset fire rate
     resetFireRate() {
       this.fireRateState = {
@@ -337,7 +338,7 @@ export const useBuffStore = defineStore('buff', {
       } else {
         this.pokemonDefeatedCount++;
       }
-      
+
       this.saveState();
     },
 
@@ -355,10 +356,10 @@ export const useBuffStore = defineStore('buff', {
     toggleAutoAttack() {
       // If user doesn't have the Electric Emblem buff, do nothing
       if (!this.hasElectricEmblem) return false;
-      
+
       // Toggle active state
       this.autoAttackState.active = !this.autoAttackState.active;
-      
+
       // If turning on, update interval and lastAttackTime
       if (this.autoAttackState.active) {
         // Fix: Calculate the interval as a numeric value instead of using the getter reference
@@ -366,57 +367,57 @@ export const useBuffStore = defineStore('buff', {
         const level = electricEmblem?.value || 1;
         const intervalSeconds = 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
         this.autoAttackState.interval = Math.round(intervalSeconds * 1000);
-        
+
         // Set the last attack time to now
         this.autoAttackState.lastAttackTime = Date.now();
-        
+
         console.log(`Auto-attack activated with interval: ${this.autoAttackState.interval}ms (${intervalSeconds.toFixed(2)}s)`);
       } else {
         console.log('Auto-attack deactivated');
       }
-      
+
       this.saveState();
       return this.autoAttackState.active;
     },
-    
+
     // Record an auto-attack
     recordAutoAttack() {
       this.autoAttackState.lastAttackTime = Date.now();
-      
+
       // Only reset triggerAttack if it was true
       if (this.autoAttackState.triggerAttack) {
         this.autoAttackState.triggerAttack = false;
       }
-      
+
       this.saveState();
     },
-    
+
     // Check if it's time for an auto-attack
     shouldAutoAttack() {
       if (!this.autoAttackState.active) return false;
-      
+
       const now = Date.now();
       const elapsed = now - this.autoAttackState.lastAttackTime;
-      
+
       // Check if enough time has passed since the last attack
       if (elapsed >= this.autoAttackState.interval) {
         // Set the reactive property to trigger the attack
         this.autoAttackState.triggerAttack = true;
         return true;
       }
-      
+
       return false;
     },
-    
+
     // Update auto-attack interval (should be called when buff level changes)
     updateAutoAttackInterval() {
       this.autoAttackState.interval = this.getAutoAttackInterval;
       this.saveState();
     },
-    
+
     initializeBuffStore() {
       const savedState = localStorage.getItem('buffState');
-      
+
       if (savedState) {
         const state = JSON.parse(savedState);
         this.$patch({
@@ -449,7 +450,7 @@ export const useBuffStore = defineStore('buff', {
         lastRegionId: this.lastRegionId,
         autoAttackState: this.autoAttackState
       };
-      
+
       localStorage.setItem('buffState', JSON.stringify(state));
     },
 
@@ -457,21 +458,21 @@ export const useBuffStore = defineStore('buff', {
     updateFireRateMultiplier() {
       const fireEmblemBuff = this.getBuffById('fire-emblem');
       if (!fireEmblemBuff) return;
-      
+
       const buffLevel = fireEmblemBuff.value;
-      
+
       // Calculate tier 1 multiplier: Base 1.0 + 0.01 per buff level
       // So at level 10 it's 1.1, at level 20 it's 1.2, etc.
       const tier1Multiplier = 1.0 + (0.01 * buffLevel);
-      
+
       // Calculate tier 2 multiplier: tier1 + tier1
       // At level 10: tier1 = 1.1, so tier2 = 1.1 + 1.1 = 2.2
       const tier2Multiplier = tier1Multiplier + tier1Multiplier;
-      
+
       // Calculate tier 3 multiplier: 3 * (tier1 + tier2)
       // At level 10: tier1 = 1.1, tier2 = 2.2, so tier3 = 3 * (1.1 + 2.2) = 3 * 3.3 = 9.9
       const tier3Multiplier = 3 * (tier1Multiplier + tier2Multiplier);
-      
+
       // Set multiplier based on current tier
       if (this.fireRateState.tier === 1) {
         this.fireRateState.multiplier = tier1Multiplier;

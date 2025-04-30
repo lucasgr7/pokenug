@@ -1,9 +1,9 @@
-
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import { tickSystem } from '../services/tickSystem'
 import type { Pokemon } from '../types/pokemon'
+import CachedImage from './CachedImage.vue'
 
 const gameStore = useGameStore()
 let regenInterval: number | NodeJS.Timeout | null = null
@@ -81,9 +81,11 @@ onUnmounted(() => {
              'opacity-75': gameStore.playerPokemon[index - 1] !== gameStore.activePokemon 
            }"
            @click="swapPokemon(gameStore.playerPokemon[index - 1])">
-        <img :src="gameStore.playerPokemon[index - 1].sprite" 
-             :alt="gameStore.playerPokemon[index - 1].name" 
-             class="w-5 h-5 object-contain">
+        <CachedImage 
+          :src="gameStore.playerPokemon[index - 1].sprite" 
+          :alt="gameStore.playerPokemon[index - 1].name" 
+          class="w-5 h-5 object-contain"
+        />
         <div class="ml-2 flex-1">
           <div class="flex justify-between items-center">
             <div class="flex items-center">

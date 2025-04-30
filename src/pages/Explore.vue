@@ -1,3 +1,319 @@
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import { useGameStore } from '@/stores/gameStore'
+import { usePokemon } from '@/composables/usePokemon'
+import { useInventory } from '@/composables/useInventory'
+import { usePokemonCapture } from '@/composables/usePokemonCapture'
+import { berryService } from '@/services/berryService'
+import BattleLog from '@/components/BattleLog.vue'
+import XPBar from '@/components/XPBar.vue'
+import BerryIcon from '@/components/BerryIcon.vue'
+import CachedImage from '@/components/CachedImage.vue'
+import type { InventoryItem } from '@/types/pokemon'
+import regions from '@/constants/regions'
+import { useBuffStore } from '@/stores/buffStore'
+import BuffDisplay from '@/components/BuffDisplay.vue'
+import { tickSystem } from '@/services/tickSystem'
+
+// Store and Pokemon data
+const gameStore = useGameStore()
+const buffStore = useBuffStore()
+const { findById } = usePokemon()
+const inventory = useInventory()
+const { attemptCapture, isTryingCatch } = usePokemonCapture()
+const showPokeballSelector = ref(false)
+const showBerrySelector = ref(false)
+const activeTasks = ref<any[]>([])
+const wildPokemon = computed(() => gameStore.battle.wildPokemon)
+const isPlayerAttacking = computed(() => gameStore.battle.isPlayerAttacking)
+const isWildPokemonHurt = computed(() => gameStore.battle.isWildPokemonHurt)
+const isEnemyAttacking = computed(() => gameStore.battle.isEnemyAttacking)
+const recoveryProgress = ref(0)
+
+const selectedPokeball = ref<InventoryItem | null>(null)
+
+const spawnTimer = computed(() => {
+  return gameStore.battle.spawnTimer
+})
+
+const isRecovering = ref(false)
+
+// Total pokeball count
+const totalPokeballs = computed(() => {
+  return inventory.getPokeballCount()
+})
+
+
+
+
+// Get available pokeballs from inventory
+const availablePokeballs = computed(() => {
+  return inventory.getItemsByType('pokeball')
+})
+
+// Get available berries from inventory
+const availableBerries = computed(() => {
+  return inventory.getItemsByType('berries').filter(berry => {
+    const definition = inventory.getItemDefinition(berry.id)
+    return definition?.effect?.type === 'auto-catch'
+  })
+})
+
+// Fire rate state from buffStore
+const fireRateState = computed(() => buffStore.getFireRateState)
+
+
+// HP calculations
+const hpPercentage = computed(() => {
+  if (!gameStore.activePokemon?.currentHP || !gameStore.activePokemon?.maxHP) return 0
+  return (gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100
+})
+
+// Select a pokeball to use
+function selectPokeball(ball: InventoryItem) {
+  selectedPokeball.value = ball
+  showPokeballSelector.value = false
+  performCapture(ball)
+}
+
+
+// Perform the actual capture attempt with the selected pokeball
+async function performCapture(ball: InventoryItem) {
+  if (!wildPokemon.value) return
+  
+  // Get the item definition for the ball from constants
+  const ballDefinition = inventory.getItemDefinition(ball.id)
+  
+  if (!ballDefinition) {
+    gameStore.battle.battleLogs.push({
+      message: `Error: Could not find the ball definition`,
+      type: 'system'
+    })
+    return
+  }
+  
+  gameStore.battle.battleLogs.push({
+    message: `Threw a ${ball.name} at ${wildPokemon.value.name}!`,
+    type: 'system'
+  })
+  // Use the capture composable to attempt the capture
+  const result = await attemptCapture(wildPokemon.value, ballDefinition)
+  
+  // Add the result message to battle logs
+  gameStore.battle.battleLogs.push({
+    message: result.message,
+    type: 'system'
+  })
+  
+  // If the capture was successful, clear the wild Pokemon and restart spawn timer
+  if (result.success) {
+    gameStore.spawnWildPokemon()
+  }
+}
+
+// Handle showing the pokeball selector
+function openPokeballSelector() {
+  if (!wildPokemon.value) return
+  
+  // If only one type of pokeball is available, use it directly
+  if (availablePokeballs.value.length === 1) {
+    selectPokeball(availablePokeballs.value[0])
+    return
+  }
+  
+  showPokeballSelector.value = true
+}
+
+// Calculate progress percentage for a task
+function getProgressPercentage(task: any) {
+  const totalDuration = task.endTime - task.startTime
+  const elapsed = Date.now() - task.startTime
+  return Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
+}
+
+
+// Get potential Pokémon that could be caught from a region's berry pool
+function getPotentialPokemon(regionId: string) {
+  const region = regions[regionId as keyof typeof regions]
+  if (!region) return []
+  
+  // Use the berry pool if available, otherwise use the regular pool
+  const pool = region.berryPool || region.pool
+  
+  // Calculate total probability for percentage calculation
+  const totalProbability = pool.reduce((sum, pokemon) => sum + (pokemon.probability || 1), 0)
+  
+  // Return formatted list with percentages
+  return pool.map(pokemon => ({
+    id: pokemon.id,
+    name: pokemon.name,
+    probability: (pokemon.probability / totalProbability) * 100
+  }))
+}
+
+// Handle showing the berry selector
+function openBerrySelector() {
+  showBerrySelector.value = true
+}
+
+// Select a berry to use
+function selectBerry(berry: InventoryItem) {
+  showBerrySelector.value = false
+  
+  const berryDefinition = inventory.getItemDefinition(berry.id)
+  if (!berryDefinition) {
+    gameStore.addNotification(`Error: Could not find the berry definition`, 'error')
+    return
+  }
+  
+  // Use the berry in the current region
+  berryService.startBerryTask(berryDefinition, gameStore.currentRegion)
+  
+  // Update the active tasks list
+  updateActiveTasks()
+}
+
+// Get remaining time for a berry task
+function getRemainingTime(taskId: string) {
+  return berryService.getRemainingTime(taskId)
+}
+
+// Format remaining time to human-readable string
+function formatRemainingTime(ms: number) {
+  const minutes = Math.floor(ms / (1000 * 60))
+  const seconds = Math.floor((ms % (1000 * 60)) / 1000)
+  
+  return `${minutes}m ${seconds}s`
+}
+
+// Format time with milliseconds, preventing negative values
+function formatTimeWithMs(ms: number) {
+  // Ensure we don't have negative values
+  ms = Math.max(0, ms);
+  
+  const seconds = Math.floor((ms / 1000) % 60)
+  const milliseconds = Math.floor(ms % 1000)
+  return `${seconds}s ${milliseconds}ms`
+}
+
+// Cancel a berry task
+function cancelBerryTask(taskId: string) {
+  berryService.cancelTask(taskId)
+  updateActiveTasks()
+}
+
+
+// Add this function to map regions to background images
+const getRegionBackgroundImage = (regionId: string) => {
+  const backgroundMap: Record<string, string> = {
+    'viridian-forest': '/images/backgrounds/viridian-palace.png',
+    'cerulean-cave (10-15)': '/images/backgrounds/cave.png',
+    // Default to viridian for other regions until more backgrounds are available
+    'beach-zone (15-25)': '/images/backgrounds/beach.png',
+    'Mountains (30-50)': '/images/backgrounds/mountains.png',
+    'ironworks-zone (80-120)': '/images/backgrounds/ironworks.png',
+
+  }
+  
+  return backgroundMap[regionId] || '/images/backgrounds/viridian-palace.png'
+}
+
+// Update the active tasks list
+function updateActiveTasks() {
+  activeTasks.value = berryService.getActiveTasksForRegion(gameStore.currentRegion)
+}
+// Handle attack action
+const attack = async () => {
+  if (!wildPokemon.value || !gameStore.activePokemon) return
+  await gameStore.attack()
+}
+
+// Type colors function
+const getTypeColor = (type: string) => {
+  const colors: Record<string, string> = {
+    normal: 'bg-gray-400',
+    fire: 'bg-red-500',
+    water: 'bg-blue-500',
+    electric: 'bg-yellow-500',
+    grass: 'bg-green-500',
+    ice: 'bg-blue-300',
+    fighting: 'bg-red-700',
+    poison: 'bg-purple-500',
+    ground: 'bg-yellow-700',
+    flying: 'bg-indigo-400',
+    psychic: 'bg-pink-500',
+    bug: 'bg-green-600',
+    rock: 'bg-yellow-600',
+    ghost: 'bg-purple-700',
+    dragon: 'bg-indigo-700',
+    dark: 'bg-gray-700',
+    steel: 'bg-gray-500',
+    fairy: 'bg-pink-400'
+  }
+  return colors[type.toLowerCase()] || 'bg-gray-400'
+}
+
+// Handle auto-attack toggle
+const toggleAutoAttack = () => {
+  const isActive = buffStore.toggleAutoAttack()
+  if (isActive) {
+    gameStore.addNotification(
+      `Auto-Attack activated! Pokemon will attack every ${(buffStore.getAutoAttackInterval / 1000).toFixed(1)} seconds.`,
+      'success',
+    )
+  }
+}
+
+// Handle region change
+const handleRegionChange = () => {
+  // Reset encounter when region changes
+  gameStore.resetBattleState()
+  gameStore.startSpawnTimer()
+  
+  // Update active berry tasks when region changes
+  updateActiveTasks()
+}
+
+// Get region name from region ID
+function getRegionName(regionId: string) {
+  return regions[regionId as keyof typeof regions]?.name || regionId
+}
+// Watch for auto-attack triggers
+watch(() => buffStore.autoAttackState.triggerAttack, (shouldAttack) => {
+  if (shouldAttack && wildPokemon.value && gameStore.activePokemon) {
+    attack()
+    buffStore.recordAutoAttack()
+  }
+})
+
+// Watch for wild Pokemon changes to start enemy attacks
+watch(() => gameStore.battle.wildPokemon, (newPokemon) => {
+  if (newPokemon) {
+    // Start run chance check interval
+    const runInterval = setInterval(() => {
+    }, 5000)
+  }
+})
+
+const THREE_SECONDS = 3;
+const TWENTY_SECONDS = 20;
+let accumulatedTime = 0;
+
+tickSystem.subscribe(() => {
+  updateActiveTasks();
+
+  accumulatedTime++;
+  if (gameStore.battle.wildPokemon && (accumulatedTime % THREE_SECONDS === 0)) {
+    accumulatedTime = 0;
+    gameStore.enemyAttack()
+  }
+
+  if (gameStore.battle.wildPokemon && (accumulatedTime % TWENTY_SECONDS === 0)) {
+    gameStore.tryPokemonRun()
+  }
+})
+</script>
+
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
     <!-- XP Bar and Buffs Section - Modified layout -->
@@ -134,12 +450,12 @@
       <div v-else-if="gameStore?.activePokemon" class="bg-blue-50 p-4 rounded-lg shadow">
         <div class="text-center mb-2 font-bold">Your Pokémon</div>
         <div class="relative">
-          <img
+          <CachedImage
             :src="gameStore?.activePokemon?.sprite ?? ''"
-            alt="Player Pokemon"
+            :alt="'Player Pokemon'"
             class="w-32 h-32 mx-auto transition-transform duration-200"
             :class="{ 'animate-attack': isPlayerAttacking }"
-          >
+          />
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2">
             <span
@@ -267,16 +583,16 @@
           <!-- Pokemon container with fixed position -->
           <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 z-10">
             <!-- Pokemon image inside container -->
-            <img
+            <CachedImage
               :src="wildPokemon.sprite"
-              alt="Wild Pokemon"
+              :alt="'Wild Pokemon'"
               class="w-full h-full transition-transform duration-200"
               :class="{ 
                 'animate-damage': isWildPokemonHurt, 
                 'animate-enemy-attack': isEnemyAttacking,
                 'animate-catch': isTryingCatch 
               }"
-            >
+            />
           </div>
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2 absolute bottom-2 left-0 right-0">
@@ -399,251 +715,6 @@
     <BattleLog :logs="gameStore.battle.battleLogs" />
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useGameStore } from '@/stores/gameStore'
-import { usePokemon } from '@/composables/usePokemon'
-import { useInventory } from '@/composables/useInventory'
-import { usePokemonCapture } from '@/composables/usePokemonCapture'
-import { tickSystem } from '@/services/tickSystem'
-import { berryService } from '@/services/berryService'
-import BattleLog from '@/components/BattleLog.vue'
-import XPBar from '@/components/XPBar.vue'
-import BerryIcon from '@/components/BerryIcon.vue'
-import type { Pokemon, InventoryItem } from '@/types/pokemon'
-import regions from '@/constants/regions'
-import items from '@/constants/items'
-import { useRouter } from 'vue-router'
-import { useBuffStore } from '@/stores/buffStore'
-import BuffDisplay from '@/components/BuffDisplay.vue'
-
-// Store and Pokemon data
-const gameStore = useGameStore()
-const buffStore = useBuffStore()
-const { findById } = usePokemon()
-const inventory = useInventory()
-const { attemptCapture } = usePokemonCapture()
-const showPokeballSelector = ref(false)
-const showBerrySelector = ref(false)
-const activeTasks = ref<any[]>([])
-const wildPokemon = computed(() => gameStore.battle.wildPokemon)
-const isPlayerAttacking = computed(() => gameStore.battle.isPlayerAttacking)
-const isWildPokemonHurt = computed(() => gameStore.battle.isWildPokemonHurt)
-const isEnemyAttacking = computed(() => gameStore.battle.isEnemyAttacking)
-const isTryingCatch = computed(() => gameStore.battle.isTryingCatch)
-
-const selectedPokeball = ref<InventoryItem | null>(null)
-
-const spawnTimer = computed(() => {
-  return gameStore.battle.spawnTimer
-})
-
-const isRecovering = ref(false)
-
-// Total pokeball count
-const totalPokeballs = computed(() => {
-  return inventory.getPokeballCount()
-})
-
-
-
-
-// Get available pokeballs from inventory
-const availablePokeballs = computed(() => {
-  return inventory.getItemsByType('pokeball')
-})
-
-// Get available berries from inventory
-const availableBerries = computed(() => {
-  return inventory.getItemsByType('berries').filter(berry => {
-    const definition = inventory.getItemDefinition(berry.id)
-    return definition?.effect?.type === 'auto-catch'
-  })
-})
-
-// Fire rate state from buffStore
-const fireRateState = computed(() => buffStore.getFireRateState)
-
-
-// HP calculations
-const hpPercentage = computed(() => {
-  if (!gameStore.activePokemon?.currentHP || !gameStore.activePokemon?.maxHP) return 0
-  return (gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100
-})
-
-// Select a pokeball to use
-function selectPokeball(ball: InventoryItem) {
-  selectedPokeball.value = ball
-  showPokeballSelector.value = false
-  performCapture(ball)
-}
-
-// Handle showing the pokeball selector
-function openPokeballSelector() {
-  if (!wildPokemon.value) return
-  
-  // If only one type of pokeball is available, use it directly
-  if (availablePokeballs.value.length === 1) {
-    selectPokeball(availablePokeballs.value[0])
-    return
-  }
-  
-  showPokeballSelector.value = true
-}
-
-// Handle showing the berry selector
-function openBerrySelector() {
-  showBerrySelector.value = true
-}
-
-// Select a berry to use
-function selectBerry(berry: InventoryItem) {
-  showBerrySelector.value = false
-  
-  const berryDefinition = inventory.getItemDefinition(berry.id)
-  if (!berryDefinition) {
-    gameStore.addNotification(`Error: Could not find the berry definition`, 'error')
-    return
-  }
-  
-  // Use the berry in the current region
-  berryService.startBerryTask(berryDefinition, gameStore.currentRegion)
-  
-  // Update the active tasks list
-  updateActiveTasks()
-}
-
-// Get remaining time for a berry task
-function getRemainingTime(taskId: string) {
-  return berryService.getRemainingTime(taskId)
-}
-
-// Format remaining time to human-readable string
-function formatRemainingTime(ms: number) {
-  const minutes = Math.floor(ms / (1000 * 60))
-  const seconds = Math.floor((ms % (1000 * 60)) / 1000)
-  
-  return `${minutes}m ${seconds}s`
-}
-
-// Format time with milliseconds, preventing negative values
-function formatTimeWithMs(ms: number) {
-  // Ensure we don't have negative values
-  ms = Math.max(0, ms);
-  
-  const seconds = Math.floor((ms / 1000) % 60)
-  const milliseconds = Math.floor(ms % 1000)
-  return `${seconds}s ${milliseconds}ms`
-}
-
-// Cancel a berry task
-function cancelBerryTask(taskId: string) {
-  berryService.cancelTask(taskId)
-  updateActiveTasks()
-}
-
-
-// Add this function to map regions to background images
-const getRegionBackgroundImage = (regionId: string) => {
-  const backgroundMap: Record<string, string> = {
-    'viridian-forest': '/images/backgrounds/viridian-palace.png',
-    'cerulean-cave (10-15)': '/images/backgrounds/cave.png',
-    // Default to viridian for other regions until more backgrounds are available
-    'beach-zone (15-25)': '/images/backgrounds/beach.png',
-    'Mountains (30-50)': '/images/backgrounds/mountains.png',
-    'ironworks-zone (80-120)': '/images/backgrounds/ironworks.png',
-
-  }
-  
-  return backgroundMap[regionId] || '/images/backgrounds/viridian-palace.png'
-}
-
-// Update the active tasks list
-function updateActiveTasks() {
-  activeTasks.value = berryService.getActiveTasksForRegion(gameStore.currentRegion)
-}
-// Handle attack action
-const attack = async () => {
-  if (!wildPokemon.value || !gameStore.activePokemon) return
-  await gameStore.attack()
-}
-
-// Type colors function
-const getTypeColor = (type: string) => {
-  const colors: Record<string, string> = {
-    normal: 'bg-gray-400',
-    fire: 'bg-red-500',
-    water: 'bg-blue-500',
-    electric: 'bg-yellow-500',
-    grass: 'bg-green-500',
-    ice: 'bg-blue-300',
-    fighting: 'bg-red-700',
-    poison: 'bg-purple-500',
-    ground: 'bg-yellow-700',
-    flying: 'bg-indigo-400',
-    psychic: 'bg-pink-500',
-    bug: 'bg-green-600',
-    rock: 'bg-yellow-600',
-    ghost: 'bg-purple-700',
-    dragon: 'bg-indigo-700',
-    dark: 'bg-gray-700',
-    steel: 'bg-gray-500',
-    fairy: 'bg-pink-400'
-  }
-  return colors[type.toLowerCase()] || 'bg-gray-400'
-}
-
-// Handle auto-attack toggle
-const toggleAutoAttack = () => {
-  const isActive = buffStore.toggleAutoAttack()
-  if (isActive) {
-    gameStore.addNotification({
-      type: 'success',
-      message: `Auto-Attack activated! Pokemon will attack every ${(buffStore.getAutoAttackInterval / 1000).toFixed(1)} seconds.`
-    })
-  }
-}
-
-// Handle region change
-const handleRegionChange = () => {
-  // Reset encounter when region changes
-  gameStore.resetBattleState()
-  gameStore.startSpawnTimer()
-  
-  // Update active berry tasks when region changes
-  updateActiveTasks()
-}
-
-// Watch for auto-attack triggers
-watch(() => buffStore.autoAttackState.triggerAttack, (shouldAttack) => {
-  if (shouldAttack && wildPokemon.value && gameStore.activePokemon) {
-    attack()
-    buffStore.recordAutoAttack()
-  }
-})
-
-// Watch for wild Pokemon changes to start enemy attacks
-watch(() => gameStore.battle.wildPokemon, (newPokemon) => {
-  if (newPokemon) {
-    // Start enemy attack interval
-    const attackInterval = setInterval(() => {
-      gameStore.enemyAttack()
-    }, 3000)
-
-    // Start run chance check interval
-    const runInterval = setInterval(() => {
-      gameStore.tryPokemonRun()
-    }, 5000)
-
-  }
-})
-// Clear intervals when Pokemon changes
-// onUnmounted(() => {
-//   clearInterval(attackInterval)
-//   clearInterval(runInterval)
-// })
-</script>
 
 <style scoped>
 .animate-attack {

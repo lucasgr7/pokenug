@@ -35,7 +35,11 @@
           <tr v-for="pokemon in displayedPokemon" :key="pokemon.id" class="border-b">
             <td class="p-2">#{{ pokemon.id.toString().padStart(3, '0') }}</td>
             <td class="p-2">
-              <img :src="pokemon.sprite" :alt="pokemon.name" class="w-16 h-16 object-contain" />
+              <CachedImage 
+                :src="pokemon.sprite" 
+                :alt="pokemon.name" 
+                class="w-16 h-16 object-contain" 
+              />
             </td>
             <td class="p-2 capitalize">{{ pokemon.name }}</td>
             <td class="p-2">
@@ -81,6 +85,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { usePokemon } from '@/composables/usePokemon';
+import CachedImage from '@/components/CachedImage.vue'
 const { pokemonList, isLoading, error, allTypes } = usePokemon();
 
 

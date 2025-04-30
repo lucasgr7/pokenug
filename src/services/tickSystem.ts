@@ -12,6 +12,29 @@ interface GameTime {
  * Manages game time and tick-based updates for the game system.
  * Handles saving/loading game state and notifying subscribers of time updates.
  */
+/**
+ * Example of creating a 3-second tick using TickSystem:
+ * 
+ * ```typescript
+ * const THREE_SECONDS = 3000; // milliseconds
+ * let accumulatedTime = 0;
+ * 
+ * const tickSystem = new TickSystem();
+ * tickSystem.subscribe((elapsed: number) => {
+ *   accumulatedTime += elapsed;
+ *   if (accumulatedTime >= THREE_SECONDS) {
+ *     // Your code to run every 3 seconds goes here
+ *     console.log('3 seconds have passed!');
+ *     accumulatedTime -= THREE_SECONDS; // Reset accumulated time
+ *   }
+ * });
+ * ```
+ * 
+ * @remarks
+ * The elapsed parameter in the callback represents the time passed since the last tick in milliseconds.
+ * You need to accumulate this time and check when it reaches your desired interval (3000ms).
+ * Remember to subtract the interval from accumulated time instead of setting to 0 to maintain precision.
+ */
 class TickSystem {
   /** Set of callback functions to be called on each tick */
   private readonly subscribers: Set<(elapsed: number) => void> = new Set()

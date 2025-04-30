@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '../stores/gameStore'
 import type { Pokemon } from '../types/pokemon'
 import PokemonGrid from '../components/PokemonGrid.vue'
+import CachedImage from '../components/CachedImage.vue'
 
 const gameStore = useGameStore()
 
@@ -415,11 +416,12 @@ function getTotalLevels(jobId: string): number {
                         class="relative group cursor-pointer w-full h-full flex items-center justify-center rounded-md bg-white bg-opacity-20" 
                         @click="removePokemon(job.assignedPokemon[i-1], id)"
                       >
-                        <img 
+                        <CachedImage 
                           :src="job.assignedPokemon[i-1].sprite" 
                           :alt="job.assignedPokemon[i-1].name"
                           class="w-10 h-10 object-contain"
                         >
+                        </CachedImage>
                         <!-- Show the Pokémon's level in a badge -->
                         <span class="absolute top-0 right-0 bg-white text-black text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
                           {{ job.assignedPokemon[i-1].level }}
