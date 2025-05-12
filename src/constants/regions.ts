@@ -138,7 +138,34 @@ const regions = {
     { id: 89, name: 'Muk', probability: 10 },
     { id: 109, name: 'Koffing', probability: 10 }
   ]
-}
+},
+'vulcanic-zone': {
+  name: 'Vulcanic Zone',
+  minLevel: 150,
+  maxLevel: 300,
+  encounterRate: 10,
+  spawnTimer: 64,
+  pool: [
+  { id: 4, name: 'Charmander', probability: 20 },
+  { id: 5, name: 'Charmeleon', probability: 15 },
+  { id: 6, name: 'Charizard', probability: 5 },
+  { id: 37, name: 'Vulpix', probability: 15 },
+  { id: 38, name: 'Ninetales', probability: 10 },
+  { id: 58, name: 'Growlithe', probability: 15 },
+  { id: 59, name: 'Arcanine', probability: 10 },
+  { id: 126, name: 'Magmar', probability: 10 }
+  ],
+  berryPool: [
+    { id: 92, name: 'Gastly', probability: 25 },
+    { id: 93, name: 'Haunter', probability: 15 },
+    { id: 94, name: 'Gengar', probability: 5 },
+    { id: 100, name: 'Voltorb', probability: 20 },
+    { id: 101, name: 'Electrode', probability: 10 },
+    { id: 125, name: 'Electabuzz', probability: 10 },
+    { id: 89, name: 'Muk', probability: 10 },
+    { id: 109, name: 'Koffing', probability: 10 }
+  ]
+},
 
 } as const;
 export default regions;
