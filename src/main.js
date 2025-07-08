@@ -29,14 +29,14 @@ tickSystem.subscribe((elapsed) => {
 })
 
 
-  // Initialize inventory
-  try {
-    const inventoryStore = inventory.getInventoryStore()
-    inventoryStore.initializeInventory()
-  }
-  catch (error) {
-    console.error('Failed to initialize inventory:', error)
-  }
+  // // Initialize inventory
+  // try {
+  //   const inventoryStore = inventory.getInventoryStore()
+  //   inventoryStore.initializeInventory()
+  // }
+  // catch (error) {
+  //   console.error('Failed to initialize inventory:', error)
+  // }
   
   // Initialize buff store to load saved buffs
   buffStore.initializeBuffStore()

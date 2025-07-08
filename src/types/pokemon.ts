@@ -18,7 +18,7 @@ export interface Pokemon {
   lastAttackTime?: number;
   isRunning?: boolean;
   workId?: string;
-  uniqueId?: string; // Added unique ID to distinguish same Pokemon types
+  uniqueId: string; // Added unique ID to distinguish same Pokemon types
 }
 
 export enum PokemonType {

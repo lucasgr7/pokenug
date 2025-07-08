@@ -62,6 +62,111 @@ const availableBerries = computed(() => {
 // Fire rate state from buffStore
 const fireRateState = computed(() => buffStore.getFireRateState)
 
+// Computed property for progress ring color based on fire rate state
+const getProgressRingColor = computed(() => {
+  // If countdown is active, show warning color
+  if (countdownProgress.value > 0 && countdownProgress.value < 100) {
+    return 'rgb(251, 146, 60)' // Orange warning color
+  }
+  
+  const count = fireRateState.value.count
+  
+  if (count < 40) {
+    // 0-40 clicks: Red
+    return 'rgb(239, 68, 68)' // Red
+  } else if (count < 80) {
+    // 40-80 clicks: Gold/Yellow
+    return 'rgb(251, 191, 36)' // Gold
+  } else {
+    // 80+ clicks: Light Blue
+    return 'rgb(96, 165, 250)' // Light Blue
+  }
+})
+
+// Background ring color - darker version of the progress color
+const getBackgroundRingColor = computed(() => {
+  const count = fireRateState.value.count
+  
+  if (count < 40) {
+    // 0-40 clicks: Dark Red
+    return 'rgb(185, 28, 28)' // Dark Red
+  } else if (count < 80) {
+    // 40-80 clicks: Darker Gold
+    return 'rgb(217, 119, 6)' // Darker Gold
+  } else {
+    // 80+ clicks: Blue
+    return 'rgb(59, 130, 246)' // Blue
+  }
+})
+
+// Reactive countdown progress that updates in real-time
+const countdownProgress = ref(0)
+let ticksSinceLastAttack = 0
+const TICKS_BEFORE_COUNTDOWN = 3 // 3 ticks (750ms) before countdown starts
+const COUNTDOWN_DURATION_TICKS = 20 // 20 ticks (5 seconds) for countdown
+
+// Update countdown progress using tickSystem
+function updateCountdownFromTick() {
+  if (fireRateState.value.count > 0) {
+    ticksSinceLastAttack++
+    
+    if (ticksSinceLastAttack >= TICKS_BEFORE_COUNTDOWN) {
+      // Start countdown after 3 ticks of no activity
+      const countdownTicks = ticksSinceLastAttack - TICKS_BEFORE_COUNTDOWN
+      const maxCountdownTicks = COUNTDOWN_DURATION_TICKS
+      
+      if (countdownTicks <= maxCountdownTicks) {
+        // Show countdown progress (100% to 0%)
+        countdownProgress.value = Math.max(0, ((maxCountdownTicks - countdownTicks) / maxCountdownTicks) * 100)
+      } else {
+        // Countdown finished, reset fire rate in buffStore
+        buffStore.resetFireRate()
+        countdownProgress.value = 0
+        ticksSinceLastAttack = 0
+      }
+    } else {
+      // Still within the 3-tick grace period
+      countdownProgress.value = 0
+    }
+  } else {
+    // No clicks accumulated, reset everything
+    ticksSinceLastAttack = 0
+    countdownProgress.value = 0
+  }
+}
+
+// Reset tick counter when attack happens
+function resetTickCounter() {
+  ticksSinceLastAttack = 0
+  countdownProgress.value = 0
+}
+
+// Computed property for the final progress value to show in the ring
+const finalProgressValue = computed(() => {
+  const count = fireRateState.value.count
+  
+  // If no clicks, show empty ring
+  if (count === 0) {
+    return 0
+  }
+  
+  // If countdown is active, show countdown progress
+  if (countdownProgress.value > 0 && countdownProgress.value < 100) {
+    return countdownProgress.value
+  }
+  
+  if (count < 40) {
+    // 0-40 clicks: Show progress toward 40
+    return (count / 40) * 100
+  } else if (count < 80) {
+    // 40-80 clicks: Show progress from 40 to 80
+    return ((count - 40) / 40) * 100
+  } else {
+    // 80+ clicks: Show progress from 80 onward (cycle every 40 clicks)
+    const cyclePosition = (count - 80) % 40
+    return (cyclePosition / 40) * 100
+  }
+})
 
 // HP calculations
 const hpPercentage = computed(() => {
@@ -138,7 +243,7 @@ function getPotentialPokemon(regionId: string) {
   if (!region) return []
   
   // Use the berry pool if available, otherwise use the regular pool
-  const pool = region.berryPool || region.pool
+  const pool = 'berryPool' in region ? region.berryPool : region.pool
   
   // Calculate total probability for percentage calculation
   const totalProbability = pool.reduce((sum, pokemon) => sum + (pokemon.probability || 1), 0)
@@ -225,6 +330,10 @@ function updateActiveTasks() {
 // Handle attack action
 const attack = async () => {
   if (!wildPokemon.value || !gameStore.activePokemon) return
+  
+  // Reset the tick counter since user is attacking
+  resetTickCounter()
+  
   await gameStore.attack()
 }
 
@@ -286,11 +395,12 @@ watch(() => buffStore.autoAttackState.triggerAttack, (shouldAttack) => {
   }
 })
 
-// Watch for wild Pokemon changes to start enemy attacks
-watch(() => gameStore.battle.wildPokemon, (newPokemon) => {
-  if (newPokemon) {
-    setInterval(() => {
-    }, 5000)
+// Watch for fire rate state changes to reset countdown when fire rate is reset
+watch(() => fireRateState.value.count, (newCount) => {
+  if (newCount === 0) {
+    // Fire rate was reset, clear countdown
+    ticksSinceLastAttack = 0
+    countdownProgress.value = 0
   }
 })
 
@@ -300,6 +410,9 @@ let accumulatedTime = 0;
 
 tickSystem.subscribe(() => {
   updateActiveTasks();
+  
+  // Update countdown progress for fire rate
+  updateCountdownFromTick();
 
   accumulatedTime++;
   if (gameStore.battle.wildPokemon && (accumulatedTime % THREE_SECONDS === 0)) {
@@ -309,6 +422,52 @@ tickSystem.subscribe(() => {
 
   if (gameStore.battle.wildPokemon && (accumulatedTime % TWENTY_SECONDS === 0)) {
     gameStore.tryPokemonRun()
+  }
+})
+
+// Computed properties for UI visibility and state
+const shouldShowFireRateCounter = computed(() => {
+  const fireEmblemBuff = buffStore.getBuffById('fire-emblem')
+  if (!fireEmblemBuff) return false
+  
+  // Show counter when active OR when building and has at least 1 attack
+  return fireRateState.value.active || (fireRateState.value.count > 0 && !fireRateState.value.active)
+})
+
+const fireRateStageInfo = computed(() => {
+  const fireEmblemBuff = buffStore.getBuffById('fire-emblem')
+  if (!fireEmblemBuff) return null
+
+  if (!fireRateState.value.active) {
+    return {
+      stage: 'building',
+      current: fireRateState.value.count,
+      target: 40,
+      description: `${fireRateState.value.count}/40 attacks to activate fire rate`
+    }
+  }
+
+  if (fireRateState.value.tier === 1) {
+    return {
+      stage: 'tier1',
+      current: fireRateState.value.count,
+      target: 80,
+      description: `Tier 1 Active • ${fireRateState.value.count}/80 to Tier 2`
+    }
+  } else if (fireRateState.value.tier === 2) {
+    return {
+      stage: 'tier2',
+      current: fireRateState.value.count,
+      target: 120,
+      description: `Tier 2 Active • ${fireRateState.value.count}/120 to Tier 3`
+    }
+  } else {
+    return {
+      stage: 'tier3',
+      current: fireRateState.value.count,
+      target: 120,
+      description: `Tier 3 Active • Max Power!`
+    }
   }
 })
 </script>
@@ -520,53 +679,146 @@ tickSystem.subscribe(() => {
           </span>
         </button>
         
-        <!-- Attack Button with Fire Effects -->
-        <button
-          @click="attack"
-          :disabled="!wildPokemon"
-          role="button"
-          class="relative px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 overflow-hidden select-none"
-          :class="{
-            'fire-rate-button-tier-1': fireRateState.active && fireRateState.tier === 1,
-            'fire-rate-button-tier-2': fireRateState.active && fireRateState.tier === 2,
-            'fire-rate-button-tier-3': fireRateState.active && fireRateState.tier === 3
-          }"
-        >
-          <span class="relative z-10">Attack</span>
-          <!-- Fire Effect Overlay -->
-          <div v-if="fireRateState.active" class="fire-button-overlay"></div>
-        </button>
-        
-        <!-- Fire Rate Counter with dynamic time display and milliseconds -->
-        <div v-if="fireRateState.active" class="fire-rate-counter absolute -top-8 left-1/2 transform -translate-x-1/2">
-          <div class="flex items-center justify-center px-2 py-1 rounded-full text-xs font-bold shadow-lg"
+        <!-- Main Battle Controls Row -->
+        <div class="flex items-center justify-center gap-12">
+          <!-- Attack Button with Circular Design and Progress Ring -->
+          <div class="relative flex-shrink-0">
+          <!-- Progress ring for fire rate - Always Visible -->
+          <svg 
+            class="absolute inset-0 w-20 h-20 -rotate-90 pointer-events-none"
+            style="z-index: 10;"
+            viewBox="0 0 80 80"
+          >
+            <!-- Background circle -->
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              :stroke="getBackgroundRingColor"
+              stroke-width="5"
+              fill="none"
+              opacity="0.3"
+            />
+            <!-- Progress circle -->
+            <circle
+              cx="40"
+              cy="40"
+              r="36"
+              :stroke="getProgressRingColor"
+              stroke-width="5"
+              fill="none"
+              stroke-linecap="round"
+              :stroke-dasharray="226.19"
+              :stroke-dashoffset="226.19 - (226.19 * finalProgressValue / 100)"
+              class="transition-all duration-300"
+            />
+          </svg>
+          
+          <!-- Circular Attack Button -->
+          <button
+            @click="attack"
+            @keyup.enter="attack"
+            @keyup.space="attack"
+            :disabled="!wildPokemon"
+            class="relative w-20 h-20 bg-red-500 text-white rounded-full hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 overflow-hidden select-none flex items-center justify-center group border-4 border-red-400"
+            style="z-index: 5;"
             :class="{
-              'bg-yellow-100 text-yellow-800': fireRateState.tier === 1,
-              'bg-red-100 text-red-800': fireRateState.tier === 2,
-              'bg-blue-100 text-blue-800': fireRateState.tier === 3
-            }">
-            <span>Fire Rate: {{ fireRateState.count }}</span>
-            <span class="ml-1">
-              ({{ formatTimeWithMs(fireRateState.timeAllowed - (Date.now() - fireRateState.lastAttackTime)) }})
-            </span>
+              'bg-yellow-500 hover:bg-yellow-600 shadow-lg shadow-yellow-500/50 animate-pulse border-yellow-400': fireRateState.active && fireRateState.tier === 1,
+              'bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/50 animate-pulse border-orange-400': fireRateState.active && fireRateState.tier === 2,
+              'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/50 animate-pulse border-blue-400': fireRateState.active && fireRateState.tier === 3,
+              'ring-4 ring-red-200 ring-opacity-60 border-red-300': shouldShowFireRateCounter && !fireRateState.active,
+              'scale-110': fireRateState.active
+            }"
+          >
+            <!-- Sword Attack Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 relative z-10" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6.92,5L4.74,7.21L8.56,11L6.21,13.39L5.5,12.68L3.03,15.16L4.45,16.57L6.92,14.1L7.63,14.81L10,12.46L13.79,16.25L16,14L6.92,5M15.5,2C16.28,2 17,2.34 17.5,2.87L21.13,6.5C21.66,7 22,7.72 22,8.5C22,9.28 21.66,10 21.13,10.5L16.91,14.74L15.5,13.33L18.7,10.09C18.89,9.9 19,9.64 19,9.36C19,9.08 18.89,8.82 18.7,8.63L15.06,5C14.68,4.61 14.05,4.61 13.67,5L11.5,7.17L10.09,5.76L14.32,1.54C14.82,1 15.54,0.68 16.32,0.68L15.5,2Z"/>
+            </svg>
+            
+            <!-- Fire Effect Overlay for active fire rate -->
+            <div 
+              v-if="fireRateState.active" 
+              class="absolute inset-0 rounded-full opacity-30"
+              :class="{
+                'bg-gradient-to-r from-yellow-400 to-red-400 animate-pulse': fireRateState.tier === 1,
+                'bg-gradient-to-r from-orange-400 to-red-500 animate-pulse': fireRateState.tier === 2,
+                'bg-gradient-to-r from-blue-400 to-cyan-500 animate-pulse': fireRateState.tier === 3
+              }"
+            ></div>
+          </button>
+          
+          <!-- Fire Rate Counter Badge -->
+          <div 
+            v-if="shouldShowFireRateCounter" 
+            class="absolute -top-2 -right-2 px-2 py-1 rounded-full text-xs font-bold shadow-lg z-20"
+            :class="{
+              'bg-red-100 text-red-800': !fireRateState.active,
+              'bg-yellow-100 text-yellow-800 animate-pulse': fireRateState.active && fireRateState.tier === 1,
+              'bg-orange-100 text-orange-800 animate-pulse': fireRateState.active && fireRateState.tier === 2,
+              'bg-purple-100 text-purple-800 animate-pulse': fireRateState.active && fireRateState.tier === 3
+            }"
+          >
+            {{ fireRateState.count }}
+          </div>
+          
+          <!-- Progress Info Text -->
+          <div 
+            v-if="fireRateStageInfo && shouldShowFireRateCounter"
+            class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded text-xs font-medium whitespace-nowrap"
+            :class="{
+              'bg-red-100 text-red-700': !fireRateState.active,
+              'bg-yellow-100 text-yellow-700': fireRateState.active && fireRateState.tier === 1,
+              'bg-orange-100 text-orange-700': fireRateState.active && fireRateState.tier === 2,
+              'bg-purple-100 text-purple-700': fireRateState.active && fireRateState.tier === 3
+            }"
+          >
+            {{ fireRateStageInfo.description }}
+          </div>
+          
+          <!-- Tier multiplier indicator (when active) -->
+          <div 
+            v-if="fireRateState.active" 
+            class="absolute -bottom-14 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded-full text-xs font-bold"
+            :class="{
+              'bg-yellow-200 text-yellow-800': fireRateState.tier === 1,
+              'bg-orange-200 text-orange-800': fireRateState.tier === 2,
+              'bg-purple-200 text-purple-800': fireRateState.tier === 3
+            }"
+          >
+            {{ fireRateState.multiplier.toFixed(1) }}x XP
           </div>
         </div>
 
-        <button
-          @click="openPokeballSelector"
-          :disabled="!wildPokemon || totalPokeballs <= 0"
-          class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 select-none"
-        >
-          Try Capture
-        </button>
-        
-        <!-- New Berry Button -->
-        <button
-          @click="openBerrySelector"
-          class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 select-none"
-        >
-          Use Berry
-        </button>
+          <!-- Action Buttons Container -->
+          <div class="flex flex-col space-y-3">
+            <button
+              @click="openPokeballSelector"
+              :disabled="!wildPokemon || totalPokeballs <= 0 || gameStore.battle.isTryingCatch"
+              class="flex items-center gap-2 px-6 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 select-none"
+            >
+              <!-- Pokeball SVG Icon -->
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="10" fill="currentColor"/>
+                <path d="M2 12h20" stroke="white" stroke-width="2"/>
+                <circle cx="12" cy="12" r="3" fill="white" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              Capture
+            </button>
+            
+            <!-- Berry Button -->
+            <button
+              @click="openBerrySelector"
+              class="flex items-center gap-2 px-6 py-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 select-none"
+            >
+              <!-- Berry SVG Icon -->
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L8 7l4 5 4-5-4-5z"/>
+                <path d="M8 7v10c0 2.21 1.79 4 4 4s4-1.79 4-4V7"/>
+              </svg>
+              Use Berry
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Wild Pokemon Panel -->

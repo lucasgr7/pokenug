@@ -8,6 +8,7 @@ import { tickSystem } from '@/services/tickSystem.js'
 import { useBuffStore } from './buffStore.js'
 import { RemovableRef } from '@vueuse/core'
 import { useStorage } from '@vueuse/core'
+import { generateRandomId } from '@/services/util.js'
 
 
 interface BattleState {
@@ -171,7 +172,25 @@ export const useGameStore = defineStore('game', {
 
       const now = Date.now();
       const elapsed = now - job.startTime;
-      const jobDuration = this.getJobRemainingTime(jobId);
+      
+      // Directly calculate job duration instead of calling another getter
+      const baseReduction = job.assignedPokemon.length * 1000;
+      let levelReduction = 0;
+      if (job.assignedPokemon.length > 0) {
+        const totalLevelBoost = job.assignedPokemon.reduce((sum, pokemon) => {
+          return sum + ((pokemon.level || 1) * 0.005);
+        }, 0);
+        levelReduction = job.baseTime * totalLevelBoost;
+      }
+      
+      let percentReduction = 0;
+      if (job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1) {
+        const additionalPokemon = job.assignedPokemon.length - 1;
+        percentReduction = job.baseTime * (job.percentualProgressWithAdditionalPokemon * additionalPokemon);
+      }
+      
+      const totalReduction = baseReduction + levelReduction + percentReduction;
+      const jobDuration = Math.max(1000, job.baseTime - totalReduction);
 
       // Calculate progress as a percentage
       const progressPercent = Math.min(100, (elapsed / jobDuration) * 100);
@@ -462,6 +481,11 @@ export const useGameStore = defineStore('game', {
       pokemon.level ??= 1
       pokemon.experience ??= 0
       pokemon.experienceToNextLevel ??= Math.floor(100 * Math.pow(pokemon.level, 1.5))
+      
+      // Ensure the Pokemon has a unique identifier
+      if (!pokemon.uniqueId) {
+        pokemon.uniqueId = generateRandomId()
+      }
 
       // Generate stats if they don't exist
       if (!pokemon.maxHP || !pokemon.attack || !pokemon.defense) {
@@ -498,19 +522,25 @@ export const useGameStore = defineStore('game', {
     levelUpPokemon(pokemon: Pokemon) {
       pokemon.level!++
 
-      // Generate new stats for this level
-      const newStats = this.generatePokemonStats(pokemon.level!)
+      // Calculate incremental stat increases based on current level
+      // Use a consistent growth formula that doesn't randomize existing stats
+      const STAT_GROWTH_EXP = 0.8;
+      const HP_PER_LEVEL = 20;
+      const ATTACK_GROWTH_RATE = 0.01; // 15% of current attack + base growth
+      const DEFENSE_GROWTH_RATE = 0.01; // 12% of current defense + base growth
 
-      // Calculate stat increases
-      const hpIncrease = newStats.maxHP - pokemon.maxHP!
-      const attackIncrease = newStats.attack - pokemon.attack!
-      const defenseIncrease = newStats.defense - pokemon.defense!
+      const growth = Math.pow(pokemon.level!, STAT_GROWTH_EXP);
+      
+      // Calculate incremental increases
+      const hpIncrease = Math.floor(HP_PER_LEVEL * growth);
+      const attackIncrease = Math.floor((pokemon.attack! + ATTACK_GROWTH_RATE));
+      const defenseIncrease = Math.floor((pokemon.defense! * DEFENSE_GROWTH_RATE));
 
-      // Update stats
-      pokemon.maxHP = newStats.maxHP
-      pokemon.currentHP = pokemon.maxHP // Heal to full on level up
-      pokemon.attack = newStats.attack
-      pokemon.defense = newStats.defense
+      // Update stats incrementally
+      pokemon.maxHP = pokemon.maxHP! + hpIncrease;
+      pokemon.currentHP = pokemon.maxHP; // Heal to full on level up
+      pokemon.attack = pokemon.attack! + attackIncrease;
+      pokemon.defense = pokemon.defense! + defenseIncrease;
 
       // Reset XP and calculate new requirement
       pokemon.experience = 0
@@ -548,7 +578,8 @@ export const useGameStore = defineStore('game', {
           experienceToNextLevel: Math.floor(100 * Math.pow(starterLevel, 1.5)),
           level: starterLevel,
           attack: stats.attack,
-          defense: stats.defense
+          defense: stats.defense,
+          uniqueId: generateRandomId()
         }
 
         this.playerPokemon = [newPokemon]
@@ -696,7 +727,7 @@ export const useGameStore = defineStore('game', {
               // Create a copy of the wild Pokemon and add a unique identifier to it
               const caughtPokemon = {
                 ...this.battle.wildPokemon,
-                uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+                uniqueId: generateRandomId()
               };
               this.addPokemonToInventory(caughtPokemon);
               this.battle.wildPokemon = null;
@@ -792,7 +823,7 @@ export const useGameStore = defineStore('game', {
         // Normal HP regeneration for non-fainted pokemon not in battle
         if (pokemon.currentHP !== undefined && pokemon.maxHP && pokemon.currentHP >= 0 && pokemon.currentHP < pokemon.maxHP && !pokemon.faintedAt) {
           const regenAmount = (pokemon.maxHP * HP_REGEN_RATE) / 100
-          const newHP = Math.min(pokemon.maxHP, pokemon.currentHP + regenAmount)
+          const newHP = Math.floor(Math.min(pokemon.maxHP, pokemon.currentHP + regenAmount))
           this.updatePokemonHP(pokemon, newHP)
         }
       })
@@ -908,7 +939,8 @@ export const useGameStore = defineStore('game', {
             attack: stats.attack,
             defense: stats.defense,
             lastAttackTime: Date.now(),
-            isRunning: false
+            isRunning: false,
+            uniqueId: generateRandomId()
           };
 
           this.addBattleLog(`A wild ${pokemon.name} (Lvl ${level}) appeared!`, 'system');
@@ -916,8 +948,6 @@ export const useGameStore = defineStore('game', {
       } catch (error) {
         console.error('Failed to spawn wild Pokemon:', error);
       }
-
-      this.battle.spawnTimer = 10;
     },
 
     // Start spawn timer with region and defeat count consideration
@@ -1270,7 +1300,7 @@ export const useGameStore = defineStore('game', {
       this.battle.isTryingCatch = true;
 
       // Additional debounce: create a unique capture attempt ID
-      const captureAttemptId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      const captureAttemptId = generateRandomId();
       this.battle.currentCaptureAttemptId = captureAttemptId;
 
       // Helper function to clean up capture state
@@ -1307,15 +1337,15 @@ export const useGameStore = defineStore('game', {
         
         this.addBattleLog(`Threw a Pokéball at ${this.battle.wildPokemon!.name}!`, 'system');
 
-        const hpPercentage = (this.battle.wildPokemon!.currentHP! / this.battle.wildPokemon!.maxHP!) * 100;
+        const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100;
         let catchChance = 0;
 
         if (hpPercentage > 50) {
-          catchChance = Math.max(5 - this.battle.wildPokemon!.level!, 1);
+          catchChance = Math.max(5 - this.battle.wildPokemon.level!, 1);
         } else if (hpPercentage < 10) {
-          catchChance = Math.max(55 - this.battle.wildPokemon!.level!, 10);
+          catchChance = Math.max(55 - this.battle.wildPokemon.level!, 10);
         } else if (hpPercentage < 25) {
-          catchChance = Math.max(35 - this.battle.wildPokemon!.level!, 5);
+          catchChance = Math.max(35 - this.battle.wildPokemon.level!, 5);
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1331,7 +1361,7 @@ export const useGameStore = defineStore('game', {
           // Create a copy of the wild Pokemon and add a unique identifier to it
           const caughtPokemon = {
             ...this.battle.wildPokemon!,
-            uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+            uniqueId: generateRandomId()
           };
           this.addPokemonToInventory(caughtPokemon);
           this.battle.wildPokemon = null;
@@ -1428,7 +1458,7 @@ export const useGameStore = defineStore('game', {
         // Create a unique work ID for this Pokemon instance
         const workingPokemon = {
           ...pokemonToAssign,
-          workId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+          workId: generateRandomId()
         };
 
         job.assignedPokemon.push(workingPokemon);
@@ -1446,7 +1476,7 @@ export const useGameStore = defineStore('game', {
         // Create a unique ID for this Pokemon instance
         const workingPokemon = {
           ...pokemonToAssign,
-          workId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+          workId: generateRandomId()
         };
 
         job.assignedPokemon.push(workingPokemon);
@@ -1695,7 +1725,7 @@ export const useGameStore = defineStore('game', {
       } else {
         // Create new notification
         const notification: Notification = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          id: generateRandomId(),
           message,
           type,
           timestamp: Date.now(),
