@@ -6,7 +6,6 @@ import type { Pokemon } from '../types/pokemon'
 import CachedImage from './CachedImage.vue'
 
 const gameStore = useGameStore()
-let regenInterval: number | NodeJS.Timeout | null = null
 let unsubscribe: (() => void) | null = null
 
 const hpPercentage = (pokemon: Pokemon) => {
@@ -53,7 +52,6 @@ const swapPokemon = (pokemon: Pokemon) => {
 }
 
 onMounted(() => {
-  regenInterval = gameStore.startHPRegen()
   // Subscribe to tick system for recovery time updates
   unsubscribe = tickSystem.subscribe(() => {
     updateRecoveryTimes()
@@ -61,9 +59,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (regenInterval) {
-    clearInterval(regenInterval)
-  }
   if (unsubscribe) {
     unsubscribe()
   }

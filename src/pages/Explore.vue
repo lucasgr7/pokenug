@@ -359,7 +359,7 @@ tickSystem.subscribe(() => {
         <span class="text-sm text-gray-500 ml-2">Encounter Rate: {{ gameStore.currentRegionData.encounterRate }}%</span>
       </div>
       <div v-if="!wildPokemon" class="text-sm text-gray-600">
-        Next spawn in: {{ spawnTimer }}s
+        Next spawn in: {{ spawnTimer ?? '...' }}s
       </div>
       <div class="bg-red-100 px-3 py-1 rounded-full text-red-600">
         <span class="mr-1">🔴</span>{{ totalPokeballs }} Pokéballs
@@ -392,7 +392,7 @@ tickSystem.subscribe(() => {
             </div>
             <button 
               @click="cancelBerryTask(task.id)" 
-              class="text-red-400 hover:text-red-600 text-sm p-1"
+              class="text-red-400 hover:text-red-600 text-sm p-1 select-none"
               title="Cancel task"
             >
               &times;
@@ -504,7 +504,7 @@ tickSystem.subscribe(() => {
         <button
           v-if="buffStore.canAutoAttack"
           @click="toggleAutoAttack"
-          class="relative px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors duration-200 overflow-hidden flex items-center"
+          class="relative px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors duration-200 overflow-hidden flex items-center select-none"
           :class="{
             'bg-yellow-600': buffStore.autoAttackState.active,
             'bg-yellow-500': !buffStore.autoAttackState.active
@@ -524,7 +524,8 @@ tickSystem.subscribe(() => {
         <button
           @click="attack"
           :disabled="!wildPokemon"
-          class="relative px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 overflow-hidden"
+          role="button"
+          class="relative px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 overflow-hidden select-none"
           :class="{
             'fire-rate-button-tier-1': fireRateState.active && fireRateState.tier === 1,
             'fire-rate-button-tier-2': fireRateState.active && fireRateState.tier === 2,
@@ -554,7 +555,7 @@ tickSystem.subscribe(() => {
         <button
           @click="openPokeballSelector"
           :disabled="!wildPokemon || totalPokeballs <= 0"
-          class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 select-none"
         >
           Try Capture
         </button>
@@ -562,7 +563,7 @@ tickSystem.subscribe(() => {
         <!-- New Berry Button -->
         <button
           @click="openBerrySelector"
-          class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 select-none"
         >
           Use Berry
         </button>
@@ -667,7 +668,7 @@ tickSystem.subscribe(() => {
         
         <button 
           @click="showPokeballSelector = false"
-          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full"
+          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full select-none"
         >
           Cancel
         </button>
@@ -711,7 +712,7 @@ tickSystem.subscribe(() => {
         
         <button 
           @click="showBerrySelector = false"
-          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full"
+          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full select-none"
         >
           Cancel
         </button>

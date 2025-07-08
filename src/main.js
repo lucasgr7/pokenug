@@ -6,6 +6,7 @@ import './style.css'
 import { tickSystem } from './services/tickSystem'
 import { useGameStore } from './stores/gameStore'
 import { useBuffStore } from './stores/buffStore'
+import * as inventory from './stores/inventoryStore'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -27,4 +28,17 @@ tickSystem.subscribe((elapsed) => {
   })
 })
 
+
+  // Initialize inventory
+  try {
+    const inventoryStore = inventory.getInventoryStore()
+    inventoryStore.initializeInventory()
+  }
+  catch (error) {
+    console.error('Failed to initialize inventory:', error)
+  }
+  
+  // Initialize buff store to load saved buffs
+  buffStore.initializeBuffStore()
+  
 app.mount('#app')

@@ -1,5 +1,13 @@
 // Region definitions
 const regions = {
+  'Home': {
+    name: 'Home',
+    minLevel: 0,
+    maxLevel: 0,
+    encounterRate: 0,
+    spawnTimer: 0.5, // 5 seconds
+    pool: []
+  },
   'viridian-forest': {
     name: 'Viridian Forest',
     minLevel: 3,

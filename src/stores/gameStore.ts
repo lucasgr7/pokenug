@@ -1,11 +1,14 @@
-import { defineStore } from 'pinia'
 import { Pokemon, PokemonType, InventoryItem } from '@/types/pokemon.js'
 import { IdleJob, DEFAULT_IDLE_JOBS } from '@/types/idleJobs.js'
 import { itemFactory } from '@/services/itemFactory.js'
+import { defineStore } from 'pinia'
 import { useInventoryStore } from './inventoryStore.js'
 import regions from '@/constants/regions.js'
 import { tickSystem } from '@/services/tickSystem.js'
 import { useBuffStore } from './buffStore.js'
+import { RemovableRef } from '@vueuse/core'
+import { useStorage } from '@vueuse/core'
+
 
 interface BattleState {
   wildPokemon: Pokemon | null;
@@ -14,7 +17,8 @@ interface BattleState {
   isWildPokemonHurt: boolean;
   isEnemyAttacking: boolean;
   isTryingCatch: boolean;
-  battleLogs: Array<{ message: string; type: 'damage' | 'heal' | 'system' }>;
+  currentCaptureAttemptId?: string;
+  battleLogs: RemovableRef<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>;
 }
 
 interface Notification {
@@ -22,6 +26,8 @@ interface Notification {
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
   timestamp: number;
+  count?: number;
+  groupKey?: string; // Used to group similar notifications
 }
 
 interface GameState {
@@ -31,7 +37,7 @@ interface GameState {
   pokeballs: number;
   currentRegion: string;
   battle: BattleState;
-  notifications: Notification[];
+  notifications: RemovableRef<Notification[]>;
   inventory: {
     pokemon: {
       [key: string]: {
@@ -64,7 +70,7 @@ export const useGameStore = defineStore('game', {
     availablePokemon: [],
     activePokemonIndex: 0,
     pokeballs: 10,
-    currentRegion: 'viridian-forest',
+    currentRegion: 'Home',
     battle: {
       wildPokemon: null,
       spawnTimer: 10,
@@ -72,9 +78,10 @@ export const useGameStore = defineStore('game', {
       isWildPokemonHurt: false,
       isEnemyAttacking: false,
       isTryingCatch: false,
-      battleLogs: []
+      currentCaptureAttemptId: undefined,
+      battleLogs: useStorage<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>('battleLogs', []) 
     },
-    notifications: [],
+    notifications: useStorage<Notification[]>('notifications', []),
     inventory: {
       pokemon: {}
     },
@@ -154,7 +161,7 @@ export const useGameStore = defineStore('game', {
 
     getJobProgressPercent: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
-      if (!job || job.assignedPokemon.length === 0 ) return 0;
+      if (!job || job.assignedPokemon.length === 0) return 0;
 
       // If the job doesn't have a startTime, it hasn't been properly initialized
       if (!job.startTime) {
@@ -255,7 +262,7 @@ export const useGameStore = defineStore('game', {
               const possibleCompletions = Math.floor(elapsedTime / jobTime)
 
               if (possibleCompletions > 0) {
-                this.addNotification(`While you were away: ${job.name} completed ${possibleCompletions} times!`, 'info');
+                this.addNotification(`While you were away: ${job.name} completed ${possibleCompletions} times!`, 'info', `away-job:${job.name}`);
               }
 
               // Apply completions
@@ -395,7 +402,7 @@ export const useGameStore = defineStore('game', {
     },
 
     generatePokemonStats(level: number) {
-      const baseHP = 100
+      const baseHP = 100 * Math.random() * 1.5 // Base HP between 100 and 150
       const hpPerLevel = 20
       const baseAttack = Math.floor(baseHP / 10)
       const attackPerLevel = baseAttack * 0.2
@@ -771,7 +778,7 @@ export const useGameStore = defineStore('game', {
       const now = Date.now()
       this.playerPokemon.forEach((pokemon) => {
         // Skip active pokemon - no regen while in battle
-        if (pokemon === this.activePokemon) return
+        if (pokemon === this.activePokemon && this.currentRegion !== 'Home') return
 
         // Check if pokemon has finished recovery time
         if (pokemon.recoveryEndTime && now >= pokemon.recoveryEndTime && pokemon.currentHP === 0) {
@@ -791,39 +798,67 @@ export const useGameStore = defineStore('game', {
       })
     },
 
-    startHPRegen() {
-      // Start the HP regeneration interval
-      const regenInterval = setInterval(() => {
-        this.regenHP()
-      }, 1000)
-
-      return regenInterval
-    },
-
     calculateStats(level: number) {
-      const baseHP = 100
-      const hpPerLevel = 20
+      const STAT_GROWTH_EXP = 0.8;      // 1 = linear; <1 = suavizado
+      const HP_PER_LEVEL = 20;
+      const ATK_DEF_RATIO = 0.8;       // manteve seu 80 %
 
-      const maxHP = Math.floor(baseHP + (hpPerLevel * (level - 1)))
+      const growth = Math.pow(level, STAT_GROWTH_EXP);
 
-      const baseAttack = Math.floor(baseHP / BASE_HITS_TO_DEFEAT)
-      const attackPerLevel = baseAttack * 0.2
-      const attack = Math.floor(baseAttack + (attackPerLevel * (level - 1)))
+      const baseHP = 100 + Math.random() * 50;          // 100-150
+      const maxHP = Math.floor(baseHP + HP_PER_LEVEL * growth);
 
-      const baseDefense = Math.floor(baseHP * 0.8)
-      const defensePerLevel = baseDefense * 0.2
-      const defense = Math.floor(baseDefense + (defensePerLevel * (level - 1)))
+      const baseAtk = Math.floor(baseHP / BASE_HITS_TO_DEFEAT);
+      const attack = Math.floor(baseAtk * (1 + 0.2 * growth));
 
-      return { maxHP, attack, defense }
+      const baseDef = Math.floor(baseHP * ATK_DEF_RATIO);
+      const defense = Math.floor(baseDef * (1 + 0.2 * growth));
+
+      return { maxHP, attack, defense };
     },
+    levelExponent(avgLevel: number,
+      midLevel = 30,
+      minExponent = 0.25): number {
 
-    calculateDamage(attack: number, defense: number, attackerLevel: number, defenderLevel: number) {
-      const levelDificulty = 8
-      const levelDifference = attackerLevel - defenderLevel
-      const levelScaling = Math.pow(LEVEL_SCALING_FACTOR, levelDifference)
-      let baseDamage = (attack * levelScaling) * (1 - (defense / (defense + 100)))
-      const variation = 0.85 + (Math.random() * 0.3) * levelDificulty
-      return Math.max(1, Math.floor(baseDamage * variation))
+      // Logística suave:  1  ➞ 0,5 em ~midLevel ➞ minExponent assimptótico
+      const raw = 1 / (1 + Math.exp((avgLevel - midLevel) / 6));
+
+      // Garante piso (nunca zera completamente)
+      return Math.max(minExponent, raw);
+    },
+    calculateDamage(
+      attack: number,
+      defense: number,
+      attackerLevel: number,
+      defenderLevel: number,
+      isEnemy: boolean = false
+    ): number {
+
+      // log the details
+      this.addBattleLog(
+        `Calculating damage: Attack=${attack}, Defense=${defense}, Attacker Level=${attackerLevel}, Defender Level=${defenderLevel}, Is Enemy=${isEnemy}`,
+        'system'
+      );
+
+      // se for inimigo adicionar um fator de 300%
+      attack *= 3; // Aumenta o ataque do inimigo
+      const BASE_SCALING = 1.28;   // era o LEVEL_SCALING_FACTOR
+
+      const levelDiff = attackerLevel - defenderLevel;
+      const avgLevel = (attackerLevel + defenderLevel) / 2;
+
+      // Expoente móvel
+      const exp = this.levelExponent(avgLevel);
+      const levelFactor = Math.pow(BASE_SCALING, levelDiff * exp);
+
+      // Resto igual
+      const baseDamage = (attack * levelFactor) *
+        (1 - (defense / (defense + 100)));
+
+      // Variação RNG (mantive seu 0,85-1,15 mas sem “levelDifficulty” que escalava o RNG)
+      const variation = 0.85 + Math.random() * 0.30;
+
+      return Math.floor(Math.max(1, Math.floor(baseDamage * variation)));
     },
 
     calculateXPGain(playerLevel: number, enemyLevel: number) {
@@ -835,6 +870,11 @@ export const useGameStore = defineStore('game', {
     },
 
     async spawnWildPokemon() {
+      // Don't spawn Pokémon in the Home region
+      if (this.currentRegion === 'Home') {
+        return;
+      }
+
       const region = this.currentRegionData;
 
       // Use probability-based selection
@@ -882,6 +922,12 @@ export const useGameStore = defineStore('game', {
 
     // Start spawn timer with region and defeat count consideration
     startSpawnTimer() {
+      // Don't spawn Pokémon in the Home region
+      if (this.currentRegion === 'Home') {
+        this.battle.spawnTimer = 0;
+        return;
+      }
+
       const buffStore = useBuffStore();
 
       // Check if we need to delay spawn based on defeat count
@@ -964,7 +1010,7 @@ export const useGameStore = defineStore('game', {
         debugger;
         console.error('Error calculating damage:', ex);
       }
-      
+
 
       // Apply damage to wild Pokemon
       this.battle.wildPokemon.currentHP = Math.max(0, this.battle.wildPokemon.currentHP! - damage);
@@ -1027,6 +1073,10 @@ export const useGameStore = defineStore('game', {
       if (!this.activePokemon) return
 
       const now = Date.now()
+      
+      // Ensure the current HP is properly set to 0
+      this.updatePokemonHP(this.activePokemon, 0)
+      
       this.activePokemon.faintedAt = now
       this.activePokemon.recoveryEndTime = now + (60 * 1000)
 
@@ -1035,13 +1085,25 @@ export const useGameStore = defineStore('game', {
       if (nextPokemon) {
         this.addBattleLog(`Go, ${nextPokemon.name}!`, 'system')
         this.setActivePokemon(nextPokemon)
-      } else if (this.battle.wildPokemon) {
+      } else {
+        // No more healthy Pokémon available - send player to Home
         this.addBattleLog(
-          `No more Pokemon available! The wild ${this.battle.wildPokemon.name} fled.`,
+          `All your Pokémon have fainted! Returning to Home for safety...`,
           'system'
         )
+        
+        // Clear the wild Pokémon and send player to Home
         this.battle.wildPokemon = null
-        this.startSpawnTimer()
+        this.currentRegion = 'Home'
+        
+        // Add notification about going home
+        this.addNotification(
+          'All your Pokémon fainted! You have been safely returned to Home.',
+          'error'
+        )
+        
+        // Reset battle state
+        this.resetBattleState()
       }
 
       this.saveState()
@@ -1064,11 +1126,13 @@ export const useGameStore = defineStore('game', {
             wildPokemon.attack ?? 0,
             activePokemon.defense ?? 0,
             wildPokemon.level ?? 1,
-            activePokemon.level ?? 1
+            activePokemon.level ?? 1,
+            true
           )
 
           // Calculate if damage would cause fainting
-          const wouldFaint = (activePokemon.currentHP ?? 0) <= damage
+          const currentHP = activePokemon.currentHP ?? 0
+          const wouldFaint = currentHP <= damage
 
           if (wouldFaint && buffStore.hasRockEmblem) {
             // Check if we have potions that can be auto-used
@@ -1090,15 +1154,16 @@ export const useGameStore = defineStore('game', {
                 'system'
               )
 
-              // Apply the potion effect
+              // Apply the potion effect first
               this.applyItemEffect(potion, activePokemon)
 
               // Remove the potion from inventory
               inventoryStore.removeItem(potion.id, 1)
 
-              // Calculate new damage after potion was applied
-              const updatedHP = Math.max(0, activePokemon.currentHP! - damage)
-              this.updatePokemonHP(activePokemon, updatedHP)
+              // Calculate damage after potion was applied
+              const newCurrentHP = activePokemon.currentHP ?? 0
+              const finalHP = Math.max(0, newCurrentHP - damage)
+              this.updatePokemonHP(activePokemon, finalHP)
 
               // Log the damage
               this.addBattleLog(
@@ -1106,7 +1171,14 @@ export const useGameStore = defineStore('game', {
                 'damage'
               )
 
+              // Update attack time
               wildPokemon.lastAttackTime = now
+              
+              // Check if still fainted after potion use
+              if (finalHP === 0) {
+                this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
+                this.handlePokemonFaint()
+              }
             }
             // No potions but we can try using stun resistance
             else if (buffStore.shouldResistStun()) {
@@ -1122,7 +1194,7 @@ export const useGameStore = defineStore('game', {
               this.updatePokemonHP(activePokemon, minHP)
 
               // Log the damage but show it was reduced
-              const actualDamage = (activePokemon.currentHP ?? 0) - minHP
+              const actualDamage = currentHP - minHP
               this.addBattleLog(
                 `${wildPokemon.name} attacks ${activePokemon.name} for ${actualDamage} damage (reduced by Rock Emblem)!`,
                 'damage'
@@ -1130,10 +1202,10 @@ export const useGameStore = defineStore('game', {
 
               wildPokemon.lastAttackTime = now
             }
-            // No resistance triggered, proceed with normal damage
+            // No resistance triggered, proceed with normal damage and fainting
             else {
-              const updatedHP = Math.max(0, (activePokemon.currentHP ?? 0) - damage)
-              this.updatePokemonHP(activePokemon, updatedHP)
+              const finalHP = Math.max(0, currentHP - damage)
+              this.updatePokemonHP(activePokemon, finalHP)
 
               wildPokemon.lastAttackTime = now
 
@@ -1142,7 +1214,7 @@ export const useGameStore = defineStore('game', {
                 'damage'
               )
 
-              if (updatedHP === 0) {
+              if (finalHP === 0) {
                 this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
                 this.handlePokemonFaint()
               }
@@ -1150,8 +1222,8 @@ export const useGameStore = defineStore('game', {
           }
           // Normal damage without Rock Emblem protection
           else {
-            const updatedHP = Math.max(0, (activePokemon.currentHP ?? 0) - damage)
-            this.updatePokemonHP(activePokemon, updatedHP)
+            const finalHP = Math.max(0, currentHP - damage)
+            this.updatePokemonHP(activePokemon, finalHP)
 
             if (this.battle.wildPokemon) {
               this.battle.wildPokemon.lastAttackTime = now
@@ -1162,7 +1234,7 @@ export const useGameStore = defineStore('game', {
               )
             }
 
-            if (updatedHP === 0) {
+            if (finalHP === 0) {
               this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
               this.handlePokemonFaint()
             }
@@ -1191,6 +1263,30 @@ export const useGameStore = defineStore('game', {
     async tryCapture() {
       if (!this.battle.wildPokemon) return;
 
+      // Prevent concurrent capture attempts with debounce
+      if (this.battle.isTryingCatch) return;
+
+      // Set the flag immediately to prevent race conditions
+      this.battle.isTryingCatch = true;
+
+      // Additional debounce: create a unique capture attempt ID
+      const captureAttemptId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      this.battle.currentCaptureAttemptId = captureAttemptId;
+
+      // Helper function to clean up capture state
+      const cleanupCapture = () => {
+        // Only reset if this is still the current attempt
+        if (this.battle.currentCaptureAttemptId === captureAttemptId) {
+          this.battle.isTryingCatch = false;
+          this.battle.currentCaptureAttemptId = undefined;
+        }
+      };
+
+      // Helper function to check if this attempt is still valid
+      const isValidAttempt = () => {
+        return this.battle.currentCaptureAttemptId === captureAttemptId && this.battle.wildPokemon;
+      };
+
       // Get pokeballs from inventory
       const inventoryStore = useInventoryStore();
       const pokeballs = inventoryStore.getItemsByType('pokeball');
@@ -1199,54 +1295,79 @@ export const useGameStore = defineStore('game', {
         // Fall back to legacy pokeball system
         if (!this.usePokeball()) {
           this.addNotification("You don't have any Pokéballs!", 'error');
+          cleanupCapture();
           return;
         }
+        
+        // Check if attempt is still valid before proceeding
+        if (!isValidAttempt()) {
+          cleanupCapture();
+          return;
+        }
+        
+        this.addBattleLog(`Threw a Pokéball at ${this.battle.wildPokemon!.name}!`, 'system');
 
-        this.battle.isTryingCatch = true;
-        this.addBattleLog(`Threw a Pokéball at ${this.battle.wildPokemon.name}!`, 'system');
-
-        const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100;
+        const hpPercentage = (this.battle.wildPokemon!.currentHP! / this.battle.wildPokemon!.maxHP!) * 100;
         let catchChance = 0;
 
         if (hpPercentage > 50) {
-          catchChance = Math.max(5 - this.battle.wildPokemon.level!, 1);
+          catchChance = Math.max(5 - this.battle.wildPokemon!.level!, 1);
         } else if (hpPercentage < 10) {
-          catchChance = Math.max(55 - this.battle.wildPokemon.level!, 10);
+          catchChance = Math.max(55 - this.battle.wildPokemon!.level!, 10);
         } else if (hpPercentage < 25) {
-          catchChance = Math.max(35 - this.battle.wildPokemon.level!, 5);
+          catchChance = Math.max(35 - this.battle.wildPokemon!.level!, 5);
         }
 
         await new Promise(resolve => setTimeout(resolve, 1000));
-        this.battle.isTryingCatch = false;
+        
+        // Check if attempt is still valid after delay
+        if (!isValidAttempt()) {
+          cleanupCapture();
+          return;
+        }
 
         if (Math.random() * 100 <= catchChance) {
-          this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'system');
+          this.addBattleLog(`Caught ${this.battle.wildPokemon!.name}!`, 'system');
           // Create a copy of the wild Pokemon and add a unique identifier to it
           const caughtPokemon = {
-            ...this.battle.wildPokemon,
+            ...this.battle.wildPokemon!,
             uniqueId: Date.now().toString() + Math.random().toString(36).substr(2, 9)
           };
           this.addPokemonToInventory(caughtPokemon);
           this.battle.wildPokemon = null;
           this.startSpawnTimer();
         } else {
-          this.addBattleLog(`${this.battle.wildPokemon.name} broke free!`, 'system');
+          this.addBattleLog(`${this.battle.wildPokemon!.name} broke free!`, 'system');
         }
+        
+        cleanupCapture();
       } else {
         // Use the first pokeball from inventory
         const pokeball = pokeballs[0];
-        this.battle.isTryingCatch = true;
+
+        // Check if attempt is still valid before applying item effect
+        if (!isValidAttempt()) {
+          cleanupCapture();
+          return;
+        }
 
         // Apply the item effect which handles the catch logic
         const result = this.applyItemEffect(pokeball);
 
         await new Promise(resolve => setTimeout(resolve, 1000));
-        this.battle.isTryingCatch = false;
+        
+        // Check if attempt is still valid after delay
+        if (!isValidAttempt()) {
+          cleanupCapture();
+          return;
+        }
 
         if (result) {
           // Remove the pokeball if successful
           inventoryStore.removeItem(pokeball.id, 1);
         }
+        
+        cleanupCapture();
       }
     },
 
@@ -1273,7 +1394,8 @@ export const useGameStore = defineStore('game', {
         isWildPokemonHurt: false,
         isEnemyAttacking: false,
         isTryingCatch: false,
-        battleLogs: []
+        currentCaptureAttemptId: undefined,
+        battleLogs: this.battle.battleLogs, 
       }
     },
 
@@ -1465,11 +1587,11 @@ export const useGameStore = defineStore('game', {
         }
 
         job.successfulCompletions++;
-        // Add success notification
-        this.addNotification(`${job.name} complete! Received ${name}.`, 'success');
+        // Add success notification with group key
+        this.addNotification(`${job.name} complete! Received ${name}.`, 'success', `job-success:${job.name}`);
       } else {
         // Add failure notification - job completed but no reward
-        this.addNotification(`${job.name} complete, but no reward found.`, 'error');
+        this.addNotification(`${job.name} complete, but no reward found.`, 'error', `job-failure:${job.name}`);
       }
 
       // Reset progress and set a new startTime for the next cycle
@@ -1552,22 +1674,112 @@ export const useGameStore = defineStore('game', {
     },
 
     // Notification methods
-    addNotification(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
-      const notification: Notification = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        message,
-        type,
-        timestamp: Date.now()
-      };
+    addNotification(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', groupKey?: string) {
+      // Create a group key if not provided - use the message itself for grouping similar messages
+      const effectiveGroupKey = groupKey || this.generateGroupKey(message, type);
+      
+      // Look for existing notification with the same group key
+      const existingNotification = this.notifications.find(n => n.groupKey === effectiveGroupKey);
+      
+      if (existingNotification) {
+        // Update existing notification
+        existingNotification.count = (existingNotification.count || 1) + 1;
+        existingNotification.timestamp = Date.now(); // Update timestamp to most recent
+        
+        // Move to end of notifications array to show as most recent
+        const index = this.notifications.indexOf(existingNotification);
+        this.notifications.splice(index, 1);
+        this.notifications.push(existingNotification);
+        
+        return existingNotification;
+      } else {
+        // Create new notification
+        const notification: Notification = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          message,
+          type,
+          timestamp: Date.now(),
+          count: 1,
+          groupKey: effectiveGroupKey
+        };
 
-      this.notifications.push(notification);
+        this.notifications.push(notification);
+        return notification;
+      }
+    },
 
-      // Auto-remove after 5 seconds
-      setTimeout(() => {
-        this.removeNotification(notification.id);
-      }, 5000);
-
-      return notification;
+    // Helper method to generate group keys for similar messages
+    generateGroupKey(message: string, type: string): string {
+      // Normalize message for grouping by removing specific details
+      let normalizedMessage = message;
+      
+      // Group "while you were away" messages by job type
+      if (message.includes('While you were away:')) {
+        const awayMatch = message.match(/While you were away: (.+?) completed \d+ times!/);
+        if (awayMatch) {
+          const [, jobName] = awayMatch;
+          normalizedMessage = `While you were away: ${jobName} completed jobs!`;
+        }
+      }
+      
+      // Group job completion messages by job type
+      else if (message.includes('complete! Received')) {
+        const jobMatch = message.match(/^(.+?) complete! Received (.+?)\.$/);
+        if (jobMatch) {
+          const [, jobName, rewardItem] = jobMatch;
+          // Group by job name and general reward type (remove quantities)
+          const generalReward = rewardItem.replace(/\d+x?\s*/, '').trim();
+          normalizedMessage = `${jobName} complete! Received ${generalReward}.`;
+        }
+      }
+      
+      // Group job completion failures by job type  
+      else if (message.includes('complete, but no reward found')) {
+        const failMatch = message.match(/^(.+?) complete, but no reward found\.$/);
+        if (failMatch) {
+          const [, jobName] = failMatch;
+          normalizedMessage = `${jobName} complete, but no reward found.`;
+        }
+      }
+      
+      // Group caught Pokemon messages
+      else if (message.includes('Caught') && message.includes('!')) {
+        const caughtMatch = message.match(/^Caught (.+?)!$/);
+        if (caughtMatch) {
+          normalizedMessage = 'Caught Pokemon!';
+        }
+      }
+      
+      // Group level up messages
+      else if (message.includes('reached level')) {
+        normalizedMessage = 'Pokemon leveled up!';
+      }
+      
+      // Group item usage messages
+      else if (message.includes('You used a') && message.includes('It will attract Pokémon')) {
+        normalizedMessage = 'Used lure item!';
+      }
+      
+      // Group Pokeball shortage messages
+      else if (message.includes("don't have any Pokéballs")) {
+        normalizedMessage = "No Pokéballs available!";
+      }
+      
+      // Group faint/recovery messages
+      else if (message.includes('fainted') || message.includes('returned to Home')) {
+        if (message.includes('All your Pokémon fainted')) {
+          normalizedMessage = 'All Pokemon fainted! Returned to Home.';
+        } else if (message.includes('fainted')) {
+          normalizedMessage = 'Pokemon fainted!';
+        }
+      }
+      
+      // Group error messages
+      else if (message.includes('Error applying buff reward')) {
+        normalizedMessage = 'Error applying buff reward!';
+      }
+      
+      return `${type}:${normalizedMessage}`;
     },
 
     removeNotification(id: string) {
@@ -1580,6 +1792,8 @@ export const useGameStore = defineStore('game', {
     // Set up game systems including auto-attack with the tickSystem
     setupGameSystems() {
       const buffStore = useBuffStore();
+      let hpRegenAccumulatedTime = 0;
+      const HP_REGEN_INTERVAL = 1000; // 1 second in milliseconds
 
       // Use the tickSystem to handle auto-attack and other time-based game mechanics
       tickSystem.subscribe((elapsed: number) => {
@@ -1597,6 +1811,13 @@ export const useGameStore = defineStore('game', {
               buffStore.recordAutoAttack();
             }
           }
+        }
+
+        // Process HP regeneration every 1 second
+        hpRegenAccumulatedTime += elapsed;
+        if (hpRegenAccumulatedTime >= HP_REGEN_INTERVAL) {
+          this.regenHP();
+          hpRegenAccumulatedTime -= HP_REGEN_INTERVAL;
         }
 
         // Update job progress for idle jobs

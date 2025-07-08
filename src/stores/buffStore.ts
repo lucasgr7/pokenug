@@ -287,7 +287,7 @@ export const useBuffStore = defineStore('buff', {
     // Update fire rate tier
     updateFireRateTier() {
       const fireEmblemBuff = this.getBuffById('fire-emblem');
-      if (!fireEmblemBuff ?? !this.fireRateState.active) return;
+      if (!fireEmblemBuff || !this.fireRateState.active) return;
 
       // Check count thresholds for tier upgrades
       if (this.fireRateState.count >= 80 && this.fireRateState.tier < 3) {
