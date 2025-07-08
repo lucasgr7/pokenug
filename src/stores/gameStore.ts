@@ -938,7 +938,7 @@ export const useGameStore = defineStore('game', {
         // 100% for testing purposes (normally would be 1/4096 = 0.000244)
         testingChance: 1.0,
         normalChance: 1 / 4096,
-        useTestingChance: true // Set to false for normal gameplay
+        useTestingChance: false // Set to false for normal gameplay
       };
       
       const shinyChance = SHINY_CONFIG.useTestingChance ? 
