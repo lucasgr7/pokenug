@@ -1,5 +1,5 @@
 // Game items definitions with standardized properties
-import type { ItemType, ItemRarity } from '@/types/pokemon';
+import type { ItemType, ItemRarity } from '../types/pokemon.js';
 
 // Item effect types
 export type HealEffect = {
@@ -32,7 +32,12 @@ export type AutoCatchEffect = {
   catchRate: number; // Base catch rate modifier
 }
 
-export type ItemEffect = HealEffect | CatchEffect | StatBoostEffect | StatusEffect | AutoCatchEffect;
+export type SpecialEffect = {
+  type: 'special';
+  effect: string;
+}
+
+export type ItemEffect = HealEffect | CatchEffect | StatBoostEffect | StatusEffect | AutoCatchEffect | SpecialEffect;
 
 // Item definition structure
 export interface ItemDefinition {
@@ -189,6 +194,20 @@ const items: Record<string, ItemDefinition> = {
     icon: '/images/stone.png',
     usable: false,
     consumable: false
+  },
+  'expansion-crystal': {
+    id: 'expansion-crystal',
+    name: 'Expansion Crystal',
+    description: 'A mystical crystal created by Psychic Pokemon. Can permanently expand any idle job by +1 slot.',
+    type: 'material',
+    rarity: 'epic',
+    icon: '/images/psychic-emblem.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'expand-job-slot'
+    }
   }
 };
 

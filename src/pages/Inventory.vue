@@ -2,9 +2,11 @@
 import { ref, computed } from 'vue'
 import { useInventory } from '../composables/useInventory'
 import type { InventoryItem, ItemType } from '../types/pokemon'
+import JobSlotExpansionModal from '../components/JobSlotExpansionModal.vue'
 
 const inventory = useInventory()
 const activeTab = ref<ItemType>('pokeball')
+const showExpansionModal = ref(false)
 
 const tabs = [
   { id: 'pokeball', label: 'Pokeballs', icon: '🔴' },
@@ -28,9 +30,17 @@ const rarityColors = {
 
 function useItem(item: InventoryItem) {
   if (item.usable) {
+    if (item.id === 'expansion-crystal') {
+      showExpansionModal.value = true
+      return
+    }
     inventory.useItem(item.id)
-    // TODO: Add effects based on item type
   }
+}
+
+function handleJobExpansion(jobId: string) {
+  // Remove one expansion crystal from inventory
+  inventory.useItem('expansion-crystal')
 }
 </script>
 
@@ -80,13 +90,13 @@ function useItem(item: InventoryItem) {
           
           <div class="flex justify-between items-center mt-2">
             <span class="text-sm font-semibold">Qty: {{ item.quantity }}</span>
-            <!-- <button 
+            <button 
               v-if="item.usable"
               @click="useItem(item)"
               class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
             >
-              Use
-            </button> -->
+              {{ item.id === 'expansion-crystal' ? 'Expand Job' : 'Use' }}
+            </button>
           </div>
         </div>
       </div>
@@ -100,5 +110,12 @@ function useItem(item: InventoryItem) {
         <p class="mt-1">Try assigning Pokémon to jobs to collect new items!</p>
       </div>
     </div>
+    
+    <!-- Job Slot Expansion Modal -->
+    <JobSlotExpansionModal 
+      :show="showExpansionModal" 
+      @close="showExpansionModal = false"
+      @expand="handleJobExpansion"
+    />
   </div>
 </template>

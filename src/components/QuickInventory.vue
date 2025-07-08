@@ -29,14 +29,22 @@
         No items yet
       </div>
     </div>
+    
+    <!-- Job Slot Expansion Modal -->
+    <JobSlotExpansionModal 
+      :show="showExpansionModal" 
+      @close="showExpansionModal = false"
+      @expand="handleJobExpansion"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useInventory } from '../composables/useInventory'
 import { useGameStore } from '../stores/gameStore'
 import type { InventoryItem } from '@/types/pokemon'
+import JobSlotExpansionModal from './JobSlotExpansionModal.vue'
 
 // Use the inventory composable
 const inventory = useInventory()
@@ -44,14 +52,18 @@ const inventory = useInventory()
 // Get the game store for item effects
 const gameStore = useGameStore()
 
+// Modal state
+const showExpansionModal = ref(false)
+
 // Get the most common items (pokeballs and potions)
 const commonItems = computed(() => {
   const pokeballs = inventory.getItemsByType('pokeball')
   const potions = inventory.getItemsByType('potion')
   const berries = inventory.getItemsByType('berries')
+  const materials = inventory.getItemsByType('material')
   
   // Combine and limit to 6 most used items
-  return [...pokeballs, ...potions, ...berries]
+  return [...pokeballs, ...potions, ...berries, ...materials]
     .sort((a, b) => b.quantity - a.quantity)
     .slice(0, 6)
 })
@@ -83,9 +95,29 @@ function useItem(item: InventoryItem) {
       gameStore.useInventoryItem(item)
       break
       
+    case 'material':
+      // Check if this is an expansion crystal
+      if (item.id === 'expansion-crystal') {
+        showExpansionModal.value = true
+        return // Don't remove the item yet, wait for job selection
+      }
+      gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
+      break
+      
     default:
       gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
   }
+}
+
+/**
+ * Handle job slot expansion
+ */
+function handleJobExpansion(jobId: string) {
+  // Remove one expansion crystal from inventory
+  inventory.useItem('expansion-crystal')
+  
+  // The actual expansion is handled by the modal component via localStorage
+  // The job expansion will be applied when the component reloads or the game state is updated
 }
 
 /**

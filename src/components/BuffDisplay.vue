@@ -195,6 +195,25 @@
                 </div>
               </div>
             </div>
+            
+            <!-- Spawn Timer Reduction Buff Display (Flying Emblem) -->
+            <div v-else-if="selectedBuff.type === 'spawn-timer-reduction'" class="flex items-center bg-gradient-to-r from-purple-50 to-blue-50 p-3 rounded-lg">
+              <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium">Spawn Timer Reduction</div>
+                <div class="text-sm mb-1">Level {{ selectedBuff.value }}: Reduces spawn timers by {{ (getSpawnTimerReduction(selectedBuff.value) * 100).toFixed(1) }}%</div>
+                <div class="text-xs bg-purple-50 text-purple-800 px-2 py-1 rounded mb-1">
+                  <span>Exponential scaling - early levels provide significant benefits</span>
+                </div>
+                <div class="text-xs text-gray-700">
+                  Affects all regions except Home. Maximum reduction: 80%
+                </div>
+              </div>
+            </div>
           </div>
           
           <!-- Close Button -->
@@ -209,8 +228,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useBuffStore } from '@/stores/buffStore'
-import type { BuffEffect } from '@/types/idleJobs'
+import { useBuffStore } from '../stores/buffStore'
+import type { BuffEffect } from '../types/idleJobs'
 
 const buffStore = useBuffStore()
 const showModal = ref(false)
@@ -246,7 +265,8 @@ const getBuffBorderClass = (type: string) => {
     'fire-rate': 'border-orange-500',
     'auto-attack': 'border-yellow-400',
     'stun-resistance': 'border-yellow-700',
-    'xp-share': 'border-cyan-500'
+    'xp-share': 'border-cyan-500',
+    'spawn-timer-reduction': 'border-purple-400'
   }
   
   return typeClasses[type] || 'border-gray-400'
@@ -271,6 +291,15 @@ const getXPSharePercentage = (level: number) => {
     const additionalShare = 5 * Math.log(1 + additionalLevels * 0.5);
     return Math.min(baseShare + additionalShare, 50); // Cap at 50% sharing
   }
+}
+
+// Calculate spawn timer reduction percentage for Flying Emblem
+const getSpawnTimerReduction = (level: number) => {
+  // Exponential scaling formula: reduction = 1 - (0.99)^(level^1.2)
+  const exponent = Math.pow(level, 1.2);
+  const reduction = 1 - Math.pow(0.99, exponent);
+  // Cap at 80% reduction (minimum 20% of original time)
+  return Math.min(reduction, 0.80);
 }
 </script>
 

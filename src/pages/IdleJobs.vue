@@ -392,9 +392,6 @@ function getTotalLevels(jobId: string): number {
                       <div class="w-16 h-16 rounded-full bg-white mr-4 p-2 flex items-center justify-center shadow-lg">
                         <img :src="job.icon" :alt="job.name" class="max-w-full rounded-full max-h-full object-contain">
                       </div>
-                      <div class="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-black animate-pulse">
-                        {{ job.assignedPokemon.length }}
-                      </div>
                     </div>
                     
                     <div class="flex-1">
@@ -402,7 +399,7 @@ function getTotalLevels(jobId: string): number {
                       <div class="text-sm opacity-90 mb-2">Type: {{ job.type }}</div>
                       <div class="flex space-x-2 text-xs">
                         <span class="bg-white bg-opacity-20 px-2 py-1 rounded-full">
-                          {{ job.assignedPokemon.length }}/{{ job.maxSlots }} Slots
+                          {{ job.assignedPokemon.length }}/{{ gameStore.getJobEffectiveMaxSlots(id) }} Slots
                         </span>
                         <span 
                           class="bg-white bg-opacity-20 px-2 py-1 rounded-full cursor-help"
@@ -537,7 +534,7 @@ function getTotalLevels(jobId: string): number {
                       @mouseout="hideTooltip"
                     >
                       <div 
-                        v-for="i in job.maxSlots" 
+                        v-for="i in gameStore.getJobEffectiveMaxSlots(id)" 
                         :key="i"
                         class="aspect-square rounded-lg border-2 border-dashed flex items-center justify-center transition-all duration-200"
                         :class="{ 

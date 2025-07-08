@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { BuffEffect } from '@/types/idleJobs'
-import regions from '@/constants/regions'
+import { BuffEffect } from '../types/idleJobs.js'
+import regions from '../constants/regions.js'
 
 interface BuffState {
   buffs: Record<string, BuffEffect>;
@@ -34,7 +34,7 @@ export const useBuffStore = defineStore('buff', {
       lastAttackTime: 0,
       multiplier: 1.0,
       activePokemonId: null,
-      timeAllowed: 5000 // Default 5 seconds
+      timeAllowed: 10000 // Updated default timeout
     },
     pokemonDefeatedCount: 0,
     lastRegionId: null,
@@ -178,11 +178,33 @@ export const useBuffStore = defineStore('buff', {
       
       const now = Date.now();
       const elapsed = now - state.fireRateState.lastAttackTime;
-      const timeLimit = 5000; // 5 seconds before reset
+      const timeLimit = 10000; // 10 seconds before reset (matches the reset logic)
       
       // Return percentage of time remaining (countdown)
       const timeRemaining = Math.max(0, timeLimit - elapsed);
       return (timeRemaining / timeLimit) * 100;
+    },
+
+    // Check if Flying Emblem is active
+    hasFlyingEmblem: (state) => {
+      return state.buffs['flying-emblem'] !== undefined;
+    },
+
+    // Get spawn timer reduction percentage from Flying Emblem
+    getSpawnTimerReduction: (state) => {
+      const flyingEmblem = state.buffs['flying-emblem'];
+      if (!flyingEmblem) return 0;
+
+      const level = flyingEmblem.value;
+      
+      // Exponential scaling formula: reduction = 1 - (0.99)^(level^1.2)
+      // This creates a steep curve where early levels provide significant benefit
+      // but later levels provide diminishing returns, reaching ~63% reduction at level 100
+      const exponent = Math.pow(level, 1.2);
+      const reduction = 1 - Math.pow(0.99, exponent);
+      
+      // Cap at 80% reduction (minimum 20% of original time)
+      return Math.min(reduction, 0.80);
     },
 
     // ...existing code...
@@ -283,15 +305,18 @@ export const useBuffStore = defineStore('buff', {
       this.fireRateState.activePokemonId ??= pokemonId;
 
       // Check if the time since last attack is within the allowed time
+      // Only reset if the player has been inactive for a significant period
       if (this.fireRateState.active && now - this.fireRateState.lastAttackTime > this.fireRateState.timeAllowed) {
         // Reset if the player took too long between attacks
+        console.log(`Fire rate reset - inactive for ${(now - this.fireRateState.lastAttackTime) / 1000}s, allowed: ${this.fireRateState.timeAllowed / 1000}s`);
         this.resetFireRate();
         return;
       }
 
-      // If not active and player took too long between attacks (5 seconds), reset count
+      // If not active and player took too long between attacks (10 seconds), reset count
       if (!this.fireRateState.active && this.fireRateState.count > 0 && 
-          now - this.fireRateState.lastAttackTime > 5000) {
+          now - this.fireRateState.lastAttackTime > 10000) {
+        console.log(`Fire rate count reset - inactive for ${(now - this.fireRateState.lastAttackTime) / 1000}s`);
         this.fireRateState.count = 0;
         this.fireRateState.lastAttackTime = 0;
         this.saveState();
@@ -320,23 +345,20 @@ export const useBuffStore = defineStore('buff', {
 
     // Update the time allowed between attacks based on count
     updateTimeAllowed() {
-      // Base time is determined by tier - higher tiers allow LESS time between attacks
+      // Base time is determined by tier - but we need reasonable timeouts to prevent accidental resets
       let baseTime;
 
       if (this.fireRateState.tier === 1) {
-        baseTime = 3000; // 3 seconds for tier 1
+        baseTime = 8000; // 8 seconds for tier 1 (more forgiving)
       } else if (this.fireRateState.tier === 2) {
-        baseTime = 2000; // 2 seconds for tier 2 (faster)
+        baseTime = 6000; // 6 seconds for tier 2
       } else if (this.fireRateState.tier === 3) {
-        baseTime = 1500; // 1.5 seconds for tier 3 (fastest)
+        baseTime = 5000; // 5 seconds for tier 3 (still reasonable)
       } else {
-        baseTime = 5000; // Default (before activation)
+        baseTime = 10000; // Default 10 seconds (before activation)
       }
 
-      // Minimum time is 500ms to prevent spam clicking
-      const reducedTime = Math.max(500, baseTime);
-
-      this.fireRateState.timeAllowed = reducedTime;
+      this.fireRateState.timeAllowed = baseTime;
     },
 
     // Activate fire rate
@@ -387,7 +409,7 @@ export const useBuffStore = defineStore('buff', {
         lastAttackTime: 0,
         multiplier: 1.0,
         activePokemonId: this.fireRateState.activePokemonId, // Preserve the active Pokemon ID
-        timeAllowed: 5000
+        timeAllowed: 10000 // Use updated default timeout
       };
       this.saveState();
     },
@@ -402,7 +424,7 @@ export const useBuffStore = defineStore('buff', {
         lastAttackTime: 0,
         multiplier: 1.0,
         activePokemonId: null,
-        timeAllowed: 5000
+        timeAllowed: 10000 // Use updated default timeout
       };
       this.saveState();
     },
@@ -514,7 +536,7 @@ export const useBuffStore = defineStore('buff', {
             lastAttackTime: 0,
             multiplier: 1.0,
             activePokemonId: null,
-            timeAllowed: 5000
+            timeAllowed: 10000 // Updated default timeout
           },
           pokemonDefeatedCount: state.pokemonDefeatedCount ?? 0,
           lastRegionId: state.lastRegionId ?? null,

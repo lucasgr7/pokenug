@@ -120,6 +120,17 @@ export const useGameStore = defineStore('game', {
 
       return inParty || inAvailable || inIdleJobs;
     },
+    getJobEffectiveMaxSlots: (state) => (jobId: string) => {
+      const job = state.idleJobs[jobId];
+      if (!job) return 0;
+      
+      // Get expansions from localStorage
+      const expansions = JSON.parse(localStorage.getItem('jobSlotExpansions') || '{}');
+      const expansion = expansions[jobId] || 0;
+      
+      return job.maxSlots + expansion;
+    },
+
     getJobTimeReduction: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
@@ -330,9 +341,17 @@ export const useGameStore = defineStore('game', {
                           }
                           break;
                         case 'material':
-                          inventoryStore.addItem(
-                            itemFactory.createMaterial(name, description)
-                          );
+                          // Check if this is an expansion crystal
+                          if (name === 'Expansion Crystal') {
+                            const expansionCrystal = itemFactory.createFromDefinition('expansion-crystal');
+                            if (expansionCrystal) {
+                              inventoryStore.addItem(expansionCrystal);
+                            }
+                          } else {
+                            inventoryStore.addItem(
+                              itemFactory.createMaterial(name, description)
+                            );
+                          }
                           break;
                         case 'buff':
                           try {
@@ -1006,7 +1025,16 @@ export const useGameStore = defineStore('game', {
       const shouldDelay = buffStore.shouldDelaySpawn;
 
       // Use the region-specific spawnTimer or default
-      const regionTimer = this.currentRegionData.spawnTimer || 10;
+      let regionTimer: number = this.currentRegionData.spawnTimer || 10;
+
+      // Apply Flying Emblem spawn timer reduction
+      const spawnReduction = buffStore.getSpawnTimerReduction;
+      if (spawnReduction > 0) {
+        regionTimer = regionTimer * (1 - spawnReduction);
+        // Ensure minimum spawn timer of 0.5 seconds
+        regionTimer = Math.max(regionTimer, 0.5);
+      }
+
       this.battle.spawnTimer = shouldDelay ? 10 : regionTimer;
 
       // If a delay was applied, reset the counter to the next 10
@@ -1539,7 +1567,7 @@ export const useGameStore = defineStore('game', {
 
     assignPokemonToJob(pokemon: Pokemon, jobId: string) {
       const job = this.idleJobs[jobId];
-      if (!job || job.assignedPokemon.length >= job.maxSlots) return false;
+      if (!job || job.assignedPokemon.length >= this.getJobEffectiveMaxSlots(jobId)) return false;
 
       // Check if Pokemon matches job type requirement
       if (job.type && !pokemon.types.includes(job.type)) return false;
@@ -1726,7 +1754,7 @@ export const useGameStore = defineStore('game', {
 
         job.successfulCompletions++;
         // Add success notification with group key
-        this.addNotification(`${job.name} complete! Received ${name}.`, 'success', `job-success:${job.name}`);
+        this.addNotification(`${job.name} complete!`, 'success', `job-success:${job.name}`);
       } else {
         // Add failure notification - job completed but no reward
         this.addNotification(`${job.name} complete, but no reward found.`, 'error', `job-failure:${job.name}`);
