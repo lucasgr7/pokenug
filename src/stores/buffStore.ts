@@ -65,6 +65,31 @@ export const useBuffStore = defineStore('buff', {
         .reduce((total, buff) => total + buff.value, 0);
     },
 
+    // Helper for getting water emblem XP sharing multiplier
+    getWaterEmblemShareMultiplier: (state) => {
+      const waterEmblem = state.buffs['water-emblem'];
+      if (!waterEmblem) return 0;
+      
+      // Calculate sharing percentage with diminishing returns after level 10
+      const level = waterEmblem.value;
+      if (level <= 10) {
+        // First 10 levels: 1% per level (linear growth)
+        return level * 0.01;
+      } else {
+        // After level 10: diminishing returns using logarithmic scaling
+        const baseShare = 0.10; // 10% from first 10 levels
+        const additionalLevels = level - 10;
+        // Use logarithmic formula: additional_share = 0.05 * ln(1 + additionalLevels * 0.5)
+        const additionalShare = 0.05 * Math.log(1 + additionalLevels * 0.5);
+        return Number((Math.min(baseShare + additionalShare, 0.50)).toFixed(2)); // Cap at 50% sharing
+      }
+    },
+
+    // Check if Water Emblem is active
+    hasWaterEmblem: (state) => {
+      return state.buffs['water-emblem'] !== undefined;
+    },
+
     // Get fire rate state
     getFireRateState: (state) => state.fireRateState,
 

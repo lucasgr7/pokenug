@@ -24,8 +24,11 @@ const regions = {
       { id: 37, name: 'vulpix', probability: 1.5 }, // Very rare (2%)
       { id: 16, name: 'Pidgey', probability: 5 },       // Uncommon (7%)
       { id: 43, name: 'oddish', probability: 5 }, // Very rare (2%)
-      { id: 69, name: 'Bellsprout', probability: 7 }, // Very rare (2%)
-      { id: 102, name: 'exeggcute', probability: 7 }, // Very rare (2%)
+      { id: 69, name: 'Bellsprout', probability: 5 }, // Very rare (2%)
+      { id: 19, name: 'rattata', probability: 10 }, 
+      { id: 143, name: 'snorlax', probability: 1 }, 
+      { id: 48, name: 'venonat', probability: 2 },
+      { id: 102, name: 'exeggcute', probability: 7 }
     ],
     berryPool: [
       { id: 19, name: 'rattata', probability: 10 }, 

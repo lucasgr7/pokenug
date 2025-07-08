@@ -1027,8 +1027,8 @@ export const useGameStore = defineStore('game', {
     async attack() {
       if (!this.battle.wildPokemon || !this.activePokemon) return false;
 
-      // Prevent attack spam by checking if we're already attacking or enemy is attacking
-      if (this.battle.isPlayerAttacking || this.battle.isEnemyAttacking) return false;
+      // Prevent attack spam by checking if we're already attacking (but allow enemy attacks to interrupt)
+      if (this.battle.isPlayerAttacking) return false;
 
       // Set battle state for animations
       this.battle.isPlayerAttacking = true;
@@ -1054,15 +1054,50 @@ export const useGameStore = defineStore('game', {
       const boostedXp = baseXpPerAttack + xpBoost;
       const totalXpPerAttack = Math.floor(boostedXp * fireRateMultiplier);
 
-      // Apply XP gain
+      // Apply XP gain to active Pokemon
       this.activePokemon.experience = (this.activePokemon.experience || 0) + totalXpPerAttack;
 
-      // Check for level up
+      // Check for level up on active Pokemon
       const nextLevelXP = this.activePokemon.experienceToNextLevel ||
         Math.floor(100 * Math.pow(this.activePokemon.level || 1, 1.5));
 
       if (this.activePokemon.experience >= nextLevelXP) {
         this.levelUpPokemon(this.activePokemon);
+      }
+
+      // Handle Water Emblem XP sharingdeb
+      if (buffStore.hasWaterEmblem) {
+        const shareMultiplier = buffStore.getWaterEmblemShareMultiplier;
+        const sharedXp = Math.floor(totalXpPerAttack * shareMultiplier);
+        
+        if (sharedXp > 0) {
+          // Share XP with all other party members (excluding the active Pokemon)
+          const otherPartyMembers = this.playerPokemon.filter(pokemon => 
+            pokemon !== this.activePokemon && !pokemon.faintedAt
+          );
+          
+          otherPartyMembers.forEach(pokemon => {
+            if (pokemon.experience !== undefined) {
+              pokemon.experience += sharedXp;
+              
+              // Check for level up on shared XP recipients
+              const memberNextLevelXP = pokemon.experienceToNextLevel ||
+                Math.floor(100 * Math.pow(pokemon.level || 1, 1.5));
+              
+              if (pokemon.experience >= memberNextLevelXP) {
+                this.levelUpPokemon(pokemon);
+              }
+            }
+          });
+          
+          // Add battle log for shared XP
+          if (otherPartyMembers.length > 0) {
+            this.addBattleLog(
+              `Water Emblem shared ${sharedXp} XP with ${otherPartyMembers.length} party member(s)! (${(shareMultiplier * 100).toFixed(1)}% sharing)`,
+              'system'
+            );
+          }
+        }
       }
 
       // Calculate damage first
@@ -1182,7 +1217,7 @@ export const useGameStore = defineStore('game', {
       this.saveState()
     },
 
-    enemyAttack() {
+    enemyAttack(retryCount: number = 0) {
       const wildPokemon = this.battle.wildPokemon
       const activePokemon = this.activePokemon
       const buffStore = useBuffStore()
@@ -1190,11 +1225,24 @@ export const useGameStore = defineStore('game', {
 
       if (!wildPokemon || !activePokemon || wildPokemon.isRunning) return
 
-      // Prevent enemy attacks during player attacks to avoid race conditions
-      if (this.battle.isPlayerAttacking || this.battle.isEnemyAttacking) return
+      // If another enemy attack is already in progress, queue this one
+      if (this.battle.isEnemyAttacking && retryCount < 5) {
+        setTimeout(() => {
+          this.enemyAttack(retryCount + 1)
+        }, 50)
+        return
+      }
+
+      // If we've exceeded retry count, skip this attack cycle
+      if (retryCount >= 5) {
+        return
+      }
+
+      // Enemy attacks have ABSOLUTE PRIORITY - they can interrupt player attacks
 
       const now = Date.now()
       if (!wildPokemon.lastAttackTime || (now - wildPokemon.lastAttackTime) >= ENEMY_ATTACK_INTERVAL) {
+        // Enemy attack has absolute priority - force set enemy attacking state
         this.battle.isEnemyAttacking = true
         
         // Calculate damage immediately to avoid state changes during timeout
@@ -1210,128 +1258,126 @@ export const useGameStore = defineStore('game', {
         const currentHP = activePokemon.currentHP ?? 0
         const wouldFaint = currentHP <= damage
 
-        // Apply the attack after a short animation delay
-        setTimeout(() => {
-          // Double-check that the battle state is still valid
-          if (!this.battle.wildPokemon || !this.activePokemon) {
-            this.battle.isEnemyAttacking = false
-            return
-          }
-
+        // Apply the attack with priority (immediate execution for absolute priority)
+        // Double-check that the battle state is still valid
+        if (!this.battle.wildPokemon || !this.activePokemon) {
           this.battle.isEnemyAttacking = false
+          return
+        }
 
-          if (wouldFaint && buffStore.hasRockEmblem) {
-            // Check if we have potions that can be auto-used
-            const potions = inventoryStore.getItemsByType('potion')
+        this.battle.isEnemyAttacking = false
 
-            if (potions.length > 0) {
-              // Auto-use the smallest potion that can would prevent fainting
-              const sortedPotions = [...potions].sort((a, b) => {
-                const healA = a.effect?.type === 'heal' ? a.effect.value : 0
-                const healB = b.effect?.type === 'heal' ? b.effect.value : 0
-                return healA - healB // Sort from smallest to largest
-              })
+        if (wouldFaint && buffStore.hasRockEmblem) {
+          // Check if we have potions that can be auto-used
+          const potions = inventoryStore.getItemsByType('potion')
 
-              const potion = sortedPotions[0] // Get the smallest potion
+          if (potions.length > 0) {
+            // Auto-use the smallest potion that can would prevent fainting
+            const sortedPotions = [...potions].sort((a, b) => {
+              const healA = a.effect?.type === 'heal' ? a.effect.value : 0
+              const healB = b.effect?.type === 'heal' ? b.effect.value : 0
+              return healA - healB // Sort from smallest to largest
+            })
 
-              // Use the potion
-              this.addBattleLog(
-                `Rock Emblem activated! Using ${potion.name} to prevent fainting!`,
-                'system'
-              )
+            const potion = sortedPotions[0] // Get the smallest potion
 
-              // Apply the potion effect first
-              this.applyItemEffect(potion, activePokemon)
+            // Use the potion
+            this.addBattleLog(
+              `Rock Emblem activated! Using ${potion.name} to prevent fainting!`,
+              'system'
+            )
 
-              // Remove the potion from inventory
-              inventoryStore.removeItem(potion.id, 1)
+            // Apply the potion effect first
+            this.applyItemEffect(potion, activePokemon)
 
-              // Calculate damage after potion was applied
-              const newCurrentHP = activePokemon.currentHP ?? 0
-              const finalHP = Math.max(0, newCurrentHP - damage)
-              this.updatePokemonHP(activePokemon, finalHP)
+            // Remove the potion from inventory
+            inventoryStore.removeItem(potion.id, 1)
 
-              // Log the damage
-              this.addBattleLog(
-                `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-                'damage'
-              )
+            // Calculate damage after potion was applied
+            const newCurrentHP = activePokemon.currentHP ?? 0
+            const finalHP = Math.max(0, newCurrentHP - damage)
+            this.updatePokemonHP(activePokemon, finalHP)
 
-              // Update attack time
-              if (this.battle.wildPokemon) {
-                this.battle.wildPokemon.lastAttackTime = now
-              }
-              
-              // Check if still fainted after potion use
-              if (finalHP === 0) {
-                this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
-                this.handlePokemonFaint()
-              }
+            // Log the damage
+            this.addBattleLog(
+              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
+              'damage'
+            )
+
+            // Update attack time
+            if (this.battle.wildPokemon) {
+              this.battle.wildPokemon.lastAttackTime = now
             }
-            // No potions but we can try using stun resistance
-            else if (buffStore.shouldResistStun()) {
-              // Calculate 10% of max HP as the minimum HP to leave
-              const minHP = Math.max(1, Math.floor(activePokemon.maxHP! * 0.1))
-
-              this.addBattleLog(
-                `Rock Emblem protected ${activePokemon.name} from fainting!`,
-                'system'
-              )
-
-              // Set the Pokemon's HP to 10% instead of fainting
-              this.updatePokemonHP(activePokemon, minHP)
-
-              // Log the damage but show it was reduced
-              const actualDamage = currentHP - minHP
-              this.addBattleLog(
-                `${wildPokemon.name} attacks ${activePokemon.name} for ${actualDamage} damage (reduced by Rock Emblem)!`,
-                'damage'
-              )
-
-              if (this.battle.wildPokemon) {
-                this.battle.wildPokemon.lastAttackTime = now
-              }
-            }
-            // No resistance triggered, proceed with normal damage and fainting
-            else {
-              const finalHP = Math.max(0, currentHP - damage)
-              this.updatePokemonHP(activePokemon, finalHP)
-
-              if (this.battle.wildPokemon) {
-                this.battle.wildPokemon.lastAttackTime = now
-              }
-
-              this.addBattleLog(
-                `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-                'damage'
-              )
-
-              if (finalHP === 0) {
-                this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
-                this.handlePokemonFaint()
-              }
+            
+            // Check if still fainted after potion use
+            if (finalHP === 0) {
+              this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
+              this.handlePokemonFaint()
             }
           }
-          // Normal damage without Rock Emblem protection
+          // No potions but we can try using stun resistance
+          else if (buffStore.shouldResistStun()) {
+            // Calculate 10% of max HP as the minimum HP to leave
+            const minHP = Math.max(1, Math.floor(activePokemon.maxHP! * 0.1))
+
+            this.addBattleLog(
+              `Rock Emblem protected ${activePokemon.name} from fainting!`,
+              'system'
+            )
+
+            // Set the Pokemon's HP to 10% instead of fainting
+            this.updatePokemonHP(activePokemon, minHP)
+
+            // Log the damage but show it was reduced
+            const actualDamage = currentHP - minHP
+            this.addBattleLog(
+              `${wildPokemon.name} attacks ${activePokemon.name} for ${actualDamage} damage (reduced by Rock Emblem)!`,
+              'damage'
+            )
+
+            if (this.battle.wildPokemon) {
+              this.battle.wildPokemon.lastAttackTime = now
+            }
+          }
+          // No resistance triggered, proceed with normal damage and fainting
           else {
             const finalHP = Math.max(0, currentHP - damage)
             this.updatePokemonHP(activePokemon, finalHP)
 
             if (this.battle.wildPokemon) {
               this.battle.wildPokemon.lastAttackTime = now
-
-              this.addBattleLog(
-                `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-                'damage'
-              )
             }
+
+            this.addBattleLog(
+              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
+              'damage'
+            )
 
             if (finalHP === 0) {
               this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
               this.handlePokemonFaint()
             }
           }
-        }, 200)
+        }
+        // Normal damage without Rock Emblem protection
+        else {
+          const finalHP = Math.max(0, currentHP - damage)
+          this.updatePokemonHP(activePokemon, finalHP)
+
+          if (this.battle.wildPokemon) {
+            this.battle.wildPokemon.lastAttackTime = now
+
+            this.addBattleLog(
+              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
+              'damage'
+            )
+          }
+
+          if (finalHP === 0) {
+            this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
+            this.handlePokemonFaint()
+          }
+        }
       }
     },
 
@@ -1887,6 +1933,11 @@ export const useGameStore = defineStore('game', {
       let hpRegenAccumulatedTime = 0;
       const HP_REGEN_INTERVAL = 1000; // 1 second in milliseconds
 
+      // Add deduplication variables
+      let deduplicationAccumulatedTime = 0;
+      const DEDUPLICATION_INTERVAL = 3 * 250; // 3 ticks (each tick is 250ms)
+      let lastPokemonCount = this.getAllPokemon.length;
+
       // Use the tickSystem to handle auto-attack and other time-based game mechanics
       tickSystem.subscribe((elapsed: number) => {
         // Process auto-attack if the conditions are met
@@ -1912,6 +1963,23 @@ export const useGameStore = defineStore('game', {
           hpRegenAccumulatedTime -= HP_REGEN_INTERVAL;
         }
 
+        // Process deduplication every 3 ticks if Pokémon count changed
+        deduplicationAccumulatedTime += elapsed;
+        if (deduplicationAccumulatedTime >= DEDUPLICATION_INTERVAL) {
+          const currentPokemonCount = this.getAllPokemon.length;
+          
+          // Only run deduplication if the count has changed
+          if (currentPokemonCount !== lastPokemonCount) {
+            // Use setTimeout to avoid blocking the tick
+            setTimeout(() => {
+              this.deduplicatePokemon();
+            }, 0);
+            lastPokemonCount = currentPokemonCount;
+          }
+          
+          deduplicationAccumulatedTime -= DEDUPLICATION_INTERVAL;
+        }
+
         // Update job progress for idle jobs
         Object.keys(this.idleJobs).forEach(jobId => {
           this.updateJobProgress(jobId, elapsed);
@@ -1919,16 +1987,109 @@ export const useGameStore = defineStore('game', {
       });
     },
 
-    // Helper method to reset battle animations
-    resetBattleAnimations() {
-      this.battle.isPlayerAttacking = false;
-      this.battle.isWildPokemonHurt = false;
-      this.battle.isEnemyAttacking = false;
-    },
+    // Deduplication routine to merge duplicate Pokémon by uniqueId
+    deduplicatePokemon() {
+      console.log('Running Pokémon deduplication routine...');
+      
+      let duplicatesFound = false;
+      
+      // Helper function to merge two Pokémon (keep the one with higher level/experience)
+      const mergePokemon = (pokemon1: Pokemon, pokemon2: Pokemon): Pokemon => {
+        // Prefer higher level, or if levels are equal, prefer higher experience
+        if ((pokemon1.level || 1) > (pokemon2.level || 1)) {
+          return pokemon1;
+        } else if ((pokemon1.level || 1) < (pokemon2.level || 1)) {
+          return pokemon2;
+        } else {
+          // Same level, check experience
+          return (pokemon1.experience || 0) >= (pokemon2.experience || 0) ? pokemon1 : pokemon2;
+        }
+      };
 
-    // Helper method to check if battle is in progress
-    isBattleInProgress(): boolean {
-      return this.battle.isPlayerAttacking || this.battle.isEnemyAttacking || this.battle.isWildPokemonHurt;
-    },
+      // Check and deduplicate playerPokemon
+      const uniquePlayerPokemon: Pokemon[] = [];
+      const seenPlayerIds = new Set<string>();
+      
+      for (const pokemon of this.playerPokemon) {
+        if (!pokemon.uniqueId) {
+          // Generate uniqueId for Pokémon that don't have one
+          pokemon.uniqueId = generateRandomId();
+          uniquePlayerPokemon.push(pokemon);
+          seenPlayerIds.add(pokemon.uniqueId);
+        } else if (seenPlayerIds.has(pokemon.uniqueId)) {
+          // Found duplicate, merge with existing
+          const existingIndex = uniquePlayerPokemon.findIndex(p => p.uniqueId === pokemon.uniqueId);
+          if (existingIndex !== -1) {
+            uniquePlayerPokemon[existingIndex] = mergePokemon(uniquePlayerPokemon[existingIndex], pokemon);
+            duplicatesFound = true;
+            console.log(`Merged duplicate Pokémon in party: ${pokemon.name} (${pokemon.uniqueId})`);
+          }
+        } else {
+          uniquePlayerPokemon.push(pokemon);
+          seenPlayerIds.add(pokemon.uniqueId);
+        }
+      }
+
+      // Check and deduplicate availablePokemon
+      const uniqueAvailablePokemon: Pokemon[] = [];
+      const seenAvailableIds = new Set<string>();
+      
+      for (const pokemon of this.availablePokemon) {
+        if (!pokemon.uniqueId) {
+          // Generate uniqueId for Pokémon that don't have one
+          pokemon.uniqueId = generateRandomId();
+          uniqueAvailablePokemon.push(pokemon);
+          seenAvailableIds.add(pokemon.uniqueId);
+        } else if (seenAvailableIds.has(pokemon.uniqueId)) {
+          // Found duplicate, merge with existing
+          const existingIndex = uniqueAvailablePokemon.findIndex(p => p.uniqueId === pokemon.uniqueId);
+          if (existingIndex !== -1) {
+            uniqueAvailablePokemon[existingIndex] = mergePokemon(uniqueAvailablePokemon[existingIndex], pokemon);
+            duplicatesFound = true;
+            console.log(`Merged duplicate Pokémon in available: ${pokemon.name} (${pokemon.uniqueId})`);
+          }
+        } else {
+          uniqueAvailablePokemon.push(pokemon);
+          seenAvailableIds.add(pokemon.uniqueId);
+        }
+      }
+
+      // Check for cross-collection duplicates (between party and available)
+      for (let i = 0; i < uniqueAvailablePokemon.length; i++) {
+        const availablePokemon = uniqueAvailablePokemon[i];
+        const duplicateInParty = uniquePlayerPokemon.findIndex(p => p.uniqueId === availablePokemon.uniqueId);
+        
+        if (duplicateInParty !== -1) {
+          // Found duplicate between collections, merge and keep in the better collection
+          const mergedPokemon = mergePokemon(uniquePlayerPokemon[duplicateInParty], availablePokemon);
+          
+          // Update the party Pokémon and remove from available
+          uniquePlayerPokemon[duplicateInParty] = mergedPokemon;
+          uniqueAvailablePokemon.splice(i, 1);
+          i--; // Adjust index after removal
+          
+          duplicatesFound = true;
+          console.log(`Merged cross-collection duplicate Pokémon: ${mergedPokemon.name} (${mergedPokemon.uniqueId})`);
+        }
+      }
+
+      // Update the state if duplicates were found
+      if (duplicatesFound) {
+        // Adjust activePokemonIndex if it's out of bounds
+        if (this.activePokemonIndex >= uniquePlayerPokemon.length) {
+          this.activePokemonIndex = Math.max(0, uniquePlayerPokemon.length - 1);
+        }
+
+        this.$patch({
+          playerPokemon: uniquePlayerPokemon,
+          availablePokemon: uniqueAvailablePokemon
+        });
+
+        this.saveState();
+        console.log(`Deduplication complete. Removed duplicates. Party: ${uniquePlayerPokemon.length}, Available: ${uniqueAvailablePokemon.length}`);
+      } else {
+        console.log('No duplicate Pokémon found.');
+      }
+    }
   }
 });

@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-const TICK_INTERVAL = 250 // 1 second
+const TICK_INTERVAL = 250 // 250ms (4 ticks per second)
 const SAVE_INTERVAL = 5000 // Save state every 5 seconds
 
 interface GameTime {
@@ -39,7 +39,7 @@ class TickSystem {
   /** Set of callback functions to be called on each tick */
   private readonly subscribers: Set<(elapsed: number) => void> = new Set()
   /** Reference to the main tick interval */
-  private interval: ReturnType<typeof setInterval> | null = null
+  private interval: ReturnType<typeof setInterval> | number | null = null
   /** Reactive game time state */
   private readonly gameTime = ref<GameTime>({
     lastTick: Date.now(),
@@ -77,18 +77,41 @@ class TickSystem {
   private start() {
     if (this.interval) return
 
-    this.interval = setInterval(() => {
-      const now = Date.now()
-      const elapsed = now - this.gameTime.value.currentTick
-      this.gameTime.value = {
-        lastTick: this.gameTime.value.currentTick,
-        currentTick: now
-      }
-      this.notifySubscribers(elapsed)
-    }, TICK_INTERVAL)
+    let lastTime = Date.now()
+    let saveAccumulator = 0
 
-    // Save state periodically
-    setInterval(() => this.saveState(), SAVE_INTERVAL)
+    const tick = () => {
+      const now = Date.now()
+      const elapsed = now - lastTime
+      
+      // Only process if enough time has passed (throttle to ~4 FPS)
+      if (elapsed >= TICK_INTERVAL) {
+        this.gameTime.value = {
+          lastTick: this.gameTime.value.currentTick,
+          currentTick: now
+        }
+        
+        // Use requestIdleCallback if available, otherwise setTimeout for async processing
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => this.notifySubscribers(elapsed), { timeout: 100 })
+        } else {
+          setTimeout(() => this.notifySubscribers(elapsed), 0)
+        }
+        
+        lastTime = now
+        
+        // Handle periodic save
+        saveAccumulator += elapsed
+        if (saveAccumulator >= SAVE_INTERVAL) {
+          this.saveState()
+          saveAccumulator = 0
+        }
+      }
+      
+      this.interval = requestAnimationFrame(tick)
+    }
+
+    this.interval = requestAnimationFrame(tick)
   }
 
   private notifySubscribers(elapsed: number) {
@@ -102,7 +125,11 @@ class TickSystem {
 
   stop() {
     if (this.interval) {
-      clearInterval(this.interval)
+      if (typeof this.interval === 'number') {
+        cancelAnimationFrame(this.interval)
+      } else {
+        clearInterval(this.interval)
+      }
       this.interval = null
     }
   }

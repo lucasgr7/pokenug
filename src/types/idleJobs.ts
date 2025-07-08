@@ -168,6 +168,39 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
   },
 
+  'water-emblem': {
+    id: 'water-emblem',
+    type: PokemonType.Water,
+    name: 'Water Emblem Training',
+    description: 'Train your Water Pokemon to enhance team experience sharing. Each level increases XP sharing across all party members.',
+    maxSlots: 4,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 14400000, // 4 hours in milliseconds (4 * 60 * 60 * 1000)
+    chance: 1.0, // 100% chance of success
+    rewards: [
+      {
+        type: 'buff',
+        chance: 1.0, // 100% chance
+        weight: 100,
+        itemDetails: {
+          name: 'Water Emblem',
+          description: 'Shares experience gained in battle across all party members. Each level increases sharing efficiency.',
+          params: {
+            buffId: 'water-emblem',
+            buffType: 'xp-share',
+            imageUrl: '/images/water-emblem.png'
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/water-emblem.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Water],
+    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+
+  },
   'pokeball-production': {
     id: 'pokeball-production',
     type: PokemonType.Bug,
