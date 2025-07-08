@@ -526,21 +526,16 @@ export const useGameStore = defineStore('game', {
       // Use a consistent growth formula that doesn't randomize existing stats
       const STAT_GROWTH_EXP = 0.8;
       const HP_PER_LEVEL = 20;
-      const ATTACK_GROWTH_RATE = 0.01; // 15% of current attack + base growth
-      const DEFENSE_GROWTH_RATE = 0.01; // 12% of current defense + base growth
-
       const growth = Math.pow(pokemon.level!, STAT_GROWTH_EXP);
       
       // Calculate incremental increases
       const hpIncrease = Math.floor(HP_PER_LEVEL * growth);
-      const attackIncrease = Math.floor((pokemon.attack! + ATTACK_GROWTH_RATE));
-      const defenseIncrease = Math.floor((pokemon.defense! * DEFENSE_GROWTH_RATE));
 
       // Update stats incrementally
       pokemon.maxHP = pokemon.maxHP! + hpIncrease;
       pokemon.currentHP = pokemon.maxHP; // Heal to full on level up
-      pokemon.attack = pokemon.attack! + attackIncrease;
-      pokemon.defense = pokemon.defense! + defenseIncrease;
+      pokemon.attack = pokemon.attack! + 1;
+      pokemon.defense = pokemon.defense! + 1;
 
       // Reset XP and calculate new requirement
       pokemon.experience = 0
@@ -552,11 +547,6 @@ export const useGameStore = defineStore('game', {
         type: 'system'
       })
 
-      // Add stat increase messages
-      this.battle.battleLogs.push({
-        message: `Stats increased! HP +${hpIncrease}, Attack +${attackIncrease}, Defense +${defenseIncrease}`,
-        type: 'system'
-      })
 
       this.saveState()
     },
@@ -648,8 +638,11 @@ export const useGameStore = defineStore('game', {
     updatePokemonHP(pokemon: Pokemon, newHP: number) {
       const index = this.playerPokemon.findIndex(p => p === pokemon)
       if (index !== -1) {
+        // Ensure HP is within valid bounds
+        const clampedHP = Math.max(0, Math.min(newHP, pokemon.maxHP || 0))
+        
         // Create a new array with the updated pokemon
-        const updatedPokemon = { ...pokemon, currentHP: newHP }
+        const updatedPokemon = { ...pokemon, currentHP: clampedHP }
         const newPlayerPokemon = [...this.playerPokemon]
         newPlayerPokemon[index] = updatedPokemon
 
@@ -658,6 +651,7 @@ export const useGameStore = defineStore('game', {
           state.playerPokemon = newPlayerPokemon
         })
 
+        // Force a state save to ensure changes persist
         this.saveState()
       }
     },
@@ -872,7 +866,7 @@ export const useGameStore = defineStore('game', {
       );
 
       // se for inimigo adicionar um fator de 300%
-      attack *= 3; // Aumenta o ataque do inimigo
+      attack *= isEnemy ? 2.5 : 1.5; // Aumenta o ataque do inimigo
       const BASE_SCALING = 1.28;   // era o LEVEL_SCALING_FACTOR
 
       const levelDiff = attackerLevel - defenderLevel;
@@ -928,25 +922,73 @@ export const useGameStore = defineStore('game', {
         const pokemon = pokemonList.find((p: Pokemon) => p.id === selectedPokemon.id);
 
         if (pokemon) {
-          const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel;
-          const stats = this.calculateStats(level);
-
-          this.battle.wildPokemon = {
-            ...pokemon,
-            level,
-            currentHP: stats.maxHP,
-            maxHP: stats.maxHP,
-            attack: stats.attack,
-            defense: stats.defense,
-            lastAttackTime: Date.now(),
-            isRunning: false,
-            uniqueId: generateRandomId()
-          };
-
-          this.addBattleLog(`A wild ${pokemon.name} (Lvl ${level}) appeared!`, 'system');
+          await this.createWildPokemon(pokemon, region);
         }
       } catch (error) {
         console.error('Failed to spawn wild Pokemon:', error);
+      }
+    },
+
+    async createWildPokemon(pokemon: Pokemon, region: any) {
+      const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel;
+      const stats = this.calculateStats(level);
+
+      // Shiny determination configuration
+      const SHINY_CONFIG = {
+        // 100% for testing purposes (normally would be 1/4096 = 0.000244)
+        testingChance: 1.0,
+        normalChance: 1 / 4096,
+        useTestingChance: true // Set to false for normal gameplay
+      };
+      
+      const shinyChance = SHINY_CONFIG.useTestingChance ? 
+        SHINY_CONFIG.testingChance : 
+        SHINY_CONFIG.normalChance;
+      
+      const isShiny = Math.random() < shinyChance;
+
+      // Use pre-loaded sprite URLs and cache them
+      let displaySprite = pokemon.sprite;
+      if (isShiny && pokemon.shinySprite) {
+        displaySprite = pokemon.shinySprite;
+      }
+
+      // Cache the sprite using imageCache
+      const cachedSprite = await this.cacheSprite(displaySprite);
+
+      this.battle.wildPokemon = {
+        ...pokemon,
+        level,
+        currentHP: stats.maxHP,
+        maxHP: stats.maxHP,
+        attack: stats.attack,
+        defense: stats.defense,
+        lastAttackTime: Date.now(),
+        isRunning: false,
+        uniqueId: generateRandomId(),
+        isShiny,
+        sprite: cachedSprite,
+        shinySprite: isShiny ? cachedSprite : undefined
+      };
+
+      // Enhanced battle log message for shiny Pokémon
+      const shinyText = isShiny ? ' ✨SHINY✨' : '';
+      this.addBattleLog(`A wild${shinyText} ${pokemon.name} (Lvl ${level}) appeared!`, 'system');
+      
+      // Add special notification for shiny Pokémon
+      if (isShiny) {
+        this.addNotification(`✨ A shiny ${pokemon.name} appeared! ✨`, 'success');
+      }
+    },
+
+    async cacheSprite(spriteUrl: string): Promise<string> {
+      try {
+        // Import imageCache
+        const { imageCache } = await import('../services/imageCache.js');
+        return await imageCache.getImage(spriteUrl);
+      } catch (error) {
+        console.warn(`Failed to cache sprite: ${spriteUrl}`, error);
+        return spriteUrl; // Fallback to original URL
       }
     },
 
@@ -985,6 +1027,9 @@ export const useGameStore = defineStore('game', {
     async attack() {
       if (!this.battle.wildPokemon || !this.activePokemon) return false;
 
+      // Prevent attack spam by checking if we're already attacking or enemy is attacking
+      if (this.battle.isPlayerAttacking || this.battle.isEnemyAttacking) return false;
+
       // Set battle state for animations
       this.battle.isPlayerAttacking = true;
 
@@ -1020,12 +1065,7 @@ export const useGameStore = defineStore('game', {
         this.levelUpPokemon(this.activePokemon);
       }
 
-
-      // Reset player attack animation and start enemy hurt animation
-      this.battle.isPlayerAttacking = false;
-      this.battle.isWildPokemonHurt = true;
-
-      // Calculate damage
+      // Calculate damage first
       let damage = 0;
       try {
         damage = this.calculateDamage(
@@ -1034,15 +1074,14 @@ export const useGameStore = defineStore('game', {
           this.activePokemon.level!,
           this.battle.wildPokemon.level!
         );
-
       }
       catch (ex) {
-        debugger;
         console.error('Error calculating damage:', ex);
+        this.battle.isPlayerAttacking = false;
+        return false;
       }
 
-
-      // Apply damage to wild Pokemon
+      // Apply damage to wild Pokemon immediately
       this.battle.wildPokemon.currentHP = Math.max(0, this.battle.wildPokemon.currentHP! - damage);
 
       // Add battle log
@@ -1050,7 +1089,11 @@ export const useGameStore = defineStore('game', {
         `${this.activePokemon.name} attacks ${this.battle.wildPokemon.name} for ${damage} damage!`,
         'damage'
       );
-      // Short delay for animation
+
+      // Start hurt animation
+      this.battle.isWildPokemonHurt = true;
+
+      // Short delay for attack animation
       await new Promise(resolve => setTimeout(resolve, 200));
 
       // Add XP log if applicable
@@ -1081,8 +1124,8 @@ export const useGameStore = defineStore('game', {
         );
       }
 
-      // Short delay for hurt animation
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // End animations
+      this.battle.isPlayerAttacking = false;
       this.battle.isWildPokemonHurt = false;
 
       // Check if Pokemon fainted
@@ -1147,22 +1190,35 @@ export const useGameStore = defineStore('game', {
 
       if (!wildPokemon || !activePokemon || wildPokemon.isRunning) return
 
+      // Prevent enemy attacks during player attacks to avoid race conditions
+      if (this.battle.isPlayerAttacking || this.battle.isEnemyAttacking) return
+
       const now = Date.now()
       if (!wildPokemon.lastAttackTime || (now - wildPokemon.lastAttackTime) >= ENEMY_ATTACK_INTERVAL) {
         this.battle.isEnemyAttacking = true
-        setTimeout(() => {
-          this.battle.isEnemyAttacking = false
-          const damage = this.calculateDamage(
-            wildPokemon.attack ?? 0,
-            activePokemon.defense ?? 0,
-            wildPokemon.level ?? 1,
-            activePokemon.level ?? 1,
-            true
-          )
+        
+        // Calculate damage immediately to avoid state changes during timeout
+        const damage = this.calculateDamage(
+          wildPokemon.attack ?? 0,
+          activePokemon.defense ?? 0,
+          wildPokemon.level ?? 1,
+          activePokemon.level ?? 1,
+          true
+        )
 
-          // Calculate if damage would cause fainting
-          const currentHP = activePokemon.currentHP ?? 0
-          const wouldFaint = currentHP <= damage
+        // Calculate if damage would cause fainting
+        const currentHP = activePokemon.currentHP ?? 0
+        const wouldFaint = currentHP <= damage
+
+        // Apply the attack after a short animation delay
+        setTimeout(() => {
+          // Double-check that the battle state is still valid
+          if (!this.battle.wildPokemon || !this.activePokemon) {
+            this.battle.isEnemyAttacking = false
+            return
+          }
+
+          this.battle.isEnemyAttacking = false
 
           if (wouldFaint && buffStore.hasRockEmblem) {
             // Check if we have potions that can be auto-used
@@ -1202,7 +1258,9 @@ export const useGameStore = defineStore('game', {
               )
 
               // Update attack time
-              wildPokemon.lastAttackTime = now
+              if (this.battle.wildPokemon) {
+                this.battle.wildPokemon.lastAttackTime = now
+              }
               
               // Check if still fainted after potion use
               if (finalHP === 0) {
@@ -1230,14 +1288,18 @@ export const useGameStore = defineStore('game', {
                 'damage'
               )
 
-              wildPokemon.lastAttackTime = now
+              if (this.battle.wildPokemon) {
+                this.battle.wildPokemon.lastAttackTime = now
+              }
             }
             // No resistance triggered, proceed with normal damage and fainting
             else {
               const finalHP = Math.max(0, currentHP - damage)
               this.updatePokemonHP(activePokemon, finalHP)
 
-              wildPokemon.lastAttackTime = now
+              if (this.battle.wildPokemon) {
+                this.battle.wildPokemon.lastAttackTime = now
+              }
 
               this.addBattleLog(
                 `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
@@ -1855,6 +1917,18 @@ export const useGameStore = defineStore('game', {
           this.updateJobProgress(jobId, elapsed);
         });
       });
-    }
+    },
+
+    // Helper method to reset battle animations
+    resetBattleAnimations() {
+      this.battle.isPlayerAttacking = false;
+      this.battle.isWildPokemonHurt = false;
+      this.battle.isEnemyAttacking = false;
+    },
+
+    // Helper method to check if battle is in progress
+    isBattleInProgress(): boolean {
+      return this.battle.isPlayerAttacking || this.battle.isEnemyAttacking || this.battle.isWildPokemonHurt;
+    },
   }
 });

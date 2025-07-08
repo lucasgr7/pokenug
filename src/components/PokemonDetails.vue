@@ -16,13 +16,15 @@
         <div class="flex items-center space-x-4">
           <!-- Pokemon Image -->
           <div class="flex-shrink-0">
-            <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center border-2 border-white shadow-md">
+            <div class="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center border-2 border-white shadow-md relative">
               <img 
-                :src="pokemon.sprite" 
+                :src="pokemon.isShiny && pokemon.shinySprite ? pokemon.shinySprite : pokemon.sprite" 
                 :alt="pokemon.name"
                 class="w-16 h-16 object-contain"
                 @error="handleImageError"
               />
+              <!-- Shiny indicator -->
+              <div v-if="pokemon.isShiny" class="absolute -top-1 -right-1 text-lg">✨</div>
             </div>
           </div>
 

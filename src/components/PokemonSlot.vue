@@ -16,14 +16,18 @@
     @dragstart="handleDragStart"
   >
     <div class="flex" :class="verticalMode ? 'flex-row items-center' : 'flex-col items-center'">
-      <img
-        :src="pokemon.sprite"
-        :alt="pokemon.name"
-        :class="verticalMode ? 'w-10 h-10 mr-2' : 'w-20 h-20'"
-        class="object-contain"
-      />
+      <div class="relative">
+        <img
+          :src="pokemon.isShiny && pokemon.shinySprite ? pokemon.shinySprite : pokemon.sprite"
+          :alt="pokemon.name"
+          :class="verticalMode ? 'w-10 h-10 mr-2' : 'w-20 h-20'"
+          class="object-contain"
+        />
+        <!-- Shiny indicator -->
+        <div v-if="pokemon.isShiny" class="absolute -top-1 -right-1 text-xs">✨</div>
+      </div>
       <div :class="verticalMode ? 'flex-1' : 'text-center mt-2'">
-        <div class="font-semibold capitalize text-sm" :class="verticalMode ? 'text-left' : ''">{{ pokemon.name }}</div>
+        <div class="font-semibold capitalize text-sm" :class="[verticalMode ? 'text-left' : '', pokemon.isShiny ? 'text-yellow-600' : '']">{{ pokemon.name }}</div>
         <div class="text-sm text-gray-500" :class="verticalMode ? 'text-xs' : ''">Lvl {{ pokemon.level }}</div>
         <div :class="[
           'flex space-x-1', 

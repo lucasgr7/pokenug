@@ -76,15 +76,21 @@ onUnmounted(() => {
              'opacity-75': gameStore.playerPokemon[index - 1] !== gameStore.activePokemon 
            }"
            @click="swapPokemon(gameStore.playerPokemon[index - 1])">
-        <CachedImage 
-          :src="gameStore.playerPokemon[index - 1].sprite" 
-          :alt="gameStore.playerPokemon[index - 1].name" 
-          :className="'w-5 h-5 object-contain'"
-        />
+        <div class="relative">
+          <CachedImage 
+            :src="(gameStore.playerPokemon[index - 1].isShiny && gameStore.playerPokemon[index - 1].shinySprite) ? 
+                   gameStore.playerPokemon[index - 1].shinySprite! : 
+                   gameStore.playerPokemon[index - 1].sprite" 
+            :alt="gameStore.playerPokemon[index - 1].name" 
+            :className="'w-5 h-5 object-contain'"
+          />
+          <!-- Shiny indicator -->
+          <div v-if="gameStore.playerPokemon[index - 1].isShiny" class="absolute -top-1 -right-1 text-xs">✨</div>
+        </div>
         <div class="ml-2 flex-1">
           <div class="flex justify-between items-center">
             <div class="flex items-center">
-              <span class="text-xs text-white capitalize">{{ gameStore.playerPokemon[index - 1].name }}</span>
+              <span class="text-xs text-white capitalize" :class="gameStore.playerPokemon[index - 1].isShiny ? 'text-yellow-300' : ''">{{ gameStore.playerPokemon[index - 1].name }}</span>
               <span v-if="isFainted(gameStore.playerPokemon[index - 1])" 
                     class="ml-1 text-xs bg-gray-700 text-white px-1 rounded">
                 Fainted ({{ getRecoveryTimeLeft(gameStore.playerPokemon[index - 1]) }}s)
