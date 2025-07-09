@@ -1340,8 +1340,14 @@ export const useGameStore = defineStore('game', {
 
       // Enemy attacks have ABSOLUTE PRIORITY - they can interrupt player attacks
 
+      // Initialize lastAttackTime to allow for first enemy attack if not set
+      // This ensures the first enemy attack can happen immediately when called by the accumulator
+      if (!wildPokemon.lastAttackTime) {
+        wildPokemon.lastAttackTime = Date.now() - ENEMY_ATTACK_INTERVAL - 1000; // Set to past time to allow immediate attack
+      }
+
       const now = Date.now()
-      if (!wildPokemon.lastAttackTime || (now - wildPokemon.lastAttackTime) >= ENEMY_ATTACK_INTERVAL) {
+      if (now - wildPokemon.lastAttackTime >= ENEMY_ATTACK_INTERVAL) {
         // Enemy attack has absolute priority - force set enemy attacking state
         this.battle.isEnemyAttacking = true
         

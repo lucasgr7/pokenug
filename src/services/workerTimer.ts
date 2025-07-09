@@ -5,8 +5,13 @@ class WorkerTimer {
   private worker: Worker | null = null
   private callbacks: Map<string, (elapsed: number) => void> = new Map()
   private isRunning = false
+  private tickInterval: number
 
-  constructor() {
+  /**
+   * @param interval Tick interval in ms. Default is 750ms to match game logic.
+   */
+  constructor(interval: number = 750) {
+    this.tickInterval = interval
     this.initWorker()
   }
 
@@ -22,12 +27,10 @@ class WorkerTimer {
         
         if (action === 'start') {
           if (interval) return
-          
           interval = setInterval(() => {
             const now = Date.now()
             const elapsed = now - lastTime
             lastTime = now
-            
             self.postMessage({ type: 'tick', elapsed })
           }, tickInterval)
         } else if (action === 'stop') {
@@ -58,20 +61,28 @@ class WorkerTimer {
     }
   }
 
-  start(interval: number = 250) {
+  /**
+   * Start the timer. If already running, does nothing.
+   * @param interval Optional override for tick interval (ms).
+   */
+  start(interval?: number) {
     if (!this.worker || this.isRunning) return
-    
     this.isRunning = true
-    this.worker.postMessage({ action: 'start', tickInterval: interval })
+    const useInterval = interval ?? this.tickInterval
+    this.worker.postMessage({ action: 'start', tickInterval: useInterval })
   }
 
   stop() {
     if (!this.worker || !this.isRunning) return
-    
     this.isRunning = false
     this.worker.postMessage({ action: 'stop' })
   }
 
+  /**
+   * Subscribe to timer ticks. The callback receives elapsed ms since last tick.
+   * @param id Unique subscriber id (e.g. 'gameLoop', 'battleSystem')
+   * @param callback Function to call on each tick
+   */
   subscribe(id: string, callback: (elapsed: number) => void) {
     this.callbacks.set(id, callback)
     return () => this.callbacks.delete(id)
@@ -91,4 +102,5 @@ class WorkerTimer {
   }
 }
 
-export const workerTimer = new WorkerTimer()
+// IMPORTANT: Use the same interval as your game logic expects (default 750ms)
+export const workerTimer = new WorkerTimer(750)
