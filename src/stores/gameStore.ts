@@ -503,6 +503,7 @@ export const useGameStore = defineStore('game', {
               lastSaveTime: Date.now()
             }
             
+            // Use JSON serialization for emergency save to avoid any cloning issues
             localStorage.setItem('gameState', JSON.stringify(essentialState));
             console.log('Emergency save completed');
           } catch (error) {
@@ -759,13 +760,13 @@ export const useGameStore = defineStore('game', {
     performBatchSave() {
       if (!this.pendingSave) return
 
-      console.log('performBatchSave: Starting save process');
 
       // Use requestIdleCallback if available for better performance
       const saveFn = () => {
         try {
           console.log('performBatchSave: Executing actual save');
           // Create a minimal state object with only essential data
+          // Note: We exclude battleLogs and notifications as they are handled by useStorage
           const essentialState = {
             playerPokemon: this.playerPokemon,
             availablePokemon: this.availablePokemon,
@@ -777,16 +778,15 @@ export const useGameStore = defineStore('game', {
             idleWorking: this.idleWorking,
             inventory: this.inventory,
             lastSaveTime: Date.now()
+            // Note: battle state and pendingSave are intentionally excluded as they're transient
           }
 
-          // Use structured cloning if available (faster than JSON), fallback to JSON
-          const stateToSave = typeof structuredClone !== 'undefined' 
-            ? structuredClone(essentialState)
-            : JSON.parse(JSON.stringify(essentialState))
+          // Always use JSON cloning for game state to avoid structuredClone compatibility issues
+          // JSON cloning is sufficient for our game data and more reliable across browsers
+          const stateToSave = JSON.parse(JSON.stringify(essentialState))
 
           // Save to localStorage (this is still synchronous but unavoidable)
           localStorage.setItem('gameState', JSON.stringify(stateToSave))
-          console.log('performBatchSave: Successfully saved to localStorage');
           
           this.pendingSave = false
         } catch (error) {
@@ -2173,7 +2173,7 @@ export const useGameStore = defineStore('game', {
 
       // Add save system variables
       let saveAccumulatedTime = 0;
-      const SAVE_INTERVAL = 2000; // Save every 2 seconds if there are pending changes
+      const SAVE_INTERVAL = 5000; // Save every 2 seconds if there are pending changes
 
       // Add deduplication variables
       let deduplicationAccumulatedTime = 0;
@@ -2191,7 +2191,6 @@ export const useGameStore = defineStore('game', {
 
             // Only trigger attack if enough time has passed
             if (timeSinceLastAttack >= buffStore.autoAttackState.interval) {
-              console.log('Auto-attack interval reached:', timeSinceLastAttack);
               this.attack();
               buffStore.recordAutoAttack();
             }
