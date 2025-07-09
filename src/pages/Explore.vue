@@ -15,7 +15,7 @@ import type { InventoryItem } from '@/types/pokemon'
 import regions from '@/constants/regions'
 import { useBuffStore } from '@/stores/buffStore'
 import BuffDisplay from '@/components/BuffDisplay.vue'
-import { tickSystem } from '@/services/tickSystem'
+import { workerTimer } from '@/services/workerTimer'
 
 // Store and Pokemon data
 const gameStore = useGameStore()
@@ -452,7 +452,7 @@ const POKEMON_RUN_CHECK_INTERVAL = 20000; // 20 seconds in milliseconds
 let enemyAttackAccumulator = 0;
 let pokemonRunAccumulator = 0;
 
-tickSystem.subscribe((elapsed: number) => {
+workerTimer.subscribe('explore.vue', (elapsed: number) => {
   updateActiveTasks();
   
   // Update countdown progress for fire rate

@@ -4,11 +4,11 @@ import { itemFactory } from '@/services/itemFactory.js'
 import { defineStore } from 'pinia'
 import { useInventoryStore } from './inventoryStore.js'
 import regions from '@/constants/regions.js'
-import { tickSystem } from '@/services/tickSystem.js'
 import { useBuffStore } from './buffStore.js'
 import { RemovableRef } from '@vueuse/core'
 import { useStorage } from '@vueuse/core'
 import { generateRandomId } from '@/services/util.js'
+import { workerTimer } from '@/services/workerTimer.js'
 
 
 interface BattleState {
@@ -2072,7 +2072,7 @@ export const useGameStore = defineStore('game', {
       let lastPokemonCount = this.getAllPokemon.length;
 
       // Use the tickSystem to handle auto-attack and other time-based game mechanics
-      tickSystem.subscribe((elapsed: number) => {
+      workerTimer.subscribe('setup game systems', (elapsed: number) => {
         // Process auto-attack if the conditions are met
         if (this.battle.wildPokemon && this.activePokemon) {
           // Check if auto-attack is enabled

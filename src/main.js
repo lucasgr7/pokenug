@@ -3,10 +3,9 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './style.css'
-import { tickSystem } from './services/tickSystem'
 import { useGameStore } from './stores/gameStore'
 import { useBuffStore } from './stores/buffStore'
-import * as inventory from './stores/inventoryStore'
+import { workerTimer } from './services/workerTimer.js'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -22,22 +21,12 @@ const buffStore = useBuffStore()
 buffStore.initializeBuffStore()
 
 // Set up global tick handler for idle jobs
-tickSystem.subscribe((elapsed) => {
+workerTimer.subscribe('idle jobs', (elapsed) => {
   Object.keys(gameStore.idleJobs).forEach(jobId => {
     gameStore.updateJobProgress(jobId, elapsed)
   })
 })
 
-
-  // // Initialize inventory
-  // try {
-  //   const inventoryStore = inventory.getInventoryStore()
-  //   inventoryStore.initializeInventory()
-  // }
-  // catch (error) {
-  //   console.error('Failed to initialize inventory:', error)
-  // }
-  
   // Initialize buff store to load saved buffs
   buffStore.initializeBuffStore()
   

@@ -11,6 +11,7 @@ class WorkerTimer {
   }
 
   private initWorker() {
+    console.log('Initializing WorkerTimer...')
     // Create worker inline
     const workerCode = `
       let lastTime = Date.now()

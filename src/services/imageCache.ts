@@ -171,7 +171,6 @@ class ImageCacheService {
       const entry = this.cache.get(url)!;
       // Update timestamp to mark as recently used
       entry.timestamp = Date.now();
-      console.info(`[ImageCache] Cache hit: ${url}`);
       return entry.data;
     }
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useGameStore } from '../stores/gameStore'
-import { tickSystem } from '../services/tickSystem'
 import type { Pokemon } from '../types/pokemon'
 import CachedImage from './CachedImage.vue'
+import { workerTimer } from '@/services/workerTimer'
 
 const gameStore = useGameStore()
 let unsubscribe: (() => void) | null = null
@@ -53,7 +53,7 @@ const swapPokemon = (pokemon: Pokemon) => {
 
 onMounted(() => {
   // Subscribe to tick system for recovery time updates
-  unsubscribe = tickSystem.subscribe(() => {
+  unsubscribe = workerTimer.subscribe(updateRecoveryTimes.name, () => {
     updateRecoveryTimes()
   })
 })
