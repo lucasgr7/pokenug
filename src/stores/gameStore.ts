@@ -80,7 +80,7 @@ const RUN_CHANCE = 0.05
 const RUN_CHECK_INTERVAL = 5000
 
 // Fear Factor Constants - Easy to balance
-const FEAR_FACTOR_WINDOW = 10000 // 10 seconds in milliseconds - window to track defeats
+const FEAR_FACTOR_WINDOW = 30000 // 10 seconds in milliseconds - window to track defeats
 const FEAR_FACTOR_THRESHOLD = 10 // Number of defeats to trigger fear (10 defeats)
 const FEAR_FACTOR_DISABLE_DURATION = 60000 // 1 minute in milliseconds - how long region stays disabled
 
