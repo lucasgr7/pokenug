@@ -30,7 +30,4 @@ workerTimer.subscribe('idle jobs', (elapsed) => {
 // Start the worker timer - this is essential for all subscriptions to work
 workerTimer.start()
 
-  // Initialize buff store to load saved buffs
-  buffStore.initializeBuffStore()
-  
 app.mount('#app')

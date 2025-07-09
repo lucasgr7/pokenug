@@ -17,6 +17,7 @@ interface BattleState {
   isPlayerAttacking: boolean;
   isWildPokemonHurt: boolean;
   isEnemyAttacking: boolean;
+  enemyAttackAnimationEndTime?: number; // Track when enemy attack animation should end
   isTryingCatch: boolean;
   currentCaptureAttemptId?: string;
   battleLogs: RemovableRef<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>;
@@ -61,6 +62,7 @@ interface GameState {
     endTime: number | null;
     remainingTime: number;
   };
+  pendingSave: boolean; // Flag to track if state needs to be saved
 }
 
 // Constants
@@ -85,6 +87,7 @@ export const useGameStore = defineStore('game', {
       isPlayerAttacking: false,
       isWildPokemonHurt: false,
       isEnemyAttacking: false,
+      enemyAttackAnimationEndTime: undefined,
       isTryingCatch: false,
       currentCaptureAttemptId: undefined,
       battleLogs: useStorage<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>('battleLogs', []),
@@ -106,7 +109,8 @@ export const useGameStore = defineStore('game', {
       regionId: null,
       endTime: null,
       remainingTime: 0
-    }
+    },
+    pendingSave: false
   }),
 
   getters: {
@@ -457,6 +461,9 @@ export const useGameStore = defineStore('game', {
 
         // Set up game systems including auto-attack with the tickSystem
         this.setupGameSystems();
+        
+        // Set up save on page unload to prevent data loss
+        this.setupSaveOnUnload();
       } else {
         // Initialize the inventory store with defaults
         const inventoryStore = useInventoryStore();
@@ -470,14 +477,57 @@ export const useGameStore = defineStore('game', {
 
         // Set up the auto-attack processing with the tickSystem
         this.setupGameSystems();
+        
+        // Set up save on page unload to prevent data loss
+        this.setupSaveOnUnload();
       }
+    },
+
+    // Set up event listeners to save before page unload
+    setupSaveOnUnload() {
+      const saveBeforeUnload = () => {
+        if (this.pendingSave) {
+          console.log('Page unloading - performing emergency save');
+          // Synchronous save since we're unloading
+          try {
+            const essentialState = {
+              playerPokemon: this.playerPokemon,
+              availablePokemon: this.availablePokemon,
+              activePokemonIndex: this.activePokemonIndex,
+              pokeballs: this.pokeballs,
+              unlocked: this.unlocked,
+              currentRegion: this.currentRegion,
+              idleJobs: this.idleJobs,
+              idleWorking: this.idleWorking,
+              inventory: this.inventory,
+              lastSaveTime: Date.now()
+            }
+            
+            localStorage.setItem('gameState', JSON.stringify(essentialState));
+            console.log('Emergency save completed');
+          } catch (error) {
+            console.error('Emergency save failed:', error);
+          }
+        }
+      };
+
+      window.addEventListener('beforeunload', saveBeforeUnload);
+      window.addEventListener('pagehide', saveBeforeUnload);
+      
+      // Also save on visibility change (when tab becomes hidden)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && this.pendingSave) {
+          console.log('Tab hidden - performing save');
+          this.performBatchSave();
+        }
+      });
     },
 
     setActivePokemon(pokemon: Pokemon) {
       const index = this.playerPokemon.indexOf(pokemon)
       if (index !== -1) {
         this.activePokemonIndex = index
-        this.saveState()
+        this.markStateForSaving()
       }
     },
 
@@ -517,7 +567,7 @@ export const useGameStore = defineStore('game', {
       }
 
       this.playerPokemon.push(pokemon);
-      this.saveState();
+      this.markStateForSaving();
       return true;
     },
 
@@ -544,7 +594,7 @@ export const useGameStore = defineStore('game', {
 
       this.playerPokemon.splice(index, 1);
       this.availablePokemon.push(pokemon);
-      this.saveState();
+      this.markStateForSaving();
       return true;
     },
 
@@ -588,7 +638,7 @@ export const useGameStore = defineStore('game', {
         this.availablePokemon.push(pokemon);
       }
 
-      this.saveState()
+      this.saveImmediately() // Save immediately when adding Pokemon to inventory
     },
 
     levelUpPokemon(pokemon: Pokemon) {
@@ -619,8 +669,7 @@ export const useGameStore = defineStore('game', {
         type: 'system'
       })
 
-
-      this.saveState()
+      this.saveImmediately() // Save immediately for level ups
     },
 
     async setStarterPokemon(pokemonName: string) {
@@ -646,14 +695,14 @@ export const useGameStore = defineStore('game', {
 
         this.playerPokemon = [newPokemon]
         this.activePokemonIndex = 0
-        this.saveState()
+        this.saveImmediately() // Save immediately for starter Pokemon
       }
     },
 
     usePokeball() {
       if (this.pokeballs > 0) {
         this.pokeballs--
-        this.saveState()
+        this.markStateForSaving()
         return true
       }
       return false
@@ -687,24 +736,71 @@ export const useGameStore = defineStore('game', {
       )
     },
 
-    saveState() {
-      const state = {
-        playerPokemon: JSON.parse(JSON.stringify(this.playerPokemon)),
-        availablePokemon: JSON.parse(JSON.stringify(this.availablePokemon)),
-        activePokemonIndex: this.activePokemonIndex,
-        pokeballs: this.pokeballs,
-        unlocked: this.unlocked,
-        battle: JSON.parse(JSON.stringify(this.battle)),
-        currentRegion: this.currentRegion,
-        idleJobs: JSON.parse(JSON.stringify(this.idleJobs)),
-        idleWorking: JSON.parse(JSON.stringify(this.idleWorking)),
-        inventory: JSON.parse(JSON.stringify(this.inventory)),
-        lastSaveTime: Date.now()
+    markStateForSaving(immediate = false) {
+      // Mark that we need to save - the actual saving will be handled by the worker timer
+      if (!this.pendingSave) {
+        this.pendingSave = true
+        console.log('State marked for saving, immediate:', immediate);
       }
-      localStorage.setItem('gameState', JSON.stringify(state))
+      
+      // For critical actions, save immediately
+      if (immediate) {
+        console.log('Performing immediate save');
+        this.performBatchSave();
+      }
+    },
 
-      // Update the reactive state
-      this.$patch(state)
+    // Method for immediate saves on critical actions
+    saveImmediately() {
+      this.markStateForSaving(true);
+    },
+
+    // Efficient batch save method called by worker timer
+    performBatchSave() {
+      if (!this.pendingSave) return
+
+      console.log('performBatchSave: Starting save process');
+
+      // Use requestIdleCallback if available for better performance
+      const saveFn = () => {
+        try {
+          console.log('performBatchSave: Executing actual save');
+          // Create a minimal state object with only essential data
+          const essentialState = {
+            playerPokemon: this.playerPokemon,
+            availablePokemon: this.availablePokemon,
+            activePokemonIndex: this.activePokemonIndex,
+            pokeballs: this.pokeballs,
+            unlocked: this.unlocked,
+            currentRegion: this.currentRegion,
+            idleJobs: this.idleJobs,
+            idleWorking: this.idleWorking,
+            inventory: this.inventory,
+            lastSaveTime: Date.now()
+          }
+
+          // Use structured cloning if available (faster than JSON), fallback to JSON
+          const stateToSave = typeof structuredClone !== 'undefined' 
+            ? structuredClone(essentialState)
+            : JSON.parse(JSON.stringify(essentialState))
+
+          // Save to localStorage (this is still synchronous but unavoidable)
+          localStorage.setItem('gameState', JSON.stringify(stateToSave))
+          console.log('performBatchSave: Successfully saved to localStorage');
+          
+          this.pendingSave = false
+        } catch (error) {
+          console.error('Failed to save game state:', error)
+          // Retry save on next batch
+        }
+      }
+
+      // Use requestIdleCallback for better performance, fallback to setTimeout
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(saveFn, { timeout: 1000 })
+      } else {
+        setTimeout(saveFn, 0)
+      }
     },
 
     updatePokemonHP(pokemon: Pokemon, newHP: number) {
@@ -723,8 +819,8 @@ export const useGameStore = defineStore('game', {
           state.playerPokemon = newPlayerPokemon
         })
 
-        // Force a state save to ensure changes persist
-        this.saveState()
+        // Mark state for saving to ensure changes persist
+        this.markStateForSaving()
       }
     },
 
@@ -1280,7 +1376,7 @@ export const useGameStore = defineStore('game', {
         this.startSpawnTimer();
       }
 
-      this.saveState();
+      this.markStateForSaving();
       return true;
     },
 
@@ -1321,7 +1417,7 @@ export const useGameStore = defineStore('game', {
         this.resetBattleState()
       }
 
-      this.saveState()
+      this.markStateForSaving()
     },
 
     enemyAttack() {
@@ -1371,7 +1467,9 @@ export const useGameStore = defineStore('game', {
           return
         }
 
-        this.battle.isEnemyAttacking = false
+        // Keep the enemy attacking animation for a short duration to allow the UI to show it
+        // Set the end time for the animation (300ms from now)
+        this.battle.enemyAttackAnimationEndTime = Date.now() + 300
 
         if (wouldFaint && buffStore.hasRockEmblem) {
           // Check if we have potions that can be auto-used
@@ -1641,7 +1739,7 @@ export const useGameStore = defineStore('game', {
         this.levelUpPokemon(playerPokemon)
       }
 
-      this.saveState()
+      this.markStateForSaving()
     },
 
     resetBattleState() {
@@ -1651,6 +1749,7 @@ export const useGameStore = defineStore('game', {
         isPlayerAttacking: false,
         isWildPokemonHurt: false,
         isEnemyAttacking: false,
+        enemyAttackAnimationEndTime: undefined,
         isTryingCatch: false,
         currentCaptureAttemptId: undefined,
         battleLogs: this.battle.battleLogs,
@@ -1720,7 +1819,7 @@ export const useGameStore = defineStore('game', {
         return false;
       }
 
-      this.saveState();
+      this.markStateForSaving();
       return true;
     },
 
@@ -1743,7 +1842,7 @@ export const useGameStore = defineStore('game', {
       const { workId, ...cleanPokemon } = removedPokemon;
       this.availablePokemon.push(cleanPokemon);
 
-      this.saveState();
+      this.markStateForSaving();
       return true;
     },
 
@@ -1875,7 +1974,7 @@ export const useGameStore = defineStore('game', {
       job.progress = 0;
       job.startTime = Date.now();
 
-      this.saveState();
+      this.markStateForSaving();
     },
 
     updateJobProgress(jobId: string, elapsed: number) {
@@ -1895,7 +1994,7 @@ export const useGameStore = defineStore('game', {
       }
 
       // Save state to ensure progress persists
-      this.saveState();
+      this.markStateForSaving();
     },
 
     moveToParty(pokemon: Pokemon, targetSlotIndex?: number) {
@@ -1945,7 +2044,7 @@ export const useGameStore = defineStore('game', {
         : this.moveToAvailable(pokemon);
 
       if (success) {
-        this.saveState();
+        this.markStateForSaving();
       }
       return success;
     },
@@ -2072,6 +2171,10 @@ export const useGameStore = defineStore('game', {
       let hpRegenAccumulatedTime = 0;
       const HP_REGEN_INTERVAL = 1000; // 1 second in milliseconds
 
+      // Add save system variables
+      let saveAccumulatedTime = 0;
+      const SAVE_INTERVAL = 2000; // Save every 2 seconds if there are pending changes
+
       // Add deduplication variables
       let deduplicationAccumulatedTime = 0;
       const DEDUPLICATION_INTERVAL = 3 * 250; // 3 ticks (each tick is 250ms)
@@ -2123,6 +2226,23 @@ export const useGameStore = defineStore('game', {
         Object.keys(this.idleJobs).forEach(jobId => {
           this.updateJobProgress(jobId, elapsed);
         });
+
+        // Handle enemy attack animation timing
+        if (this.battle.isEnemyAttacking && this.battle.enemyAttackAnimationEndTime) {
+          const now = Date.now();
+          if (now >= this.battle.enemyAttackAnimationEndTime) {
+            this.battle.isEnemyAttacking = false;
+            this.battle.enemyAttackAnimationEndTime = undefined;
+          }
+        }
+
+        // Handle batch saving with proper timing
+        saveAccumulatedTime += elapsed;
+        if (saveAccumulatedTime >= SAVE_INTERVAL && this.pendingSave) {
+          console.log('Triggering batch save after', saveAccumulatedTime, 'ms');
+          this.performBatchSave();
+          saveAccumulatedTime = 0; // Reset the timer
+        }
       });
     },
 
@@ -2224,7 +2344,7 @@ export const useGameStore = defineStore('game', {
           availablePokemon: uniqueAvailablePokemon
         });
 
-        this.saveState();
+        this.markStateForSaving();
         console.log(`Deduplication complete. Removed duplicates. Party: ${uniquePlayerPokemon.length}, Available: ${uniqueAvailablePokemon.length}`);
       } else {
         console.log('No duplicate Pokémon found.');
@@ -2299,7 +2419,7 @@ export const useGameStore = defineStore('game', {
         }
       }
 
-      this.saveState();
+      this.markStateForSaving();
       return true;
     },
 
