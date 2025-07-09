@@ -236,6 +236,20 @@ const items: Record<string, ItemDefinition> = {
       type: 'special',
       effect: 'unlock-temporary-region'
     }
+  },
+  'phantom-contract': {
+    id: 'phantom-contract',
+    name: 'Phantom Contract',
+    description: 'A mysterious contract that allows you to reset the fear factor of a captured Pokemon and guarantees its capture on the next attempt.',
+    type: 'material',
+    rarity: 'legendary',
+    icon: '/images/phantom-contract.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'reset-fear-factor'
+    }
   }
 };
 

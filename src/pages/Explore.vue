@@ -11,6 +11,7 @@ import CachedImage from '@/components/CachedImage.vue'
 import BerryTasksDisplay from '@/components/BerryTasksDisplay.vue'
 import PokemonSelectionModal from '@/components/PokemonSelectionModal.vue'
 import ActionButtons from '@/components/ActionButtons.vue'
+import CircularActionButton from '@/components/CircularActionButton.vue'
 import type { InventoryItem } from '@/types/pokemon'
 import regions from '@/constants/regions'
 import { useBuffStore } from '@/stores/buffStore'
@@ -519,6 +520,47 @@ const temporaryRegionTimeFormatted = computed(() => {
   const seconds = Math.floor((remaining % 60000) / 1000)
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 })
+
+// Fire rate button variants for the CircularActionButton component
+const getAttackButtonVariant = computed(() => {
+  if (fireRateState.value.active) {
+    switch (fireRateState.value.tier) {
+      case 1: return 'electric'
+      case 2: return 'fire'
+      case 3: return 'water'
+      default: return 'attack'
+    }
+  }
+  return 'attack'
+})
+
+const getFireRateBadgeVariant = computed(() => {
+  if (!fireRateState.value.active) return 'error'
+  switch (fireRateState.value.tier) {
+    case 1: return 'warning'
+    case 2: return 'warning'
+    case 3: return 'active'
+    default: return 'default'
+  }
+})
+
+const getFireRateBottomVariant = computed(() => {
+  switch (fireRateState.value.tier) {
+    case 1: return 'yellow'
+    case 2: return 'orange'
+    case 3: return 'purple'
+    default: return 'yellow'
+  }
+})
+
+const getFireRateEffectVariant = computed(() => {
+  switch (fireRateState.value.tier) {
+    case 1: return 'electric'
+    case 2: return 'fire'
+    case 3: return 'water'
+    default: return 'fire'
+  }
+})
 </script>
 
 <template>
@@ -677,30 +719,24 @@ const temporaryRegionTimeFormatted = computed(() => {
 
         <!-- Main Battle Controls Row -->
         <div class="flex items-center justify-center gap-12">
-          <!-- Attack Button with Circular Design and Progress Ring -->
-          <div class="relative flex-shrink-0">
-            <!-- Progress ring for fire rate - Always Visible -->
-            <svg class="absolute inset-0 w-20 h-20 -rotate-90 pointer-events-none" style="z-index: 10;"
-              viewBox="0 0 80 80">
-              <!-- Background circle -->
-              <circle cx="40" cy="40" r="36" :stroke="getBackgroundRingColor" stroke-width="5" fill="none"
-                opacity="0.3" />
-              <!-- Progress circle -->
-              <circle cx="40" cy="40" r="36" :stroke="getProgressRingColor" stroke-width="5" fill="none"
-                stroke-linecap="round" :stroke-dasharray="226.19"
-                :stroke-dashoffset="226.19 - (226.19 * finalProgressValue / 100)" class="transition-all duration-300" />
-            </svg>
-
-            <!-- Circular Attack Button -->
-            <button @click="attack" @keyup.enter="attack" @keyup.space="attack" :disabled="!wildPokemon"
-              class="relative w-20 h-20 bg-red-500 text-white rounded-full hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 overflow-hidden select-none flex items-center justify-center group border-4 border-red-400"
-              style="z-index: 5;" :class="{
-                'bg-yellow-500 hover:bg-yellow-600 shadow-lg shadow-yellow-500/50 animate-pulse border-yellow-400': fireRateState.active && fireRateState.tier === 1,
-                'bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/50 animate-pulse border-orange-400': fireRateState.active && fireRateState.tier === 2,
-                'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/50 animate-pulse border-blue-400': fireRateState.active && fireRateState.tier === 3,
-                'ring-4 ring-red-200 ring-opacity-60 border-red-300': shouldShowFireRateCounter && !fireRateState.active,
-                'scale-110': fireRateState.active
-              }">
+          <!-- Attack Button with Fire Rate Progress Ring -->
+          <CircularActionButton
+            :disabled="!wildPokemon"
+            :variant="getAttackButtonVariant"
+            :show-progress-ring="true"
+            :progress-value="finalProgressValue"
+            :progress-ring-color="getProgressRingColor"
+            :background-ring-color="getBackgroundRingColor"
+            :badge="shouldShowFireRateCounter ? fireRateState.count : undefined"
+            :badge-variant="getFireRateBadgeVariant"
+            :bottom-indicator="fireRateState.active ? `${fireRateState.multiplier.toFixed(1)}x XP` : undefined"
+            :bottom-indicator-variant="getFireRateBottomVariant"
+            :show-effect-overlay="fireRateState.active"
+            :effect-variant="getFireRateEffectVariant"
+            :animate="fireRateState.active ? 'pulse' : undefined"
+            @click="attack"
+          >
+            <template #icon>
               <!-- Sword Attack Icon -->
               <svg fill="#eee" viewBox="0 0 256 256" width="80" height="30" id="Flat" xmlns="http://www.w3.org/2000/svg">
                 <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
@@ -711,48 +747,16 @@ const temporaryRegionTimeFormatted = computed(() => {
                   </path>
                 </g>
               </svg>
-
-              <!-- Fire Effect Overlay for active fire rate -->
-              <div v-if="fireRateState.active" class="absolute inset-0 rounded-full opacity-30" :class="{
-                'bg-gradient-to-r from-yellow-400 to-red-400 animate-pulse': fireRateState.tier === 1,
-                'bg-gradient-to-r from-orange-400 to-red-500 animate-pulse': fireRateState.tier === 2,
-                'bg-gradient-to-r from-blue-400 to-cyan-500 animate-pulse': fireRateState.tier === 3
-              }"></div>
-            </button>
-
-            <!-- Fire Rate Counter Badge -->
-            <div v-if="shouldShowFireRateCounter"
-              class="absolute -top-2 -right-2 px-2 py-1 rounded-full text-xs font-bold shadow-lg z-20" :class="{
-                'bg-red-100 text-red-800': !fireRateState.active,
-                'bg-yellow-100 text-yellow-800 animate-pulse': fireRateState.active && fireRateState.tier === 1,
-                'bg-orange-100 text-orange-800 animate-pulse': fireRateState.active && fireRateState.tier === 2,
-                'bg-purple-100 text-purple-800 animate-pulse': fireRateState.active && fireRateState.tier === 3
-              }">
-              {{ fireRateState.count }}
-            </div>
-
-            <!-- Tier multiplier indicator (when active) -->
-            <div v-if="fireRateState.active"
-              class="absolute -bottom-14 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded-full text-xs font-bold"
-              :class="{
-                'bg-yellow-200 text-yellow-800': fireRateState.tier === 1,
-                'bg-orange-200 text-orange-800': fireRateState.tier === 2,
-                'bg-purple-200 text-purple-800': fireRateState.tier === 3
-              }">
-              {{ fireRateState.multiplier.toFixed(1) }}x XP
-            </div>
-          </div>
+            </template>
+          </CircularActionButton>
 
           <!-- Guaranteed Capture Button (Phantom Contract) -->
-          <div v-if="gameStore.hasGuaranteedCapture && wildPokemon" class="flex justify-center">
-            <button 
-              @click="useGuaranteedCapture" 
-              class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-lg border-2 border-purple-400 animate-pulse flex items-center gap-2"
-            >
-              <span class="text-lg">👻</span>
-              <span class="text-sm font-bold">Guaranteed Capture</span>
-            </button>
-          </div>
+          <CircularActionButton
+            v-if="gameStore.hasGuaranteedCapture && wildPokemon"
+            variant="ghost"
+            animate="pulse"
+            default-icon="👻"
+          />
 
           <!-- Action Buttons Container -->
           <ActionButtons 

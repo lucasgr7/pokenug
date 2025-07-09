@@ -1001,7 +1001,7 @@ export const useGameStore = defineStore('game', {
               // Expansion crystal logic would go here
               this.addNotification(`Used ${item.name}! Job slot expansion available.`, 'success');
               return true;
-            } else if (item.effect.effect === 'phantom-contract') {
+            } else if (item.effect.effect === 'reset-fear-factor') {
               // Reset fear factor for current region and enable guaranteed capture
               this.resetFearFactor(this.currentRegion);
               this.phantomContract.guaranteedCaptureAvailable = true;
