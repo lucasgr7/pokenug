@@ -837,7 +837,7 @@ const getFireRateEffectVariant = computed(() => {
         <div class="text-center mb-2 font-bold text-green-800 ml-8">🏠 Safe Haven</div>
         <div class="relative h-48 overflow-hidden rounded-lg mb-2 bg-gradient-to-b from-green-100 to-green-200 flex items-center justify-center">
           <!-- Home image with fallback -->
-            <CachedImage src="/images/home.png" alt="House to relax"/>
+            <img src="/images/home.png" alt="House to relax"/>
           <!-- Fallback home icon (hidden by default) -->
           <div class="hidden w-32 h-32 items-center justify-center text-6xl text-green-600 drop-shadow-lg">
             🏡
