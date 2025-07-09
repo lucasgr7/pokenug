@@ -219,6 +219,20 @@ const hpPercentage = computed(() => {
   return (gameStore.activePokemon.currentHP / gameStore.activePokemon.maxHP) * 100
 })
 
+// Fear Factor calculations
+const fearFactorProgress = computed(() => {
+  return gameStore.getFearFactorProgress(gameStore.currentRegion)
+})
+
+const isRegionDisabledByFear = computed(() => {
+  return gameStore.isRegionDisabledByFear(gameStore.currentRegion)
+})
+
+const fearFactorTimeRemaining = computed(() => {
+  const ms = gameStore.getFearFactorTimeRemaining(gameStore.currentRegion)
+  return Math.ceil(ms / 1000) // Convert to seconds
+})
+
 // Select a pokeball to use
 function selectPokeball(ball: InventoryItem) {
   selectedPokeball.value = ball
@@ -559,12 +573,23 @@ const temporaryRegionTimeFormatted = computed(() => {
     </div>
 
     <!-- Zone Status Bar -->
-    <div class="mb-4 bg-gray-100 p-3 rounded-lg flex justify-between items-center">
+    <div class="mb-4 p-3 rounded-lg flex justify-between items-center" :class="{
+      'bg-green-50 border border-green-200': gameStore.currentRegion === 'Home',
+      'bg-gray-100': gameStore.currentRegion !== 'Home'
+    }">
       <div>
-        <span class="font-bold text-gray-700">{{ gameStore.currentRegionData.name }}</span>
-        <span class="text-sm text-gray-500 ml-2">Encounter Rate: {{ gameStore.currentRegionData.encounterRate }}%</span>
+        <span class="font-bold" :class="{
+          'text-green-800': gameStore.currentRegion === 'Home',
+          'text-gray-700': gameStore.currentRegion !== 'Home'
+        }">{{ gameStore.currentRegionData.name }}</span>
+        <span v-if="gameStore.currentRegion !== 'Home'" class="text-sm text-gray-500 ml-2">Encounter Rate: {{ gameStore.currentRegionData.encounterRate }}%</span>
       </div>
-      <div v-if="!wildPokemon" class="text-sm text-gray-600">
+      <div v-if="!wildPokemon && gameStore.currentRegion === 'Home'" class="text-sm text-green-700 font-medium flex items-center flex-wrap">
+        <span class="mr-2">🏠</span>
+        <span class="hidden sm:inline">Welcome home! When you're ready, let's go to <strong>Viridian Forest</strong>!</span>
+        <span class="sm:hidden">Welcome home! Select <strong>Viridian Forest</strong> above!</span>
+      </div>
+      <div v-else-if="!wildPokemon && gameStore.currentRegion !== 'Home'" class="text-sm text-gray-600">
         Next spawn in: {{ Math.ceil(spawnTimer) ?? '...' }}s
       </div>
       <div class="bg-red-100 px-3 py-1 rounded-full text-red-600">
@@ -732,8 +757,21 @@ const temporaryRegionTimeFormatted = computed(() => {
       </div>
 
       <!-- Wild Pokemon Panel -->
-      <div v-if="wildPokemon" class="bg-red-50 p-4 rounded-lg shadow">
-        <div class="text-center mb-2 font-bold">Wild Pokémon</div>
+      <div v-if="wildPokemon" class="bg-red-50 p-4 rounded-lg pl-6 shadow relative">
+        <!-- Fear Factor Indicator -->
+        <div class="absolute left-2 top-4 bottom-4 w-2 flex flex-col items-center z-20">
+          <!-- Skull Icon -->
+          <div class="text-red-600 mb-1 text-lg">💀</div>
+          <!-- Vertical Progress Bar -->
+          <div class="flex-1 w-3 bg-gray-300 rounded-full relative overflow-hidden">
+            <div 
+              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-red-600 to-red-400 rounded-full transition-all duration-500"
+              :style="{ height: fearFactorProgress + '%' }"
+            ></div>
+          </div>
+        </div>
+        
+        <div class="text-center mb-2 font-bold ml-8">Wild Pokémon</div>
         <div class="relative h-48 overflow-hidden rounded-lg mb-2">
           <!-- Background image based on region -->
           <img :src="getRegionBackgroundImage(gameStore.currentRegion)" alt="Region Background"
@@ -774,39 +812,54 @@ const temporaryRegionTimeFormatted = computed(() => {
           </div>
         </div>
       </div>
-      <div v-else class="bg-gray-100 p-4 rounded-lg shadow flex items-center justify-center text-gray-500">
-        No wild Pokémon found...
-      </div>
-    </div>
-
-    <!-- Pokeball Selector Modal -->
-    <div v-if="showPokeballSelector" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-4">Select a Pokéball</h3>
-
-        <div class="grid grid-cols-1 gap-3">
-          <div v-for="ball in availablePokeballs" :key="ball.id"
-            class="border rounded-lg p-3 flex items-center hover:bg-gray-100 cursor-pointer"
-            @click="selectPokeball(ball)">
-            <div class="w-10 h-10 flex-shrink-0 mr-3 bg-gray-100 rounded-lg overflow-hidden">
-              <img :src="ball.icon" :alt="ball.name" class="w-full h-full object-contain" @error="(e: Event) => {
-                const target = e.target as HTMLImageElement;
-                target.src = '/images/not-found.png';
-              }">
-            </div>
-
-            <div class="flex-1">
-              <div class="font-medium">{{ ball.name }} <span class="text-sm text-gray-500">({{ ball.quantity }})</span>
-              </div>
-              <div class="text-xs text-gray-600">{{ ball.description }}</div>
-            </div>
+      <!-- Home Region Display -->
+      <div v-else-if="gameStore.currentRegion === 'Home'" class="bg-green-50 p-4 rounded-lg shadow border-2 border-green-200 relative">
+        <div class="text-center mb-2 font-bold text-green-800 ml-8">🏠 Safe Haven</div>
+        <div class="relative h-48 overflow-hidden rounded-lg mb-2 bg-gradient-to-b from-green-100 to-green-200 flex items-center justify-center">
+          <!-- Home image with fallback -->
+            <CachedImage src="/images/home.png" alt="House to relax"/>
+          <!-- Fallback home icon (hidden by default) -->
+          <div class="hidden w-32 h-32 items-center justify-center text-6xl text-green-600 drop-shadow-lg">
+            🏡
           </div>
         </div>
-
-        <button @click="showPokeballSelector = false"
-          class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition-colors w-full select-none">
-          Cancel
-        </button>
+        <div class="text-center text-sm text-green-700 mt-2 space-y-2">
+          <p class="flex items-center justify-center gap-1">
+            <span>🌿</span>
+            <span>A peaceful place where your Pokémon can rest and recover.</span>
+          </p>
+          <p class="text-xs text-green-600 bg-green-100 p-2 rounded-lg">
+            <span class="font-medium">Ready for adventure?</span> Head to <strong>Viridian Forest</strong> in the region selector above!
+          </p>
+        </div>
+      </div>
+      <!-- Other Regions - No Pokemon -->
+      <div v-else class="bg-gray-100 p-4 rounded-lg shadow relative" :class="{
+        'bg-red-100 border border-red-300': isRegionDisabledByFear
+      }">
+        <!-- Fear Factor Indicator -->
+        <div class="absolute left-2 top-4 bottom-4 flex w-2 flex-col items-center z-20">
+          <div class="mb-1 text-lg" :class="{
+            'text-red-600': fearFactorProgress > 0,
+            'text-gray-400': fearFactorProgress === 0
+          }">💀</div>
+          <div class="flex-1 w-3 bg-gray-300 rounded-full relative overflow-hidden">
+            <div 
+              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-red-600 to-red-400 rounded-full transition-all duration-500"
+              :style="{ height: fearFactorProgress + '%' }"
+            ></div>
+          </div>
+        </div>
+        
+        <div class="flex items-center justify-center text-gray-500 ml-8">
+          <span v-if="isRegionDisabledByFear" class="text-red-600 font-medium text-center">
+            😨 Pokemon are too frightened to appear!<br>
+            <span class="text-sm">They'll return in {{ fearFactorTimeRemaining }}s</span>
+          </span>
+          <span v-else>
+            No wild Pokémon found...
+          </span>
+        </div>
       </div>
     </div>
 

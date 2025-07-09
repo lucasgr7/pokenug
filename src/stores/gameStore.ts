@@ -33,6 +33,11 @@ interface Notification {
   groupKey?: string; // Used to group similar notifications
 }
 
+interface FearFactorState {
+  defeats: Array<{ timestamp: number; region: string }>;
+  disabledRegions: Record<string, number>; // region -> disableEndTime
+}
+
 interface GameState {
   playerPokemon: Pokemon[]; // This will now be specifically the active party
   availablePokemon: Pokemon[]; // Pokemon not in party or working
@@ -62,6 +67,7 @@ interface GameState {
     endTime: number | null;
     remainingTime: number;
   };
+  fearFactor: RemovableRef<FearFactorState>;
   pendingSave: boolean; // Flag to track if state needs to be saved
 }
 
@@ -72,6 +78,11 @@ const HP_REGEN_RATE = 2.5 // 2.5% per second
 const ENEMY_ATTACK_INTERVAL = 3000
 const RUN_CHANCE = 0.05
 const RUN_CHECK_INTERVAL = 5000
+
+// Fear Factor Constants - Easy to balance
+const FEAR_FACTOR_WINDOW = 10000 // 10 seconds in milliseconds - window to track defeats
+const FEAR_FACTOR_THRESHOLD = 10 // Number of defeats to trigger fear (10 defeats)
+const FEAR_FACTOR_DISABLE_DURATION = 60000 // 1 minute in milliseconds - how long region stays disabled
 
 
 export const useGameStore = defineStore('game', {
@@ -110,6 +121,10 @@ export const useGameStore = defineStore('game', {
       endTime: null,
       remainingTime: 0
     },
+    fearFactor: useStorage<FearFactorState>('fearFactor', {
+      defeats: [],
+      disabledRegions: {}
+    }),
     pendingSave: false
   }),
 
@@ -282,6 +297,27 @@ export const useGameStore = defineStore('game', {
         return [...baseRegions, state.temporaryRegion.regionId];
       }
       return baseRegions;
+    },
+
+    // Fear Factor getters
+    getFearFactorProgress: (state) => (region: string) => {
+      const now = Date.now();
+      const recentDefeats = state.fearFactor.defeats.filter(
+        defeat => defeat.region === region && (now - defeat.timestamp) <= FEAR_FACTOR_WINDOW
+      );
+      return Math.min(100, (recentDefeats.length / FEAR_FACTOR_THRESHOLD) * 100);
+    },
+
+    isRegionDisabledByFear: (state) => (region: string) => {
+      const now = Date.now();
+      const disableEndTime = state.fearFactor.disabledRegions[region];
+      return disableEndTime ? now < disableEndTime : false;
+    },
+
+    getFearFactorTimeRemaining: (state) => (region: string) => {
+      const now = Date.now();
+      const disableEndTime = state.fearFactor.disabledRegions[region];
+      return disableEndTime ? Math.max(0, disableEndTime - now) : 0;
     }
   },
 
@@ -459,6 +495,12 @@ export const useGameStore = defineStore('game', {
           inventory: state.inventory ?? { pokemon: {} }
         })
 
+        // Recycle battle logs to ensure they don't exceed the limit
+        this.recycleBattleLogs();
+
+        // Recycle notifications to ensure they don't exceed the limit
+        this.recycleNotifications();
+
         // Set up game systems including auto-attack with the tickSystem
         this.setupGameSystems();
         
@@ -474,6 +516,12 @@ export const useGameStore = defineStore('game', {
         buffStore.initializeBuffStore();
 
         this.selectRandomStarter()
+
+        // Recycle battle logs to ensure they don't exceed the limit
+        this.recycleBattleLogs();
+
+        // Recycle notifications to ensure they don't exceed the limit
+        this.recycleNotifications();
 
         // Set up the auto-attack processing with the tickSystem
         this.setupGameSystems();
@@ -667,6 +715,7 @@ export const useGameStore = defineStore('game', {
         message: `${pokemon.name} reached level ${pokemon.level}!`,
         type: 'system'
       })
+      this.recycleBattleLogs()
 
       this.saveImmediately() // Save immediately for level ups
     },
@@ -1076,11 +1125,33 @@ export const useGameStore = defineStore('game', {
 
     addBattleLog(message: string, type: 'damage' | 'heal' | 'system') {
       this.battle.battleLogs.push({ message, type })
+      this.recycleBattleLogs()
+    },
+
+    recycleBattleLogs() {
+      const MAX_BATTLE_LOGS = 100
+      if (this.battle.battleLogs.length > MAX_BATTLE_LOGS) {
+        // Keep only the latest MAX_BATTLE_LOGS messages
+        this.battle.battleLogs.splice(0, this.battle.battleLogs.length - MAX_BATTLE_LOGS)
+      }
+    },
+
+    recycleNotifications() {
+      const MAX_NOTIFICATIONS = 50
+      if (this.notifications.length > MAX_NOTIFICATIONS) {
+        // Keep only the latest MAX_NOTIFICATIONS messages
+        this.notifications.splice(0, this.notifications.length - MAX_NOTIFICATIONS)
+      }
     },
 
     async spawnWildPokemon() {
       // Don't spawn Pokémon in the Home region
       if (this.currentRegion === 'Home') {
+        return;
+      }
+
+      // Don't spawn Pokémon if the region is disabled by fear factor
+      if (this.isRegionDisabledByFear(this.currentRegion)) {
         return;
       }
 
@@ -1187,6 +1258,12 @@ export const useGameStore = defineStore('game', {
     startSpawnTimer() {
       // Don't spawn Pokémon in the Home region
       if (this.currentRegion === 'Home') {
+        this.battle.spawnTimer = 0;
+        return;
+      }
+
+      // Don't start spawn timer if the region is disabled by fear factor
+      if (this.isRegionDisabledByFear(this.currentRegion)) {
         this.battle.spawnTimer = 0;
         return;
       }
@@ -1367,6 +1444,9 @@ export const useGameStore = defineStore('game', {
       if (this.battle?.wildPokemon?.currentHP === 0) {
         const defeatedPokemon = { ...this.battle.wildPokemon };
         this.handleXPGain(this.activePokemon, defeatedPokemon);
+
+        // Track defeat for fear factor
+        this.addDefeatToFearFactor(this.currentRegion);
 
         this.addBattleLog(`${defeatedPokemon.name} fainted!`, 'system');
         this.battle.wildPokemon = null;
@@ -2063,6 +2143,7 @@ export const useGameStore = defineStore('game', {
         const index = this.notifications.indexOf(existingNotification);
         this.notifications.splice(index, 1);
         this.notifications.push(existingNotification);
+        this.recycleNotifications();
         
         return existingNotification;
       } else {
@@ -2077,6 +2158,7 @@ export const useGameStore = defineStore('game', {
         };
 
         this.notifications.push(notification);
+        this.recycleNotifications();
         return notification;
       }
     },
@@ -2177,6 +2259,10 @@ export const useGameStore = defineStore('game', {
       const DEDUPLICATION_INTERVAL = 3 * 250; // 3 ticks (each tick is 250ms)
       let lastPokemonCount = this.getAllPokemon.length;
 
+      // Add fear factor variables
+      let fearFactorAccumulatedTime = 0;
+      const FEAR_FACTOR_UPDATE_INTERVAL = 1000; // Update fear factor every 1 second
+
       // Use the tickSystem to handle auto-attack and other time-based game mechanics
       workerTimer.subscribe('setup game systems', (elapsed: number) => {
         // Process auto-attack if the conditions are met
@@ -2237,6 +2323,13 @@ export const useGameStore = defineStore('game', {
         if (saveAccumulatedTime >= SAVE_INTERVAL && this.pendingSave) {
           this.performBatchSave();
           saveAccumulatedTime = 0; // Reset the timer
+        }
+
+        // Update fear factor system
+        fearFactorAccumulatedTime += elapsed;
+        if (fearFactorAccumulatedTime >= FEAR_FACTOR_UPDATE_INTERVAL) {
+          this.updateFearFactor();
+          fearFactorAccumulatedTime -= FEAR_FACTOR_UPDATE_INTERVAL;
         }
       });
     },
@@ -2509,6 +2602,82 @@ export const useGameStore = defineStore('game', {
       // This function will be called when the dragon stone is used
       const duration = 600000; // 10 minutes
       this.activateTemporaryRegion('ethereal-nexus', duration);
+    },
+
+    // Fear Factor Methods
+    addDefeatToFearFactor(region: string) {
+      const now = Date.now();
+      
+      // Add the new defeat
+      this.fearFactor.defeats.push({ timestamp: now, region });
+      
+      // Clean up old defeats (older than the window)
+      this.fearFactor.defeats = this.fearFactor.defeats.filter(
+        defeat => (now - defeat.timestamp) <= FEAR_FACTOR_WINDOW
+      );
+      
+      // Check if fear threshold is reached for this region
+      const recentDefeats = this.fearFactor.defeats.filter(
+        defeat => defeat.region === region && (now - defeat.timestamp) <= FEAR_FACTOR_WINDOW
+      );
+      
+      if (recentDefeats.length >= FEAR_FACTOR_THRESHOLD) {
+        this.triggerFearFactor(region);
+      }
+      
+      this.markStateForSaving();
+    },
+
+    triggerFearFactor(region: string) {
+      const now = Date.now();
+      const disableEndTime = now + FEAR_FACTOR_DISABLE_DURATION;
+      
+      // Disable the region
+      this.fearFactor.disabledRegions[region] = disableEndTime;
+      
+      // Clear wild Pokemon if we're in the affected region
+      if (this.currentRegion === region) {
+        this.battle.wildPokemon = null;
+      }
+      
+      // Clear defeats for this region since fear is now active
+      this.fearFactor.defeats = this.fearFactor.defeats.filter(
+        defeat => defeat.region !== region
+      );
+      
+      this.addBattleLog('The Pokemon in this area have become too frightened to appear!', 'system');
+      this.addNotification(`Fear factor activated in ${region}! Pokemon will avoid this area for 1 minute.`, 'warning');
+      
+      this.markStateForSaving();
+    },
+
+    updateFearFactor() {
+      const now = Date.now();
+      let regionsCleared = false;
+      
+      // Clean up expired defeats
+      this.fearFactor.defeats = this.fearFactor.defeats.filter(
+        defeat => (now - defeat.timestamp) <= FEAR_FACTOR_WINDOW
+      );
+      
+      // Check for expired disabled regions
+      Object.keys(this.fearFactor.disabledRegions).forEach(region => {
+        const disableEndTime = this.fearFactor.disabledRegions[region];
+        if (now >= disableEndTime) {
+          delete this.fearFactor.disabledRegions[region];
+          regionsCleared = true;
+          
+          if (this.currentRegion === region) {
+            this.addBattleLog('The Pokemon have calmed down and returned to the area.', 'system');
+            this.addNotification(`Fear factor cleared in ${region}! Pokemon are appearing again.`, 'success');
+            this.startSpawnTimer();
+          }
+        }
+      });
+      
+      if (regionsCleared) {
+        this.markStateForSaving();
+      }
     }
   }
 });
