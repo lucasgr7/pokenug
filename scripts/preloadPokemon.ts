@@ -17,7 +17,6 @@ interface SimplifiedPokemon {
 }
 
 async function preloadPokemonData() {
-  console.log('Starting Pokémon data preload...');
   
   try {
     // Fetch first 151 Pokémon (1st generation)

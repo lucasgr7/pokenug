@@ -308,7 +308,6 @@ export const useBuffStore = defineStore('buff', {
       // Only reset if the player has been inactive for a significant period
       if (this.fireRateState.active && now - this.fireRateState.lastAttackTime > this.fireRateState.timeAllowed) {
         // Reset if the player took too long between attacks
-        console.log(`Fire rate reset - inactive for ${(now - this.fireRateState.lastAttackTime) / 1000}s, allowed: ${this.fireRateState.timeAllowed / 1000}s`);
         this.resetFireRate();
         return;
       }
@@ -316,7 +315,6 @@ export const useBuffStore = defineStore('buff', {
       // If not active and player took too long between attacks (10 seconds), reset count
       if (!this.fireRateState.active && this.fireRateState.count > 0 && 
           now - this.fireRateState.lastAttackTime > 10000) {
-        console.log(`Fire rate count reset - inactive for ${(now - this.fireRateState.lastAttackTime) / 1000}s`);
         this.fireRateState.count = 0;
         this.fireRateState.lastAttackTime = 0;
         this.saveState();

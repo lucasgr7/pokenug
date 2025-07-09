@@ -411,13 +411,7 @@ const getTypeColor = (type: string) => {
 
 // Handle auto-attack toggle
 const toggleAutoAttack = () => {
-  const isActive = buffStore.toggleAutoAttack()
-  if (isActive) {
-    gameStore.addNotification(
-      `Auto-Attack activated! Pokemon will attack every ${(buffStore.getAutoAttackInterval / 1000).toFixed(1)} seconds.`,
-      'success',
-    )
-  }
+  buffStore.toggleAutoAttack()
 }
 
 // Handle region change
@@ -489,43 +483,6 @@ const shouldShowFireRateCounter = computed(() => {
 
   // Show counter when active OR when building and has at least 1 attack
   return fireRateState.value.active || (fireRateState.value.count > 0 && !fireRateState.value.active)
-})
-
-const fireRateStageInfo = computed(() => {
-  const fireEmblemBuff = buffStore.getBuffById('fire-emblem')
-  if (!fireEmblemBuff) return null
-
-  if (!fireRateState.value.active) {
-    return {
-      stage: 'building',
-      current: fireRateState.value.count,
-      target: 40,
-      description: `${fireRateState.value.count}/40 attacks to activate fire rate`
-    }
-  }
-
-  if (fireRateState.value.tier === 1) {
-    return {
-      stage: 'tier1',
-      current: fireRateState.value.count,
-      target: 80,
-      description: `Tier 1 Active • ${fireRateState.value.count}/80 to Tier 2`
-    }
-  } else if (fireRateState.value.tier === 2) {
-    return {
-      stage: 'tier2',
-      current: fireRateState.value.count,
-      target: 120,
-      description: `Tier 2 Active • ${fireRateState.value.count}/120 to Tier 3`
-    }
-  } else {
-    return {
-      stage: 'tier3',
-      current: fireRateState.value.count,
-      target: 120,
-      description: `Tier 3 Active • Max Power!`
-    }
-  }
 })
 
 // Temporary region countdown
@@ -742,18 +699,6 @@ const temporaryRegionTimeFormatted = computed(() => {
                 'bg-purple-100 text-purple-800 animate-pulse': fireRateState.active && fireRateState.tier === 3
               }">
               {{ fireRateState.count }}
-            </div>
-
-            <!-- Progress Info Text -->
-            <div v-if="fireRateStageInfo && shouldShowFireRateCounter"
-              class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded text-xs font-medium whitespace-nowrap"
-              :class="{
-                'bg-red-100 text-red-700': !fireRateState.active,
-                'bg-yellow-100 text-yellow-700': fireRateState.active && fireRateState.tier === 1,
-                'bg-orange-100 text-orange-700': fireRateState.active && fireRateState.tier === 2,
-                'bg-purple-100 text-purple-700': fireRateState.active && fireRateState.tier === 3
-              }">
-              {{ fireRateStageInfo.description }}
             </div>
 
             <!-- Tier multiplier indicator (when active) -->

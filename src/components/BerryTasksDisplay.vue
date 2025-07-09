@@ -26,7 +26,7 @@ const isExpanded = ref(false)
 // Calculate progress percentage for a task
 function getProgressPercentage(task: BerryTask) {
   const totalDuration = task.endTime - task.startTime
-  const elapsed = Date.now() - task.startTime
+  const elapsed = performance.now() - task.startTime
   return Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
 }
 

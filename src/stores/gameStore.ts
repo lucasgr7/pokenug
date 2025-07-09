@@ -487,7 +487,6 @@ export const useGameStore = defineStore('game', {
     setupSaveOnUnload() {
       const saveBeforeUnload = () => {
         if (this.pendingSave) {
-          console.log('Page unloading - performing emergency save');
           // Synchronous save since we're unloading
           try {
             const essentialState = {
@@ -505,7 +504,6 @@ export const useGameStore = defineStore('game', {
             
             // Use JSON serialization for emergency save to avoid any cloning issues
             localStorage.setItem('gameState', JSON.stringify(essentialState));
-            console.log('Emergency save completed');
           } catch (error) {
             console.error('Emergency save failed:', error);
           }
@@ -746,7 +744,6 @@ export const useGameStore = defineStore('game', {
       
       // For critical actions, save immediately
       if (immediate) {
-        console.log('Performing immediate save');
         this.performBatchSave();
       }
     },
@@ -2238,7 +2235,6 @@ export const useGameStore = defineStore('game', {
         // Handle batch saving with proper timing
         saveAccumulatedTime += elapsed;
         if (saveAccumulatedTime >= SAVE_INTERVAL && this.pendingSave) {
-          console.log('Triggering batch save after', saveAccumulatedTime, 'ms');
           this.performBatchSave();
           saveAccumulatedTime = 0; // Reset the timer
         }
@@ -2247,8 +2243,6 @@ export const useGameStore = defineStore('game', {
 
     // Deduplication routine to merge duplicate Pokémon by uniqueId
     deduplicatePokemon() {
-      console.log('Running Pokémon deduplication routine...');
-      
       let duplicatesFound = false;
       
       // Helper function to merge two Pokémon (keep the one with higher level/experience)
@@ -2280,7 +2274,6 @@ export const useGameStore = defineStore('game', {
           if (existingIndex !== -1) {
             uniquePlayerPokemon[existingIndex] = mergePokemon(uniquePlayerPokemon[existingIndex], pokemon);
             duplicatesFound = true;
-            console.log(`Merged duplicate Pokémon in party: ${pokemon.name} (${pokemon.uniqueId})`);
           }
         } else {
           uniquePlayerPokemon.push(pokemon);
@@ -2304,7 +2297,6 @@ export const useGameStore = defineStore('game', {
           if (existingIndex !== -1) {
             uniqueAvailablePokemon[existingIndex] = mergePokemon(uniqueAvailablePokemon[existingIndex], pokemon);
             duplicatesFound = true;
-            console.log(`Merged duplicate Pokémon in available: ${pokemon.name} (${pokemon.uniqueId})`);
           }
         } else {
           uniqueAvailablePokemon.push(pokemon);
@@ -2327,7 +2319,6 @@ export const useGameStore = defineStore('game', {
           i--; // Adjust index after removal
           
           duplicatesFound = true;
-          console.log(`Merged cross-collection duplicate Pokémon: ${mergedPokemon.name} (${mergedPokemon.uniqueId})`);
         }
       }
 
@@ -2344,9 +2335,6 @@ export const useGameStore = defineStore('game', {
         });
 
         this.markStateForSaving();
-        console.log(`Deduplication complete. Removed duplicates. Party: ${uniquePlayerPokemon.length}, Available: ${uniqueAvailablePokemon.length}`);
-      } else {
-        console.log('No duplicate Pokémon found.');
       }
     },
 
