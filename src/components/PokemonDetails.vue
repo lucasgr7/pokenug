@@ -110,34 +110,48 @@
               </span>
             </div>
 
-            <!-- Action Button -->
-            <button
-              v-if="canAddToParty"
-              @click="emit('add-to-party', pokemon!)"
-              class="w-full flex items-center justify-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors duration-200"
-            >
-              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-              </svg>
-              Add to Party
-            </button>
-            
-            <button
-              v-else-if="canRemoveFromParty"
-              @click="emit('remove-from-party', pokemon!)"
-              class="w-full flex items-center justify-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors duration-200"
-            >
-              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
-              </svg>
-              Remove from Party
-            </button>
+            <!-- Action Buttons -->
+            <div class="flex flex-col space-y-2">
+              <button
+                v-if="canAddToParty"
+                @click="emit('add-to-party', pokemon!)"
+                class="w-full flex items-center justify-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors duration-200"
+              >
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add to Party
+              </button>
+              
+              <button
+                v-else-if="canRemoveFromParty"
+                @click="emit('remove-from-party', pokemon!)"
+                class="w-full flex items-center justify-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors duration-200"
+              >
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                </svg>
+                Remove from Party
+              </button>
 
-            <div 
-              v-else
-              class="w-full flex items-center justify-center px-3 py-1.5 bg-gray-400 text-white text-xs font-medium rounded cursor-not-allowed"
-            >
-              {{ getPokemonLocation(pokemon).type === 'working' ? 'Working' : 'Party Full' }}
+              <div 
+                v-else
+                class="w-full flex items-center justify-center px-3 py-1.5 bg-gray-400 text-white text-xs font-medium rounded cursor-not-allowed"
+              >
+                {{ getPokemonLocation(pokemon).type === 'working' ? 'Working' : 'Party Full' }}
+              </div>
+
+              <!-- Release Button -->
+              <button
+                v-if="canRelease"
+                @click="emit('release-pokemon', pokemon!)"
+                class="w-full flex items-center justify-center px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded transition-colors duration-200"
+              >
+                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+                Release Pokémon
+              </button>
             </div>
 
             <!-- Party Info -->
@@ -226,12 +240,12 @@
             </div>
           </div>
 
-          <div v-if="pokemon.faintedAt">
+          <div v-if="pokemon?.faintedAt">
             <span class="text-xs text-gray-600">Recovery</span>
             <span class="text-xs font-medium text-red-600 block mt-1">{{ getRecoveryTime() }}</span>
           </div>
 
-          <div v-if="pokemon.workId" class="col-span-2">
+          <div v-if="pokemon?.workId" class="col-span-2">
             <span class="text-xs text-gray-600">Working Job</span>
             <div class="mt-1">
               <span class="text-xs font-medium text-purple-600 block">{{ getWorkingJobName() }}</span>
@@ -254,7 +268,7 @@
 
           <div>
             <span class="text-xs text-gray-600">Unique ID</span>
-            <span class="font-mono text-xs text-gray-500 block mt-1 truncate">{{ pokemon.uniqueId || 'N/A' }}</span>
+            <span class="font-mono text-xs text-gray-500 block mt-1 truncate">{{ pokemon?.uniqueId || 'N/A' }}</span>
           </div>
         </div>
       </div>
@@ -271,15 +285,15 @@
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div class="flex justify-between py-1 border-b border-gray-100">
             <span class="text-gray-600">Species</span>
-            <span class="font-medium capitalize truncate">{{ pokemon.name }}</span>
+            <span class="font-medium capitalize truncate">{{ pokemon?.name }}</span>
           </div>
           
           <div class="flex justify-between py-1 border-b border-gray-100">
             <span class="text-gray-600">Types</span>
-            <span class="font-medium">{{ pokemon.types.length }}</span>
+            <span class="font-medium">{{ pokemon?.types.length }}</span>
           </div>
 
-          <div v-if="pokemon.lastAttackTime" class="col-span-2 flex justify-between py-1">
+          <div v-if="pokemon?.lastAttackTime" class="col-span-2 flex justify-between py-1">
             <span class="text-gray-600">Last Battle</span>
             <span class="font-medium text-blue-600">{{ formatLastBattle() }}</span>
           </div>
@@ -298,11 +312,13 @@ interface Props {
   pokemon: Pokemon | null
   canAddToParty?: boolean
   canRemoveFromParty?: boolean
+  canRelease?: boolean
 }
 
 interface Emits {
   (e: 'add-to-party', pokemon: Pokemon): void
   (e: 'remove-from-party', pokemon: Pokemon): void
+  (e: 'release-pokemon', pokemon: Pokemon): void
 }
 
 const props = defineProps<Props>()

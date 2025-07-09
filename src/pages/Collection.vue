@@ -1,7 +1,8 @@
 <script lang="ts" setup>
 import PokemonGrid from '@/components/PokemonGrid.vue'
 import PokemonDetails from '@/components/PokemonDetails.vue'
-import { ref, computed } from 'vue'
+import ConfirmationModal from '@/components/ConfirmationModal.vue'
+import { ref, computed, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import type { Pokemon } from '@/types/pokemon'
 
@@ -10,12 +11,17 @@ const gameStore = useGameStore()
 const showParty = ref(true)
 const showWorking = ref(true)
 const showAvailable = ref(true)
-const verticalMode = ref(false)
-const columnSize = ref(6)
-const itemsPerPage = ref(12)
 const selectedPokemon = ref<Pokemon | null>(null)
 const searchQuery = ref('')
 const selectedType = ref('all')
+
+// Pagination
+const currentPage = ref(1)
+const itemsPerPage = 12
+
+// Modal state
+const showReleaseModal = ref(false)
+const pokemonToRelease = ref<Pokemon | null>(null)
 
 // Get all unique types from all Pokemon including working ones
 const availableTypes = computed(() => {
@@ -44,6 +50,26 @@ const filteredPokemon = computed(() => {
     return matchesSearch && matchesType && matchesStatus
   })
 })
+
+// Pagination computed properties
+const totalPages = computed(() => Math.ceil(filteredPokemon.value.length / itemsPerPage))
+
+const paginatedPokemon = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredPokemon.value.slice(start, end)
+})
+
+// Reset to first page when filters change
+function resetPagination() {
+  currentPage.value = 1
+}
+
+function goToPage(page: number) {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+  }
+}
 
 // Helper function to determine Pokemon location/status
 function getPokemonLocation(pokemon: Pokemon): { type: 'party' | 'available' | 'working', details?: string } {
@@ -159,6 +185,31 @@ function canRemoveFromParty(pokemon: Pokemon): boolean {
   return location.type === 'party' && gameStore.playerPokemon.length > 1
 }
 
+function canReleasePokemon(pokemon: Pokemon): boolean {
+  const location = getPokemonLocation(pokemon)
+  
+  // Cannot release working Pokemon
+  if (location.type === 'working') return false
+  
+  // Must have at least one Pokemon remaining (total count check)
+  const totalPokemon = gameStore.playerPokemon.length + gameStore.availablePokemon.length
+  if (totalPokemon <= 1) return false
+  
+  // If releasing from party, ensure we'll still have at least one Pokemon in party
+  if (location.type === 'party') {
+    const remainingPartyCount = gameStore.playerPokemon.length - 1
+    const totalAvailable = gameStore.availablePokemon.length
+    
+    // Must have at least one Pokemon total after release
+    if (remainingPartyCount + totalAvailable < 1) return false
+    
+    // If party would be empty, ensure there's at least one available Pokemon to move to party
+    if (remainingPartyCount === 0 && totalAvailable === 0) return false
+  }
+  
+  return true
+}
+
 function addToParty(pokemon: Pokemon) {
   if (!canAddToParty(pokemon)) return
   
@@ -173,34 +224,72 @@ function removeFromParty(pokemon: Pokemon) {
   gameStore.removePokemonFromParty(pokemon)
   // Force reactivity update
   selectedPokemon.value = { ...pokemon }
-}</script>
+}
+
+function releasePokemon(pokemon: Pokemon) {
+  if (!canReleasePokemon(pokemon)) return
+  
+  // Show confirmation modal instead of browser confirm
+  pokemonToRelease.value = pokemon
+  showReleaseModal.value = true
+}
+
+function confirmRelease() {
+  if (!pokemonToRelease.value) return
+  
+  const pokemon = pokemonToRelease.value
+  
+  // Use the new releasePokemon method from gameStore
+  gameStore.releasePokemon(pokemon)
+  
+  // Clear selection if the released Pokemon was selected
+  if (selectedPokemon.value === pokemon) {
+    selectedPokemon.value = null
+  }
+  
+  // Show notification
+  gameStore.addNotification(`${pokemon.name} has been released!`, 'info')
+  
+  // Close modal and reset
+  closeReleaseModal()
+}
+
+function closeReleaseModal() {
+  showReleaseModal.value = false
+  pokemonToRelease.value = null
+}
+
+// Watch for filter changes to reset pagination
+watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => {
+  resetPagination()
+});</script>
 <template>
     <div class="h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-4">
         <!-- Pokédex Header -->
-        <div class="bg-red-600 rounded-t-lg shadow-2xl border-4 border-red-700 p-6 mb-0">
+        <div class="bg-red-600 rounded-t-lg shadow-2xl border-4 border-red-700 p-3 mb-0">
             <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-3">
                     <!-- Pokédex Logo -->
-                    <div class="w-16 h-16 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center">
-                        <div class="w-8 h-8 bg-blue-400 rounded-full border-2 border-white"></div>
+                    <div class="w-10 h-10 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center">
+                        <div class="w-5 h-5 bg-blue-400 rounded-full border-2 border-white"></div>
                     </div>
                     <div>
-                        <h1 class="text-3xl font-bold text-white">Pokédex</h1>
-                        <p class="text-red-100">Digital Encyclopedia</p>
+                        <h1 class="text-xl font-bold text-white">Pokédex</h1>
+                        <p class="text-sm text-red-100">Digital Encyclopedia</p>
                     </div>
                 </div>
                 
                 <!-- Status Lights -->
                 <div class="flex space-x-2">
-                    <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                    <div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                    <div class="w-3 h-3 bg-red-400 rounded-full"></div>
+                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <div class="w-2 h-2 bg-red-400 rounded-full"></div>
                 </div>
             </div>
         </div>
 
         <!-- Main Pokédex Body -->
-        <div class="bg-red-500 border-4 border-red-600 rounded-b-lg shadow-2xl h-[calc(100vh-120px)]">
+        <div class="bg-red-500 border-4 border-red-600 rounded-b-lg shadow-2xl h-[calc(100vh-100px)]">
             <!-- Control Panel -->
             <div class="bg-gray-800 p-4 border-b-4 border-gray-700">
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -275,10 +364,15 @@ function removeFromParty(pokemon: Pokemon) {
                             <h2 class="font-bold text-lg">
                                 Pokémon Collection ({{ filteredPokemon.length }})
                             </h2>
-                            <div class="text-xs mt-1 flex space-x-4">
-                                <span>Party: {{ gameStore.playerPokemon.length }}</span>
-                                <span>Working: {{ gameStore.idleWorking.length }}</span>
-                                <span>Available: {{ gameStore.availablePokemon.length }}</span>
+                            <div class="text-xs mt-1 flex justify-between items-center">
+                                <div class="flex space-x-4">
+                                    <span>Party: {{ gameStore.playerPokemon.length }}</span>
+                                    <span>Working: {{ gameStore.idleWorking.length }}</span>
+                                    <span>Available: {{ gameStore.availablePokemon.length }}</span>
+                                </div>
+                                <div v-if="totalPages > 1" class="text-xs">
+                                    Page {{ currentPage }} of {{ totalPages }}
+                                </div>
                             </div>
                         </div>
 
@@ -307,7 +401,7 @@ function removeFromParty(pokemon: Pokemon) {
                             </div>
 
                             <div 
-                                v-for="pokemon in filteredPokemon" 
+                                v-for="pokemon in paginatedPokemon" 
                                 :key="pokemon.uniqueId || `${pokemon.name}-${pokemon.level}`"
                                 @click="handlePokemonSelect(pokemon)"
                                 :class="selectedPokemon === pokemon ? 'bg-blue-100 border-blue-500 ring-2 ring-blue-500' : 'bg-white border-gray-200 hover:bg-gray-50'"
@@ -382,7 +476,19 @@ function removeFromParty(pokemon: Pokemon) {
 
                                         <!-- Actions -->
                                         <div class="col-span-1 flex justify-end">
-                                            <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                            <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center space-x-1">
+                                                <!-- Release Button -->
+                                                <button
+                                                    v-if="canReleasePokemon(pokemon)"
+                                                    @click.stop="releasePokemon(pokemon)"
+                                                    class="w-4 h-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center transition-colors"
+                                                    title="Release Pokémon"
+                                                >
+                                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                    </svg>
+                                                </button>
+                                                
                                                 <!-- Add to Party Button -->
                                                 <button
                                                     v-if="canAddToParty(pokemon)"
@@ -407,7 +513,7 @@ function removeFromParty(pokemon: Pokemon) {
                                                 </button>
                                                 <!-- Working/Unavailable indicator -->
                                                 <div
-                                                    v-else
+                                                    v-else-if="!canAddToParty(pokemon) && !canRemoveFromParty(pokemon)"
                                                     class="w-5 h-5 bg-gray-400 text-white rounded-full flex items-center justify-center"
                                                     title="Cannot modify while working or party full"
                                                 >
@@ -421,6 +527,50 @@ function removeFromParty(pokemon: Pokemon) {
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Pagination Controls -->
+                        <div v-if="totalPages > 1" class="bg-gray-200 p-2 border-t">
+                            <div class="flex items-center justify-between">
+                                <button
+                                    @click="goToPage(currentPage - 1)"
+                                    :disabled="currentPage === 1"
+                                    :class="currentPage === 1 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'"
+                                    class="px-3 py-1 rounded text-sm font-medium transition-colors"
+                                >
+                                    Previous
+                                </button>
+                                
+                                <div class="flex space-x-1">
+                                    <button
+                                        v-for="page in Math.min(totalPages, 5)"
+                                        :key="page"
+                                        @click="goToPage(page)"
+                                        :class="page === currentPage ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'"
+                                        class="w-8 h-8 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                    >
+                                        {{ page }}
+                                    </button>
+                                    <span v-if="totalPages > 5" class="flex items-center px-2 text-gray-500">...</span>
+                                    <button
+                                        v-if="totalPages > 5 && currentPage < totalPages - 2"
+                                        @click="goToPage(totalPages)"
+                                        :class="totalPages === currentPage ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'"
+                                        class="w-8 h-8 rounded text-sm font-medium transition-colors flex items-center justify-center"
+                                    >
+                                        {{ totalPages }}
+                                    </button>
+                                </div>
+                                
+                                <button
+                                    @click="goToPage(currentPage + 1)"
+                                    :disabled="currentPage === totalPages"
+                                    :class="currentPage === totalPages ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'"
+                                    class="px-3 py-1 rounded text-sm font-medium transition-colors"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -430,11 +580,51 @@ function removeFromParty(pokemon: Pokemon) {
                         :pokemon="selectedPokemon" 
                         :can-add-to-party="selectedPokemon ? canAddToParty(selectedPokemon) : false"
                         :can-remove-from-party="selectedPokemon ? canRemoveFromParty(selectedPokemon) : false"
+                        :can-release="selectedPokemon ? canReleasePokemon(selectedPokemon) : false"
                         @add-to-party="addToParty"
                         @remove-from-party="removeFromParty"
+                        @release-pokemon="releasePokemon"
                     />
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Release Confirmation Modal -->
+    <ConfirmationModal
+        :is-visible="showReleaseModal"
+        type="danger"
+        title="Release Pokémon"
+        :message="`Are you sure you want to release ${pokemonToRelease?.name}? This action cannot be undone and the Pokémon will be permanently removed from your collection.`"
+        subtitle="This action is irreversible"
+        confirm-text="Release"
+        cancel-text="Keep"
+        @confirm="confirmRelease"
+        @cancel="closeReleaseModal"
+    >
+        <template #details v-if="pokemonToRelease">
+            <div class="flex items-center space-x-3">
+                <img 
+                    :src="pokemonToRelease.sprite" 
+                    :alt="pokemonToRelease.name"
+                    class="w-12 h-12 object-contain"
+                    @error="(e) => (e.target as HTMLImageElement).src = '/images/not-found.png'"
+                />
+                <div>
+                    <div class="font-medium text-gray-900 capitalize">{{ pokemonToRelease.name }}</div>
+                    <div class="text-sm text-gray-500">Level {{ pokemonToRelease.level || 1 }} • {{ getStatusText(pokemonToRelease) }}</div>
+                    <div class="flex space-x-1 mt-1">
+                        <span 
+                            v-for="type in pokemonToRelease.types" 
+                            :key="type"
+                            class="px-2 py-0.5 text-xs rounded text-white"
+                            :class="getTypeColorClass(type)"
+                        >
+                            {{ type.charAt(0).toUpperCase() + type.slice(1) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </ConfirmationModal>
 </template>

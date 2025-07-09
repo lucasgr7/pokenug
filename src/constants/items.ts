@@ -195,6 +195,20 @@ const items: Record<string, ItemDefinition> = {
     usable: false,
     consumable: false
   },
+  'seeker-stone': {
+    id: 'seeker-stone',
+    name: 'Seeker Stone',
+    description: 'A mystical stone that reveals hidden Pokemon. Use it to choose the next Pokemon that will appear in your current region.',
+    type: 'material',
+    rarity: 'rare',
+    icon: '/images/seeker-stone.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'choose-next-spawn'
+    }
+  },
   'expansion-crystal': {
     id: 'expansion-crystal',
     name: 'Expansion Crystal',

@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-h-screen bg-gray-100">
     <!-- Left Panel -->
-    <div class="w-64 bg-red-600 text-white p-4 space-y-4">
+    <div class="w-64 flex-shrink-0 bg-red-600 text-white p-4 space-y-4">
       <div class="text-xl font-bold mb-6 text-center">PokéNGU</div>
       <NotificationHeader />
       <nav class="space-y-1">

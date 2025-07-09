@@ -392,5 +392,37 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     icon: '/images/rock-emblem.png',
     backgroundColor: TYPE_COLORS[PokemonType.Rock],
     percentualProgressWithAdditionalPokemon: 0.1 // 10% progress per additional Pokemon
+  },
+  'seeker-stone-mining': {
+    id: 'seeker-stone-mining',
+    type: PokemonType.Ground,
+    name: 'Seeker Stone Mining',
+    description: 'Ground Pokemon mine deep underground to find mystical seeker stones that can reveal hidden Pokemon.',
+    maxSlots: 1,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 21600000, // 6 hours in milliseconds (6 * 60 * 60 * 1000)
+    chance: 0.7, // 70% chance of success
+    rewards: [
+      {
+        type: 'material',
+        chance: 0.7, // 70% chance
+        weight: 100,
+        itemDetails: {
+          name: 'Seeker Stone',
+          description: 'A mystical stone that reveals hidden Pokemon. Use it to choose the next Pokemon that will appear in your current region.',
+          params: { 
+            effect: 'choose-next-spawn',
+            isConsumable: true,
+            rarity: 'rare'
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/seeker-stone.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Ground],
+    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
   }
 };

@@ -20,6 +20,7 @@ interface BattleState {
   isTryingCatch: boolean;
   currentCaptureAttemptId?: string;
   battleLogs: RemovableRef<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>;
+  nextSpawnQueue: Array<{ id: number, name: string }>;
 }
 
 interface Notification {
@@ -80,7 +81,8 @@ export const useGameStore = defineStore('game', {
       isEnemyAttacking: false,
       isTryingCatch: false,
       currentCaptureAttemptId: undefined,
-      battleLogs: useStorage<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>('battleLogs', []) 
+      battleLogs: useStorage<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>('battleLogs', []),
+      nextSpawnQueue: []
     },
     notifications: useStorage<Notification[]>('notifications', []),
     inventory: {
@@ -301,7 +303,7 @@ export const useGameStore = defineStore('game', {
                   job.successfulCompletions++
 
                   if (job.rewards && job.rewards.length > 0) {
-                    const totalWeight = job.rewards.reduce((sum, reward) => sum + reward.weight, 0);
+                    const totalWeight = job.rewards.reduce((sum: number, reward: any) => sum + reward.weight, 0);
                     const randomValue = Math.random() * totalWeight;
 
                     let cumulativeWeight = 0;
@@ -783,6 +785,19 @@ export const useGameStore = defineStore('game', {
             this.addNotification(`You used a ${item.name}. It will attract Pokémon over time.`, 'success');
             return true;
 
+          case 'special':
+            // Handle special effects
+            if (item.effect.effect === 'choose-next-spawn') {
+              // This is handled by the UI layer - just return true to allow consumption
+              return true;
+            } else if (item.effect.effect === 'expand-job-slot') {
+              // Expansion crystal logic would go here
+              this.addNotification(`Used ${item.name}! Job slot expansion available.`, 'success');
+              return true;
+            }
+            this.addNotification(`Special effect not implemented: ${item.effect.effect}`, 'error');
+            return false;
+
           default:
             this.addNotification(`Item effect type not supported: ${(item.effect as any).type}`, 'error');
             return false;
@@ -919,21 +934,28 @@ export const useGameStore = defineStore('game', {
         return;
       }
 
-      const region = this.currentRegionData;
+      let selectedPokemon: { id: number, name: string };
 
-      // Use probability-based selection
-      const weightedPool: Array<{ id: number, name: string }> = [];
+      // Check if there's a queued Pokemon to spawn first
+      if (this.battle.nextSpawnQueue.length > 0) {
+        selectedPokemon = this.battle.nextSpawnQueue.shift()!;
+        this.addBattleLog(`A ${selectedPokemon.name} appears from the seeker stone's power!`, 'system');
+      } else {
+        // Normal probability-based selection
+        const region = this.currentRegionData;
+        const weightedPool: Array<{ id: number, name: string }> = [];
 
-      region.pool.forEach((pokemon: { probability: number; id: any; name: any }) => {
-        // Add Pokémon to the pool multiple times based on its probability
-        const count = pokemon.probability || 1;
-        for (let i = 0; i < count; i++) {
-          weightedPool.push({ id: pokemon.id, name: pokemon.name });
-        }
-      });
+        region.pool.forEach((pokemon: { probability: number; id: any; name: any }) => {
+          // Add Pokémon to the pool multiple times based on its probability
+          const count = pokemon.probability || 1;
+          for (let i = 0; i < count; i++) {
+            weightedPool.push({ id: pokemon.id, name: pokemon.name });
+          }
+        });
 
-      // Select a random Pokémon from the weighted pool
-      const selectedPokemon = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+        // Select a random Pokémon from the weighted pool
+        selectedPokemon = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+      }
 
       try {
         const response = await fetch('/pokemon-data.json');
@@ -941,7 +963,7 @@ export const useGameStore = defineStore('game', {
         const pokemon = pokemonList.find((p: Pokemon) => p.id === selectedPokemon.id);
 
         if (pokemon) {
-          await this.createWildPokemon(pokemon, region);
+          await this.createWildPokemon(pokemon, this.currentRegionData);
         }
       } catch (error) {
         console.error('Failed to spawn wild Pokemon:', error);
@@ -1245,7 +1267,7 @@ export const useGameStore = defineStore('game', {
       this.saveState()
     },
 
-    enemyAttack(retryCount: number = 0) {
+    enemyAttack() {
       const wildPokemon = this.battle.wildPokemon
       const activePokemon = this.activePokemon
       const buffStore = useBuffStore()
@@ -1253,16 +1275,9 @@ export const useGameStore = defineStore('game', {
 
       if (!wildPokemon || !activePokemon || wildPokemon.isRunning) return
 
-      // If another enemy attack is already in progress, queue this one
-      if (this.battle.isEnemyAttacking && retryCount < 5) {
-        setTimeout(() => {
-          this.enemyAttack(retryCount + 1)
-        }, 50)
-        return
-      }
-
-      // If we've exceeded retry count, skip this attack cycle
-      if (retryCount >= 5) {
+      // If another enemy attack is already in progress, skip this cycle
+      // The tickSystem will call this again on the next tick
+      if (this.battle.isEnemyAttacking) {
         return
       }
 
@@ -1298,8 +1313,9 @@ export const useGameStore = defineStore('game', {
         if (wouldFaint && buffStore.hasRockEmblem) {
           // Check if we have potions that can be auto-used
           const potions = inventoryStore.getItemsByType('potion')
+          const totalPotions = potions.reduce((sum, potion) => sum + potion.quantity, 0)
+          if (potions.length >= 1 && totalPotions >= 4) {
 
-          if (potions.length > 0) {
             // Auto-use the smallest potion that can would prevent fainting
             const sortedPotions = [...potions].sort((a, b) => {
               const healA = a.effect?.type === 'heal' ? a.effect.value : 0
@@ -1316,10 +1332,12 @@ export const useGameStore = defineStore('game', {
             )
 
             // Apply the potion effect first
-            this.applyItemEffect(potion, activePokemon)
+            for(let i = 0; i < 4; i++) {
+              this.useInventoryItem(potion)
+            }
 
             // Remove the potion from inventory
-            inventoryStore.removeItem(potion.id, 1)
+            inventoryStore.removeItem(potion.id, 4)
 
             // Calculate damage after potion was applied
             const newCurrentHP = activePokemon.currentHP ?? 0
@@ -1561,7 +1579,8 @@ export const useGameStore = defineStore('game', {
         isEnemyAttacking: false,
         isTryingCatch: false,
         currentCaptureAttemptId: undefined,
-        battleLogs: this.battle.battleLogs, 
+        battleLogs: this.battle.battleLogs,
+        nextSpawnQueue: this.battle.nextSpawnQueue || []
       }
     },
 
@@ -2118,6 +2137,121 @@ export const useGameStore = defineStore('game', {
       } else {
         console.log('No duplicate Pokémon found.');
       }
-    }
+    },
+
+    releasePokemon(pokemon: Pokemon) {
+      // Remove from party if it's there
+      const partyIndex = this.playerPokemon.findIndex(p => 
+        p.uniqueId ? p.uniqueId === pokemon.uniqueId : p === pokemon
+      );
+      if (partyIndex !== -1) {
+        // If it's the active pokemon, switch to another one first
+        if (partyIndex === this.activePokemonIndex) {
+          const nextPokemon = this.findNextAvailablePokemon();
+          if (nextPokemon) {
+            this.setActivePokemon(nextPokemon);
+          } else {
+            // Adjust active pokemon index if no other pokemon available
+            this.activePokemonIndex = Math.max(0, this.activePokemonIndex - 1);
+          }
+        }
+        
+        // Adjust active pokemon index if needed
+        if (partyIndex <= this.activePokemonIndex && this.activePokemonIndex > 0) {
+          this.activePokemonIndex--;
+        }
+        
+        this.playerPokemon.splice(partyIndex, 1);
+      }
+
+      // Remove from available Pokemon if it's there
+      const availableIndex = this.availablePokemon.findIndex(p => 
+        p.uniqueId ? p.uniqueId === pokemon.uniqueId : p === pokemon
+      );
+      if (availableIndex !== -1) {
+        this.availablePokemon.splice(availableIndex, 1);
+      }
+
+      // Remove from working Pokemon if it's there
+      const workingIndex = this.idleWorking.findIndex(p => 
+        p.uniqueId ? p.uniqueId === pokemon.uniqueId : p === pokemon
+      );
+      if (workingIndex !== -1) {
+        this.idleWorking.splice(workingIndex, 1);
+      }
+
+      // Remove from any idle jobs
+      Object.values(this.idleJobs).forEach(job => {
+        const jobIndex = job.assignedPokemon.findIndex(p => 
+          p.uniqueId ? p.uniqueId === pokemon.uniqueId : p === pokemon
+        );
+        if (jobIndex !== -1) {
+          job.assignedPokemon.splice(jobIndex, 1);
+        }
+      });
+
+      // Remove from inventory tracking
+      const inventoryKey = pokemon.name;
+      if (this.inventory.pokemon[inventoryKey]) {
+        const instanceIndex = this.inventory.pokemon[inventoryKey].instances.findIndex(p => 
+          p.uniqueId ? p.uniqueId === pokemon.uniqueId : p === pokemon
+        );
+        if (instanceIndex !== -1) {
+          this.inventory.pokemon[inventoryKey].instances.splice(instanceIndex, 1);
+          this.inventory.pokemon[inventoryKey].count--;
+          
+          // Remove the entry entirely if no instances remain
+          if (this.inventory.pokemon[inventoryKey].count <= 0) {
+            delete this.inventory.pokemon[inventoryKey];
+          }
+        }
+      }
+
+      this.saveState();
+      return true;
+    },
+
+    // Queue a Pokemon to be the next one spawned
+    queuePokemonForSpawn(pokemonId: number, pokemonName: string) {
+      this.battle.nextSpawnQueue.push({ id: pokemonId, name: pokemonName });
+    },
+
+    // Get all available Pokemon from current region (pool + berryPool)
+    getCurrentRegionPokemonPool(): Array<{ id: number, name: string, probability: number, source: 'pool' | 'berryPool' }> {
+      if (this.currentRegion === 'Home') {
+        return [];
+      }
+
+      const region = this.currentRegionData as any;
+      const allPokemon: Array<{ id: number, name: string, probability: number, source: 'pool' | 'berryPool' }> = [];
+
+      // Add Pokemon from regular pool
+      region.pool.forEach((pokemon: { probability: number; id: any; name: any }) => {
+        allPokemon.push({
+          id: pokemon.id,
+          name: pokemon.name,
+          probability: pokemon.probability,
+          source: 'pool'
+        });
+      });
+
+      // Add Pokemon from berry pool if it exists
+      if (region.berryPool) {
+        region.berryPool.forEach((pokemon: { probability: number; id: any; name: any }) => {
+          // Check if Pokemon is already in the list from regular pool
+          const existing = allPokemon.find(p => p.id === pokemon.id);
+          if (!existing) {
+            allPokemon.push({
+              id: pokemon.id,
+              name: pokemon.name,
+              probability: pokemon.probability,
+              source: 'berryPool'
+            });
+          }
+        });
+      }
+
+      return allPokemon;
+    },
   }
 });

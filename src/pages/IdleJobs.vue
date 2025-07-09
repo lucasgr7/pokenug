@@ -272,13 +272,13 @@ function getTotalLevels(jobId: string): number {
 }
 </script>
 <template>
-  <div class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen p-6">
+  <div class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen p-4 lg:p-6">
     <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Idle Jobs</h1>
     
     <!-- Grid layout with PokemonGrid on the left and Carousel on the right -->
-    <div class="flex flex-col xl:flex-row space-y-6 xl:space-y-0 xl:space-x-6 max-w-7xl mx-auto">
+    <div class="flex flex-col xl:flex-row space-y-6 xl:space-y-0 xl:space-x-6 max-w-6xl mx-auto">
       <!-- Left Column: PokemonGrid -->
-      <div class="w-full xl:w-1/4">
+      <div class="w-full xl:w-80 xl:flex-shrink-0">
         <div class="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
           <h2 class="text-xl font-bold text-gray-700 mb-3">Available Pokémon</h2>
           
@@ -308,7 +308,7 @@ function getTotalLevels(jobId: string): number {
       </div>
 
       <!-- Right Column: Carousel -->
-      <div class="w-full xl:w-3/4">
+      <div class="w-full xl:flex-1 xl:min-w-0">
         <!-- Carousel Navigation Indicators -->
         <div class="flex justify-center mb-6">
           <div class="flex space-x-2">
@@ -330,7 +330,7 @@ function getTotalLevels(jobId: string): number {
         </div>
 
         <!-- Main Carousel Container -->
-        <div class="relative overflow-hidden">
+        <div class="relative overflow-hidden max-w-4xl mx-auto">
           <!-- Navigation Arrows -->
           <button
             @click="prevJob"
@@ -362,14 +362,14 @@ function getTotalLevels(jobId: string): number {
 
           <!-- Carousel Cards Container -->
           <div
-            class="flex transition-transform duration-500 ease-out mx-16"
+            class="flex transition-transform duration-500 ease-out mx-8 sm:mx-12 lg:mx-16"
             :style="{ transform: `translateX(-${currentJobIndex * 100}%)` }"
           >
             <!-- Job Cards -->
             <div
               v-for="(job, id) in availableJobs"
               :key="id"
-              class="w-full flex-shrink-0 px-4"
+              class="w-full flex-shrink-0 px-2 sm:px-4"
             >
               <!-- Animated Job Card -->
               <div
@@ -415,11 +415,11 @@ function getTotalLevels(jobId: string): number {
                   <p class="text-sm opacity-80 mb-4">{{ job.description }}</p>
                   
                   <!-- Stats Section -->
-                  <div class="bg-black bg-opacity-10 rounded-xl p-4 mb-4">
+                  <div class="bg-black bg-opacity-10 rounded-xl p-3 lg:p-4 mb-4">
                     <!-- Total Level Display -->
                     <div v-if="job.assignedPokemon.length > 0" class="mb-3">
                       <span 
-                        class="inline-block bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-medium cursor-help"
+                        class="inline-block bg-white bg-opacity-30 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium cursor-help"
                         @mouseover="showInfoTooltip($event, tooltips.totalLevel)"
                         @mouseout="hideTooltip"
                       >
@@ -435,7 +435,7 @@ function getTotalLevels(jobId: string): number {
                         @mouseout="hideTooltip"
                       >
                         <div class="font-medium">Base Success</div>
-                        <div class="text-lg font-bold">{{ formatPercent(job.chance) }}</div>
+                        <div class="text-sm lg:text-lg font-bold">{{ formatPercent(job.chance) }}</div>
                       </div>
                       
                       <div 
@@ -445,7 +445,7 @@ function getTotalLevels(jobId: string): number {
                         @mouseout="hideTooltip"
                       >
                         <div class="font-medium">Current Success</div>
-                        <div class="text-lg font-bold">{{ formatPercent(gameStore.getJobSuccessChance(String(id))) }}</div>
+                        <div class="text-sm lg:text-lg font-bold">{{ formatPercent(gameStore.getJobSuccessChance(String(id))) }}</div>
                       </div>
                     </div>
                     
@@ -524,10 +524,10 @@ function getTotalLevels(jobId: string): number {
                   </div>
                   
                   <!-- Pokemon Slots -->
-                  <div class="bg-black bg-opacity-10 rounded-xl p-4">
+                  <div class="bg-black bg-opacity-10 rounded-xl p-3 lg:p-4">
                     <h4 class="text-sm font-bold mb-2 opacity-90">Assigned Pokémon</h4>
                     <div 
-                      class="grid grid-cols-5 gap-2" 
+                      class="grid grid-cols-4 sm:grid-cols-5 gap-1 sm:gap-2" 
                       @dragover.prevent
                       @drop="handleDrop($event, id)"
                       @mouseover="showInfoTooltip($event, tooltips.dragPokemon)"

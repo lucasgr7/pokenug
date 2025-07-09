@@ -46,6 +46,13 @@ import { useGameStore } from '../stores/gameStore'
 import type { InventoryItem } from '@/types/pokemon'
 import JobSlotExpansionModal from './JobSlotExpansionModal.vue'
 
+// Define emits
+interface Emits {
+  (e: 'use-seeker-stone', item: InventoryItem): void
+}
+
+const emit = defineEmits<Emits>()
+
 // Use the inventory composable
 const inventory = useInventory()
 
@@ -100,6 +107,12 @@ function useItem(item: InventoryItem) {
       if (item.id === 'expansion-crystal') {
         showExpansionModal.value = true
         return // Don't remove the item yet, wait for job selection
+      }
+      // Check if this is a seeker stone
+      if (item.id === 'seeker-stone') {
+        // Emit an event to the parent to handle seeker stone usage
+        emit('use-seeker-stone', item)
+        return
       }
       gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
       break
