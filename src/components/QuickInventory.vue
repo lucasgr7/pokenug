@@ -1,103 +1,65 @@
 <template>
   <div class="relative">
-    <!-- Header with gradient background -->
-    <div class="flex justify-between items-center mb-3 px-3 py-2 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 rounded-xl backdrop-blur-sm border border-white/10">
-      <h3 class="text-sm font-bold text-white/90 flex items-center">
-        <div class="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full mr-2 animate-pulse"></div>
-        Inventory
+    <!-- Clean flat header -->
+    <div class="flex justify-between items-center px-4 py-3 bg-slate-800/90 rounded-2xl border border-slate-700/50">
+      <h3 class="text-sm font-semibold text-white flex items-center">
+        <div class="w-2 bg-blue-400  mr-3"></div>
+        Quick Inventory
       </h3>
-      <router-link to="/inventory" class="text-xs text-white/60 hover:text-white/90 transition-all duration-300 hover:scale-105">
-        View All →
+      <router-link to="/inventory" class="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1">
+        View All
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
       </router-link>
     </div>
 
-    <!-- Items Grid with enhanced styling -->
-    <div class="grid grid-cols-3 gap-2 p-2 bg-black/20 rounded-xl backdrop-blur-sm border border-white/5">
+    <!-- Flat items grid -->
+    <div class="grid grid-cols-3 gap-1 p-2 bg-slate-800/60 rounded-3xl border border-slate-700/30">
       <div 
         v-for="(item, index) in commonItems" 
         :key="item.id" 
         :class="[
-          'group relative flex flex-col items-center cursor-pointer transition-all duration-500 ease-out',
-          'p-3 rounded-lg overflow-hidden transform hover:scale-105 hover:-translate-y-1',
-          'border border-white/10 backdrop-blur-sm',
-          item.usable ? 'hover:shadow-2xl hover:shadow-purple-500/20' : 'opacity-60 cursor-not-allowed',
-          getItemGradientClass(item)
+          'group relative flex flex-col items-center cursor-pointer transition-all duration-200',
+          'p-4 rounded-xl',
+          item.usable ? 'hover:scale-105 hover:-translate-y-1' : 'opacity-50 cursor-not-allowed',
+          getItemBackgroundClass(item)
         ]"
-        :style="{ animationDelay: `${index * 100}ms` }"
         @click="useItem(item)"
       >
-        <!-- Animated background blob -->
-        <div class="absolute inset-0 opacity-20">
-          <div class="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent rounded-lg animate-float"></div>
-          <div class="absolute top-0 right-0 w-8 h-8 bg-white/10 rounded-full blur-sm animate-float-delayed"></div>
-        </div>
-
-        <!-- Liquid ripple effect on hover -->
-        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div class="absolute inset-0 bg-gradient-radial from-white/20 via-white/5 to-transparent rounded-lg animate-ripple"></div>
-        </div>
-
-        <!-- Item image with enhanced styling -->
-        <div class="relative z-10 mb-2">
-          <div class="w-12 h-12 flex items-center justify-center bg-white/10 rounded-full backdrop-blur-sm border border-white/20 group-hover:border-white/40 transition-all duration-300">
+        <!-- Circular image container -->
+        <div class="relative mb-3">
+          <div class="w-16 h-16 rounded-full overflow-hidden border-3 border-white/20 group-hover:border-white/40 transition-all duration-200 bg-white/10">
             <img 
               :src="`/images/${item.id}.png`" 
               :alt="item.name" 
-              class="w-8 h-8 object-contain filter drop-shadow-lg group-hover:scale-110 transition-transform duration-300" 
+              class="w-full object-cover object-center group-hover:scale-110 transition-transform duration-200" 
               @error="handleImageError"
             >
           </div>
-        </div>
-        
-        <!-- Item name with better typography -->
-        <span class="relative z-10 text-[10px] font-medium text-white/80 text-center leading-tight truncate w-full group-hover:text-white transition-colors duration-300">
-          {{ item.name }}
-        </span>
-        
-        <!-- Quantity badge with modern styling -->
-        <div class="absolute -top-1 -right-1 z-20">
-          <div class="bg-gradient-to-r from-yellow-400 to-orange-400 text-black text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-white/20 shadow-lg animate-bounce-subtle">
-            {{ item.quantity }}
+          
+          <!-- Quantity badge -->
+          <div class="absolute -top-1 -right-1 z-10">
+            <div class="bg-white text-slate-800 text-xs font-bold px-2 py-1 rounded-full shadow-lg min-w-[20px] text-center">
+              {{ item.quantity }}
+            </div>
           </div>
         </div>
         
-        <!-- Type indicators with enhanced styling -->
-        <div class="absolute bottom-1 right-1 z-20">
-          <!-- Consumable indicator -->
-          <div 
-            v-if="item.consumable" 
-            class="w-2.5 h-2.5 bg-gradient-to-r from-red-400 to-pink-400 rounded-full border border-white/30 shadow-lg animate-pulse"
-            title="Consumable"
-          ></div>
-          
-          <!-- Pokeball indicator -->
-          <div 
-            v-else-if="item.type === 'pokeball'" 
-            class="w-2.5 h-2.5 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full border border-white/30 shadow-lg animate-pulse"
-            title="Pokeball"
-          ></div>
-
-          <!-- Material indicator -->
-          <div 
-            v-else-if="item.type === 'material'" 
-            class="w-2.5 h-2.5 bg-gradient-to-r from-gray-400 to-slate-400 rounded-full border border-white/30 shadow-lg animate-pulse"
-            title="Material"
-          ></div>
-        </div>
-
-        <!-- Hover glow effect -->
-        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-          <div class="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/10 rounded-lg"></div>
-        </div>
+        
+        <!-- Hover overlay -->
+        <div class="absolute inset-0 bg-white/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
       </div>
 
-      <!-- Empty state with enhanced styling -->
-      <div v-if="commonItems.length === 0" class="col-span-3 text-center py-6">
-        <div class="bg-gradient-to-r from-red-500/20 to-pink-500/20 rounded-lg p-4 border border-red-500/20 backdrop-blur-sm">
-          <div class="w-8 h-8 bg-red-500/20 rounded-full mx-auto mb-2 flex items-center justify-center">
-            <span class="text-red-400 text-sm">!</span>
+      <!-- Empty state -->
+      <div v-if="commonItems.length === 0" class="col-span-3 text-center py-8">
+        <div class="bg-slate-700/50 rounded-xl p-6 border border-slate-600/50">
+          <div class="w-12 h-12 bg-slate-600/50 rounded-full mx-auto mb-3 flex items-center justify-center">
+            <svg class="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"></path>
+            </svg>
           </div>
-          <span class="text-xs text-red-300/80">No items yet</span>
+          <span class="text-sm text-slate-400">No items available</span>
         </div>
       </div>
     </div>
@@ -119,11 +81,9 @@ import type { InventoryItem } from '@/types/pokemon'
 import JobSlotExpansionModal from './JobSlotExpansionModal.vue'
 
 // Define emits
-interface Emits {
-  (e: 'use-seeker-stone', item: InventoryItem): void
-}
-
-const emit = defineEmits<Emits>()
+const emit = defineEmits<{
+  'use-seeker-stone': [item: InventoryItem]
+}>()
 
 // Use the inventory composable
 const inventory = useInventory()
@@ -159,60 +119,81 @@ function useItem(item: InventoryItem) {
   // Handle item usage based on type
   switch (item.type) {
     case 'pokeball':
-      // Only usable in battle
-      if (!gameStore.battle.wildPokemon) {
-        gameStore.addNotification('No wild Pokemon to catch!', 'error')
-      } else {
-        // Initialize the catch attempt
-        gameStore.tryCapture()
-      }
+      handlePokeballUsage()
       break
       
     case 'potion':
     case 'berries':
-      // Apply the effect on the active Pokemon
       gameStore.useInventoryItem(item)
       break
       
     case 'material':
-      // Check if this is an expansion crystal
-      if (item.id === 'expansion-crystal') {
-        showExpansionModal.value = true
-        return // Don't remove the item yet, wait for job selection
-      }
-      // Check if this is a seeker stone
-      if (item.id === 'seeker-stone') {
-        // Emit an event to the parent to handle seeker stone usage
-        emit('use-seeker-stone', item)
-        return
-      }
-      // Check if this is a dragon stone
-      if (item.id === 'dragon-stone') {
-        // Check if temporary region is already active
-        if (gameStore.isTemporaryRegionActive) {
-          gameStore.addNotification('A temporary region is already active!', 'error')
-          return
-        }
-        // Use the dragon stone
-        inventory.getInventoryStore().removeItem(item.id, 1)
-        gameStore.consumeDragonStone()
-        gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
-        return
-      }
-      // Check if this is a phantom contract
-      if (item.id === 'phantom-contract') {
-        // Use the phantom contract
-        const success = gameStore.useInventoryItem(item)
-        if (success) {
-          gameStore.addNotification('Phantom Contract activated! Fear factor reset and guaranteed capture enabled!', 'success')
-        }
-        return
-      }
-      gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
+      handleMaterialUsage(item)
       break
       
     default:
       gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
+  }
+}
+
+/**
+ * Handle pokeball usage
+ */
+function handlePokeballUsage() {
+  if (!gameStore.battle.wildPokemon) {
+    gameStore.addNotification('No wild Pokemon to catch!', 'error')
+  } else {
+    gameStore.tryCapture()
+  }
+}
+
+/**
+ * Handle material item usage
+ */
+function handleMaterialUsage(item: InventoryItem) {
+  switch (item.id) {
+    case 'expansion-crystal':
+      showExpansionModal.value = true
+      break
+      
+    case 'seeker-stone':
+      emit('use-seeker-stone', item)
+      break
+      
+    case 'dragon-stone':
+      handleDragonStoneUsage(item)
+      break
+      
+    case 'phantom-contract':
+      handlePhantomContractUsage(item)
+      break
+      
+    default:
+      gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
+  }
+}
+
+/**
+ * Handle dragon stone usage
+ */
+function handleDragonStoneUsage(item: InventoryItem) {
+  if (gameStore.isTemporaryRegionActive) {
+    gameStore.addNotification('A temporary region is already active!', 'error')
+    return
+  }
+  
+  inventory.getInventoryStore().removeItem(item.id, 1)
+  gameStore.consumeDragonStone()
+  gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
+}
+
+/**
+ * Handle phantom contract usage
+ */
+function handlePhantomContractUsage(item: InventoryItem) {
+  const success = gameStore.useInventoryItem(item)
+  if (success) {
+    gameStore.addNotification('Phantom Contract activated! Fear factor reset and guaranteed capture enabled!', 'success')
   }
 }
 
@@ -238,146 +219,97 @@ function handleImageError(event: Event) {
 }
 
 /**
- * Get background gradient class based on item type
+ * Get background color class based on item type
  */
-function getItemGradientClass(item: InventoryItem): string {
+function getItemBackgroundClass(item: InventoryItem): string {
   switch (item.type) {
     case 'pokeball': 
-      return 'bg-gradient-to-br from-blue-600/40 via-blue-500/30 to-cyan-400/20'
+      return 'bg-blue-500/20 hover:bg-blue-500/30'
     case 'potion': 
-      return 'bg-gradient-to-br from-green-600/40 via-emerald-500/30 to-lime-400/20'
+      return 'bg-green-500/20 hover:bg-green-500/30'
     case 'berries': 
-      return 'bg-gradient-to-br from-purple-600/40 via-violet-500/30 to-pink-400/20'
+      return 'bg-purple-500/20 hover:bg-purple-500/30'
     case 'material': 
-      return 'bg-gradient-to-br from-gray-600/40 via-slate-500/30 to-gray-400/20'
+      return 'bg-gray-500/20 hover:bg-gray-500/30'
     case 'key': 
-      return 'bg-gradient-to-br from-yellow-600/40 via-amber-500/30 to-orange-400/20'
+      return 'bg-yellow-500/20 hover:bg-yellow-500/30'
     default: 
-      return 'bg-gradient-to-br from-indigo-600/40 via-blue-500/30 to-purple-400/20'
+      return 'bg-slate-500/20 hover:bg-slate-500/30'
   }
 }
 
 /**
- * Get background color class based on item type
+ * Get type indicator color class
  */
-function getItemColorClass(item: InventoryItem): string {
+function getTypeIndicatorClass(item: InventoryItem): string {
   switch (item.type) {
-    case 'pokeball': return 'bg-blue-700'
-    case 'potion': return 'bg-green-700'
-    case 'berries': return 'bg-purple-700'
-    case 'material': return 'bg-gray-700'
-    case 'key': return 'bg-yellow-700'
-    default: return 'bg-green-700'
+    case 'pokeball': 
+      return 'bg-blue-400'
+    case 'potion': 
+      return 'bg-green-400'
+    case 'berries': 
+      return 'bg-purple-400'
+    case 'material': 
+      return 'bg-gray-400'
+    case 'key': 
+      return 'bg-yellow-400'
+    default: 
+      return 'bg-slate-400'
   }
 }
 </script>
 
 <style scoped>
-/* Custom animations for liquid effects */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-    opacity: 0.7;
-  }
-  50% {
-    transform: translateY(-10px) rotate(180deg);
-    opacity: 1;
-  }
-}
-
-@keyframes float-delayed {
-  0%, 100% {
-    transform: translateY(0px) translateX(0px) scale(1);
-    opacity: 0.5;
-  }
-  33% {
-    transform: translateY(-8px) translateX(-4px) scale(1.1);
-    opacity: 0.8;
-  }
-  66% {
-    transform: translateY(-12px) translateX(4px) scale(0.9);
-    opacity: 0.6;
-  }
-}
-
-@keyframes ripple {
-  0% {
-    transform: scale(0);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
-}
-
-@keyframes bounce-subtle {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
-}
-
-@keyframes gradient-shift {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-/* Animation classes */
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
-.animate-float-delayed {
-  animation: float-delayed 8s ease-in-out infinite;
-}
-
-.animate-ripple {
-  animation: ripple 0.6s ease-out;
-}
-
-.animate-bounce-subtle {
-  animation: bounce-subtle 2s ease-in-out infinite;
-}
-
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient-shift 4s ease infinite;
-}
-
-/* Custom gradient radial utility */
-.bg-gradient-radial {
-  background: radial-gradient(circle, var(--tw-gradient-stops));
-}
-
-/* Enhance backdrop blur for better glass effect */
-.backdrop-blur-sm {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-
-/* Custom hover effects */
-.group:hover .group-hover\:scale-110 {
-  transform: scale(1.1);
-}
-
-/* Smooth transitions for all elements */
-* {
+/* Clean flat design styles - no fancy animations */
+.transition-all {
+  transition-property: all;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
 }
 
-/* Enhanced shadow effects */
-.hover\:shadow-2xl:hover {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+.transition-colors {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
 }
 
-.hover\:shadow-purple-500\/20:hover {
-  box-shadow: 0 25px 50px -12px rgba(147, 51, 234, 0.2);
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Custom border width for circular images */
+.border-3 {
+  border-width: 3px;
+}
+
+/* Ensure images fit perfectly in circular containers */
+.object-cover {
+  object-fit: cover;
+}
+
+.object-center {
+  object-position: center;
+}
+
+
+.group:hover .group-hover\:border-white\/40 {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Remove all fancy animations and effects */
+.hover\:scale-105:hover {
+  transform: scale(1.05);
+}
+
+.hover\:-translate-y-1:hover {
+  transform: translateY(-0.25rem) scale(1.05);
 }
 </style>
