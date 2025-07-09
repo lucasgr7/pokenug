@@ -38,6 +38,10 @@ interface FearFactorState {
   disabledRegions: Record<string, number>; // region -> disableEndTime
 }
 
+interface PhantomContractState {
+  guaranteedCaptureAvailable: boolean;
+}
+
 interface GameState {
   playerPokemon: Pokemon[]; // This will now be specifically the active party
   availablePokemon: Pokemon[]; // Pokemon not in party or working
@@ -55,7 +59,7 @@ interface GameState {
     }
   };
   unlocked: {
-    pokedex: boolean;
+    pokedex: boolean
     inventory: boolean;
     idleJobs: boolean;
   };
@@ -68,16 +72,15 @@ interface GameState {
     remainingTime: number;
   };
   fearFactor: RemovableRef<FearFactorState>;
+  phantomContract: RemovableRef<PhantomContractState>;
   pendingSave: boolean; // Flag to track if state needs to be saved
 }
 
 // Constants
 const BASE_HITS_TO_DEFEAT = 10
-const LEVEL_SCALING_FACTOR = 1.2
 const HP_REGEN_RATE = 2.5 // 2.5% per second
 const ENEMY_ATTACK_INTERVAL = 3000
 const RUN_CHANCE = 0.05
-const RUN_CHECK_INTERVAL = 5000
 
 // Fear Factor Constants - Easy to balance
 const FEAR_FACTOR_WINDOW = 30000 // 10 seconds in milliseconds - window to track defeats
@@ -124,6 +127,9 @@ export const useGameStore = defineStore('game', {
     fearFactor: useStorage<FearFactorState>('fearFactor', {
       defeats: [],
       disabledRegions: {}
+    }),
+    phantomContract: useStorage<PhantomContractState>('phantomContract', {
+      guaranteedCaptureAvailable: false
     }),
     pendingSave: false
   }),
@@ -318,7 +324,9 @@ export const useGameStore = defineStore('game', {
       const now = Date.now();
       const disableEndTime = state.fearFactor.disabledRegions[region];
       return disableEndTime ? Math.max(0, disableEndTime - now) : 0;
-    }
+    },
+
+    hasGuaranteedCapture: (state) => state.phantomContract.guaranteedCaptureAvailable
   },
 
   actions: {
@@ -993,6 +1001,12 @@ export const useGameStore = defineStore('game', {
               // Expansion crystal logic would go here
               this.addNotification(`Used ${item.name}! Job slot expansion available.`, 'success');
               return true;
+            } else if (item.effect.effect === 'phantom-contract') {
+              // Reset fear factor for current region and enable guaranteed capture
+              this.resetFearFactor(this.currentRegion);
+              this.phantomContract.guaranteedCaptureAvailable = true;
+              this.addNotification(`Used ${item.name}! Fear factor reset and guaranteed capture enabled!`, 'success');
+              return true;
             }
             this.addNotification(`Special effect not implemented: ${item.effect.effect}`, 'error');
             return false;
@@ -1448,7 +1462,23 @@ export const useGameStore = defineStore('game', {
         // Track defeat for fear factor
         this.addDefeatToFearFactor(this.currentRegion);
 
-        this.addBattleLog(`${defeatedPokemon.name} fainted!`, 'system');
+        // Check for guaranteed capture (phantom contract)
+        if (this.phantomContract.guaranteedCaptureAvailable) {
+          this.addBattleLog(`${defeatedPokemon.name} fainted! Phantom Contract activates - guaranteed capture!`, 'system');
+          // Create a copy of the defeated Pokemon and add a unique identifier to it
+          const capturedPokemon = {
+            ...defeatedPokemon,
+            uniqueId: generateRandomId(),
+            currentHP: defeatedPokemon.maxHP // Restore to full HP when captured
+          };
+          this.addPokemonToInventory(capturedPokemon);
+          // Consume the phantom contract
+          this.phantomContract.guaranteedCaptureAvailable = false;
+          this.addNotification('Phantom Contract used! Pokemon captured!', 'success');
+        } else {
+          this.addBattleLog(`${defeatedPokemon.name} fainted!`, 'system');
+        }
+        
         this.battle.wildPokemon = null;
         this.startSpawnTimer();
       }
@@ -1667,6 +1697,11 @@ export const useGameStore = defineStore('game', {
 
     tryPokemonRun() {
       if (!this.battle.wildPokemon || this.battle.wildPokemon.isRunning) return
+
+      // Prevent Pokemon from running away if phantom contract guaranteed capture is active
+      if (this.phantomContract.guaranteedCaptureAvailable) {
+        return;
+      }
 
       if (Math.random() < RUN_CHANCE && this.battle.wildPokemon.currentHP! < this.battle.wildPokemon.maxHP! / 2) {
         this.battle.wildPokemon.isRunning = true
@@ -2678,6 +2713,53 @@ export const useGameStore = defineStore('game', {
       if (regionsCleared) {
         this.markStateForSaving();
       }
+    },
+
+    resetFearFactor(region: string) {
+      // Clear all defeats for the specified region
+      this.fearFactor.defeats = this.fearFactor.defeats.filter(
+        defeat => defeat.region !== region
+      );
+      
+      // Remove region from disabled regions if it's disabled
+      if (this.fearFactor.disabledRegions[region]) {
+        delete this.fearFactor.disabledRegions[region];
+      }
+      
+      this.addBattleLog(`Fear factor has been reset in ${region}!`, 'system');
+      this.markStateForSaving();
+    },
+
+    useGuaranteedCapture() {
+      if (!this.phantomContract.guaranteedCaptureAvailable) {
+        this.addNotification('No guaranteed capture available!', 'error');
+        return false;
+      }
+
+      if (!this.battle.wildPokemon) {
+        this.addNotification('No wild Pokemon to capture!', 'error');
+        return false;
+      }
+
+      // Capture the wild Pokemon instantly
+      const capturedPokemon = {
+        ...this.battle.wildPokemon,
+        uniqueId: generateRandomId()
+      };
+      
+      this.addBattleLog(`Phantom Contract activates! ${capturedPokemon.name} is captured instantly!`, 'system');
+      this.addPokemonToInventory(capturedPokemon);
+      
+      // Consume the phantom contract
+      this.phantomContract.guaranteedCaptureAvailable = false;
+      this.addNotification('Phantom Contract used! Pokemon captured!', 'success');
+      
+      // Clear the wild Pokemon
+      this.battle.wildPokemon = null;
+      this.startSpawnTimer();
+      
+      this.markStateForSaving();
+      return true;
     }
   }
 });

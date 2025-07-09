@@ -199,6 +199,15 @@ function useItem(item: InventoryItem) {
         gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
         return
       }
+      // Check if this is a phantom contract
+      if (item.id === 'phantom-contract') {
+        // Use the phantom contract
+        const success = gameStore.useInventoryItem(item)
+        if (success) {
+          gameStore.addNotification('Phantom Contract activated! Fear factor reset and guaranteed capture enabled!', 'success')
+        }
+        return
+      }
       gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
       break
       

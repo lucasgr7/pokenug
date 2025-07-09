@@ -458,5 +458,37 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     icon: '/images/dragon-stone.png',
     backgroundColor: TYPE_COLORS[PokemonType.Dragon],
     percentualProgressWithAdditionalPokemon: 0.25 // 25% progress per additional Pokemon
+  },
+  'phantom-contracting': {
+    id: 'phantom-contracting',
+    type: PokemonType.Ghost,
+    name: 'Phantom Contracting',
+    description: 'Ghost Pokemon channel spectral energies to forge mystical contracts that can calm the fears of wild Pokemon.',
+    maxSlots: 1,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 36000000, // 10 hours in milliseconds (10 * 60 * 60 * 1000)
+    chance: 0.5, // 50% chance of success
+    rewards: [
+      {
+        type: 'material',
+        chance: 0.5, // 50% chance
+        weight: 100,
+        itemDetails: {
+          name: 'Phantom Contract',
+          description: 'A mystical contract forged from spectral energies. When used, it resets the fear factor in your current region and grants you one guaranteed capture.',
+          params: { 
+            effect: 'phantom-contract',
+            isConsumable: true,
+            rarity: 'epic'
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/phantom-contract.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Ghost],
+    percentualProgressWithAdditionalPokemon: 0.20 // 20% progress per additional Pokemon
   }
 };

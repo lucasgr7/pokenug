@@ -398,6 +398,11 @@ const attack = async () => {
   await gameStore.attack()
 }
 
+// Handle guaranteed capture action
+const useGuaranteedCapture = () => {
+  gameStore.useGuaranteedCapture()
+}
+
 // Type colors function
 const getTypeColor = (type: string) => {
   const colors: Record<string, string> = {
@@ -736,6 +741,17 @@ const temporaryRegionTimeFormatted = computed(() => {
               }">
               {{ fireRateState.multiplier.toFixed(1) }}x XP
             </div>
+          </div>
+
+          <!-- Guaranteed Capture Button (Phantom Contract) -->
+          <div v-if="gameStore.hasGuaranteedCapture && wildPokemon" class="flex justify-center">
+            <button 
+              @click="useGuaranteedCapture" 
+              class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-lg border-2 border-purple-400 animate-pulse flex items-center gap-2"
+            >
+              <span class="text-lg">👻</span>
+              <span class="text-sm font-bold">Guaranteed Capture</span>
+            </button>
           </div>
 
           <!-- Action Buttons Container -->
