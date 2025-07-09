@@ -272,52 +272,54 @@ function getTotalLevels(jobId: string): number {
 }
 </script>
 <template>
-  <div class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen p-4 lg:p-6">
-    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Idle Jobs</h1>
+  <div class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen p-2 lg:p-4">
+    <h1 class="text-2xl lg:text-3xl font-bold text-gray-800 mb-3 lg:mb-4 text-center">Idle Jobs</h1>
     
-    <!-- Grid layout with PokemonGrid on the left and Carousel on the right -->
-    <div class="flex flex-col xl:flex-row space-y-6 xl:space-y-0 xl:space-x-6 max-w-6xl mx-auto">
-      <!-- Left Column: PokemonGrid -->
-      <div class="w-full xl:w-80 xl:flex-shrink-0">
-        <div class="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
-          <h2 class="text-xl font-bold text-gray-700 mb-3">Available Pokémon</h2>
+    <!-- Split layout with PokemonGrid (35%) and Carousel (65%) side by side -->
+    <div class="flex flex-col lg:flex-row gap-2 h-[calc(100vh-6rem)] max-w-full mx-auto">
+      <!-- Left Side: PokemonGrid (35%) -->
+      <div class="w-full lg:w-[35%] flex flex-col min-h-0">
+        <div class="bg-white p-2 lg:p-3 rounded-lg shadow-md border border-gray-200 flex-1 flex flex-col min-h-0">
+          <h2 class="text-sm lg:text-base font-bold text-gray-700 mb-2">Available Pokémon</h2>
           
           <!-- PokemonGrid Configuration Controls -->
-          <div class="mb-4 flex flex-wrap gap-3 text-sm">
-            <label class="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-              <input type="checkbox" v-model="showParty" class="mr-2">
+          <div class="mb-2 flex flex-wrap gap-1 lg:gap-2 text-xs lg:text-sm">
+            <label class="flex items-center bg-gray-100 px-2 py-1 rounded-full">
+              <input type="checkbox" v-model="showParty" class="mr-1">
               Show Party
             </label>
-            <label class="flex items-center bg-gray-100 px-3 py-1 rounded-full">
-              <span class="mr-2">Columns:</span>
-              <select v-model="columnSize" class="border rounded px-2 py-1 bg-white">
+            <label class="flex items-center bg-gray-100 px-2 py-1 rounded-full">
+              <span class="mr-1">Cols:</span>
+              <select v-model="columnSize" class="border rounded px-1 py-0.5 bg-white text-xs">
                 <option v-for="n in 4" :key="n" :value="n">{{ n }}</option>
               </select>
             </label>
           </div>
           
           <!-- The PokemonGrid component -->
-          <PokemonGrid 
-            :show-party="showParty"
-            :vertical-mode="verticalMode"
-            :column-size="columnSize"
-            :filter-type="''"
-            :items-per-page="itemsPerPage"
-          />
+          <div class="flex-1 min-h-0 overflow-hidden">
+            <PokemonGrid 
+              :show-party="showParty"
+              :vertical-mode="verticalMode"
+              :column-size="columnSize"
+              :filter-type="''"
+              :items-per-page="itemsPerPage"
+            />
+          </div>
         </div>
       </div>
 
-      <!-- Right Column: Carousel -->
-      <div class="w-full xl:flex-1 xl:min-w-0">
+      <!-- Right Half: Carousel -->
+      <div class="w-full md:w-1/2 flex flex-col min-h-2">
         <!-- Carousel Navigation Indicators -->
-        <div class="flex justify-center mb-6">
-          <div class="flex space-x-2">
+        <div class="flex justify-center mb-3 md:mb-4">
+          <div class="flex space-x-1.5 lg:space-x-2">
             <button
               v-for="(job, index) in Object.values(availableJobs)"
               :key="index"
               @click="goToJob(index)"
               :class="[
-                'w-4 h-4 rounded-full transition-all duration-300 border-2 border-white shadow-lg',
+                'w-3 h-3 lg:w-4 lg:h-4 rounded-full transition-all duration-300 border-2 border-white shadow-lg',
                 index === currentJobIndex 
                   ? 'scale-125 shadow-xl' 
                   : 'scale-100 opacity-70 hover:opacity-100 hover:scale-110'
@@ -330,14 +332,14 @@ function getTotalLevels(jobId: string): number {
         </div>
 
         <!-- Main Carousel Container -->
-        <div class="relative overflow-hidden max-w-4xl mx-auto">
+        <div class="relative overflow-hidden max-w-2xl mx-auto flex-1 flex flex-col">
           <!-- Navigation Arrows -->
           <button
             @click="prevJob"
             :disabled="currentJobIndex === 0"
             :class="[
-              'absolute left-0 top-1/2 transform -translate-y-1/2 z-20 w-12 h-12 rounded-full shadow-lg transition-all duration-200',
-              'flex items-center justify-center text-white text-xl font-bold',
+              'absolute left-0 top-1/2 transform -translate-y-1/2 z-20 w-8 h-8 lg:w-12 lg:h-12 rounded-full shadow-lg transition-all duration-200',
+              'flex items-center justify-center text-white text-lg lg:text-xl font-bold',
               currentJobIndex === 0 
                 ? 'bg-gray-400 cursor-not-allowed opacity-50' 
                 : 'bg-blue-500 hover:bg-blue-600 hover:scale-110 active:scale-95'
@@ -350,8 +352,8 @@ function getTotalLevels(jobId: string): number {
             @click="nextJob"
             :disabled="currentJobIndex === Object.keys(availableJobs).length - 1"
             :class="[
-              'absolute right-0 top-1/2 transform -translate-y-1/2 z-20 w-12 h-12 rounded-full shadow-lg transition-all duration-200',
-              'flex items-center justify-center text-white text-xl font-bold',
+              'absolute right-0 top-1/2 transform -translate-y-1/2 z-20 w-8 h-8 lg:w-12 lg:h-12 rounded-full shadow-lg transition-all duration-200',
+              'flex items-center justify-center text-white text-lg lg:text-xl font-bold',
               currentJobIndex === Object.keys(availableJobs).length - 1 
                 ? 'bg-gray-400 cursor-not-allowed opacity-50' 
                 : 'bg-blue-500 hover:bg-blue-600 hover:scale-110 active:scale-95'
@@ -362,18 +364,18 @@ function getTotalLevels(jobId: string): number {
 
           <!-- Carousel Cards Container -->
           <div
-            class="flex transition-transform duration-500 ease-out mx-8 sm:mx-12 lg:mx-16"
+            class="flex transition-transform duration-500 ease-out mx-6 sm:mx-8 lg:mx-12 xl:mx-16 flex-1"
             :style="{ transform: `translateX(-${currentJobIndex * 100}%)` }"
           >
             <!-- Job Cards -->
             <div
               v-for="(job, id) in availableJobs"
               :key="id"
-              class="w-full flex-shrink-0 px-2 sm:px-4"
+              class="w-full flex-shrink-0 px-1 sm:px-2 lg:px-4 flex flex-col"
             >
               <!-- Animated Job Card -->
               <div
-                class="relative rounded-2xl shadow-2xl overflow-hidden transition-all duration-300"
+                class="relative rounded-xl lg:rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 flex-1 flex flex-col"
                 :style="{ 
                   background: `linear-gradient(135deg, ${job.backgroundColor || '#f3f4f6'}, ${job.backgroundColor ? adjustBrightness(job.backgroundColor, -20) : '#e5e7eb'})`,
                   color: getContrastingTextColor(job.backgroundColor || '#f3f4f6')
@@ -385,19 +387,19 @@ function getTotalLevels(jobId: string): number {
                 </div>
 
                 <!-- Card Content -->
-                <div class="relative p-6 z-10">
+                <div class="relative p-3 lg:p-6 z-10 flex-1 flex flex-col">
                   <!-- Job Header -->
-                  <div class="flex items-center mb-4">
+                  <div class="flex items-center mb-3 lg:mb-4">
                     <div class="relative">
-                      <div class="w-16 h-16 rounded-full bg-white mr-4 p-2 flex items-center justify-center shadow-lg">
+                      <div class="w-12 h-12 lg:w-16 lg:h-16 rounded-full bg-white mr-3 lg:mr-4 p-2 flex items-center justify-center shadow-lg">
                         <img :src="job.icon" :alt="job.name" class="max-w-full rounded-full max-h-full object-contain">
                       </div>
                     </div>
                     
-                    <div class="flex-1">
-                      <h3 class="text-2xl font-bold mb-1">{{ job.name }}</h3>
-                      <div class="text-sm opacity-90 mb-2">Type: {{ job.type }}</div>
-                      <div class="flex space-x-2 text-xs">
+                    <div class="flex-1 min-w-0">
+                      <h3 class="text-lg lg:text-2xl font-bold mb-1 truncate">{{ job.name }}</h3>
+                      <div class="text-xs lg:text-sm opacity-90 mb-1 lg:mb-2">Type: {{ job.type }}</div>
+                      <div class="flex space-x-1 lg:space-x-2 text-xs">
                         <span class="bg-white bg-opacity-20 px-2 py-1 rounded-full">
                           {{ job.assignedPokemon.length }}/{{ gameStore.getJobEffectiveMaxSlots(id) }} Slots
                         </span>
@@ -412,14 +414,14 @@ function getTotalLevels(jobId: string): number {
                     </div>
                   </div>
                   
-                  <p class="text-sm opacity-80 mb-4">{{ job.description }}</p>
+                  <p class="text-xs lg:text-sm opacity-80 mb-3 lg:mb-4 flex-shrink-0">{{ job.description }}</p>
                   
                   <!-- Stats Section -->
-                  <div class="bg-black bg-opacity-10 rounded-xl p-3 lg:p-4 mb-4">
+                  <div class="bg-black bg-opacity-10 rounded-lg lg:rounded-xl p-2 lg:p-3 mb-3 lg:mb-4 flex-shrink-0">
                     <!-- Total Level Display -->
-                    <div v-if="job.assignedPokemon.length > 0" class="mb-3">
+                    <div v-if="job.assignedPokemon.length > 0" class="mb-2 lg:mb-3">
                       <span 
-                        class="inline-block bg-white bg-opacity-30 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium cursor-help"
+                        class="inline-block bg-white bg-opacity-30 px-2 py-1 rounded-full text-xs font-medium cursor-help"
                         @mouseover="showInfoTooltip($event, tooltips.totalLevel)"
                         @mouseout="hideTooltip"
                       >
@@ -428,7 +430,7 @@ function getTotalLevels(jobId: string): number {
                     </div>
                     
                     <!-- Success Chance Displays -->
-                    <div class="grid grid-cols-2 gap-2 mb-3 text-xs">
+                    <div class="grid grid-cols-2 gap-2 mb-2 lg:mb-3 text-xs">
                       <div 
                         class="bg-gray-300 bg-opacity-80 px-2 py-1 rounded-lg cursor-help text-center"
                         @mouseover="showInfoTooltip($event, tooltips.baseSuccess)"
@@ -474,8 +476,8 @@ function getTotalLevels(jobId: string): number {
                   </div>
                   
                   <!-- Progress Section -->
-                  <div class="mb-4">
-                    <div class="flex justify-between items-center mb-2 text-sm">
+                  <div class="mb-3 lg:mb-4 flex-shrink-0">
+                    <div class="flex justify-between items-center mb-2 text-xs lg:text-sm">
                       <span class="font-medium opacity-80">Progress</span>
                       <span 
                         class="font-bold bg-white bg-opacity-30 px-2 py-1 rounded-full cursor-help"
@@ -487,7 +489,7 @@ function getTotalLevels(jobId: string): number {
                     </div>
                     
                     <!-- Animated Progress Bar -->
-                    <div class="relative h-4 bg-black bg-opacity-20 rounded-full overflow-hidden">
+                    <div class="relative h-3 lg:h-4 bg-black bg-opacity-20 rounded-full overflow-hidden">
                       <div 
                         :style="{ width: job.progress + '%' }"
                         class="h-full bg-gradient-to-r from-white to-white bg-opacity-80 rounded-full transition-all duration-1000 ease-out relative"
@@ -524,10 +526,10 @@ function getTotalLevels(jobId: string): number {
                   </div>
                   
                   <!-- Pokemon Slots -->
-                  <div class="bg-black bg-opacity-10 rounded-xl p-3 lg:p-4">
-                    <h4 class="text-sm font-bold mb-2 opacity-90">Assigned Pokémon</h4>
+                  <div class="bg-black bg-opacity-10 rounded-lg lg:rounded-xl p-2 lg:p-3 flex-1 flex flex-col">
+                    <h4 class="text-xs lg:text-sm font-bold mb-2 opacity-90">Assigned Pokémon</h4>
                     <div 
-                      class="grid grid-cols-4 sm:grid-cols-5 gap-1 sm:gap-2" 
+                      class="grid grid-cols-4 sm:grid-cols-5 gap-1 sm:gap-2 flex-1" 
                       @dragover.prevent
                       @drop="handleDrop($event, id)"
                       @mouseover="showInfoTooltip($event, tooltips.dragPokemon)"
@@ -550,10 +552,10 @@ function getTotalLevels(jobId: string): number {
                             <CachedImage 
                               :src="job.assignedPokemon[i-1].sprite" 
                               :alt="job.assignedPokemon[i-1].name"
-                              :className="'w-8 h-8 object-contain'"
+                              :className="'w-6 h-6 lg:w-8 lg:h-8 object-contain'"
                             />
                             <!-- Level Badge -->
-                            <span class="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg">
+                            <span class="absolute -top-1 -right-1 bg-yellow-400 text-black text-[10px] font-bold rounded-full w-4 h-4 lg:w-5 lg:h-5 flex items-center justify-center shadow-lg">
                               {{ job.assignedPokemon[i-1].level }}
                             </span>
                             <!-- Remove Overlay -->
@@ -564,8 +566,8 @@ function getTotalLevels(jobId: string): number {
                         </template>
                         <template v-else>
                           <div class="flex flex-col items-center justify-center text-xs opacity-50">
-                            <div class="w-6 h-6 rounded-full border-2 border-dashed border-current mb-1"></div>
-                            <span>Empty</span>
+                            <div class="w-4 h-4 lg:w-6 lg:h-6 rounded-full border-2 border-dashed border-current mb-1"></div>
+                            <span class="text-[10px] lg:text-xs">Empty</span>
                           </div>
                         </template>
                       </div>
@@ -578,8 +580,8 @@ function getTotalLevels(jobId: string): number {
         </div>
 
         <!-- Job Counter -->
-        <div class="text-center mt-6 text-gray-600">
-          <span class="text-sm">
+        <div class="text-center mt-3 lg:mt-6 text-gray-600 flex-shrink-0">
+          <span class="text-xs lg:text-sm">
             Job {{ currentJobIndex + 1 }} of {{ Object.keys(availableJobs).length }}
           </span>
         </div>
