@@ -222,6 +222,20 @@ const items: Record<string, ItemDefinition> = {
       type: 'special',
       effect: 'expand-job-slot'
     }
+  },
+  'dragon-stone': {
+    id: 'dragon-stone',
+    name: 'Dragon Stone',
+    description: 'A powerful mystical stone infused with draconic energy. Consuming it temporarily unlocks access to the legendary Ethereal Nexus, a realm where the most powerful Pokemon dwell.',
+    type: 'material',
+    rarity: 'legendary',
+    icon: '/images/stone.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'unlock-temporary-region'
+    }
   }
 };
 

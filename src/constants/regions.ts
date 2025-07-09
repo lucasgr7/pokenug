@@ -25,17 +25,17 @@ const regions = {
       { id: 16, name: 'Pidgey', probability: 5 },       // Uncommon (7%)
       { id: 43, name: 'oddish', probability: 5 }, // Very rare (2%)
       { id: 69, name: 'Bellsprout', probability: 5 }, // Very rare (2%)
-      { id: 19, name: 'rattata', probability: 10 }, 
-      { id: 143, name: 'snorlax', probability: 1 }, 
+      { id: 19, name: 'rattata', probability: 10 },
+      { id: 143, name: 'snorlax', probability: 1 },
       { id: 48, name: 'venonat', probability: 2 },
       { id: 102, name: 'exeggcute', probability: 7 }
     ],
     berryPool: [
-      { id: 19, name: 'rattata', probability: 10 }, 
-      { id: 20, name: 'raticate', probability: 8 }, 
-      { id: 133, name: 'Eevee', probability: 5 },   
-      { id: 25, name: 'Pikachu', probability: 5 },  
-      { id: 143, name: 'snorlax', probability: 2 }, 
+      { id: 19, name: 'rattata', probability: 10 },
+      { id: 20, name: 'raticate', probability: 8 },
+      { id: 133, name: 'Eevee', probability: 5 },
+      { id: 25, name: 'Pikachu', probability: 5 },
+      { id: 143, name: 'snorlax', probability: 2 },
       { id: 12, name: 'butterfree', probability: 5 },
       { id: 15, name: 'beedrill', probability: 10 },
       { id: 48, name: 'venonat', probability: 8 },
@@ -87,7 +87,7 @@ const regions = {
       { id: 69, name: 'Bellsprout', probability: 15 },   // Common (15%)
       { id: 114, name: 'Tangela', probability: 5 },       // Rare (5%)
       { id: 118, name: 'Goldeen', probability: 5 },       // Rare (5%)
-      
+
     ],
     berryPool: [
       { id: 1, name: 'Squirtle', probability: 10 }, // Super rare (1%)
@@ -106,50 +106,80 @@ const regions = {
     spawnTimer: 16, // 30 seconds
     pool: [
       //bulbasaur
-      {id: 1, name: 'Bulbasaur', probability: 5},
-      {id: 2, name: 'Ivysaur', probability: 2.5},
-      {id: 147, name: 'Dratini', probability: 1},
-      {id: 148, name: 'Dragonair', probability: 0.5},
-      {id: 4, name: 'Charmander', probability: 5},
-      {id: 5, name: 'Charmeleon', probability: 2.5},
-      {id: 58, name: 'Growlithe', probability: 10},
-      {id: 59, name: 'Arcanine', probability: 5},
-      {id: 126, name: 'Magmar', probability: 7.5}
+      { id: 1, name: 'Bulbasaur', probability: 5 },
+      { id: 2, name: 'Ivysaur', probability: 2.5 },
+      { id: 147, name: 'Dratini', probability: 1 },
+      { id: 148, name: 'Dragonair', probability: 0.5 },
+      { id: 4, name: 'Charmander', probability: 5 },
+      { id: 5, name: 'Charmeleon', probability: 2.5 },
+      { id: 58, name: 'Growlithe', probability: 10 },
+      { id: 59, name: 'Arcanine', probability: 5 },
+      { id: 126, name: 'Magmar', probability: 7.5 }
     ],
     berryPool: [
-      {id: 147, name: 'Dratini', probability: 10},
-      {id: 148, name: 'Dragonair', probability: 5},
-      {id: 4, name: 'Charmander', probability: 25},
-      {id: 5, name: 'Charmeleon', probability: 15},
-      {id: 59, name: 'Arcanine', probability: 20},
-      {id: 126, name: 'Magmar', probability: 25}
+      { id: 147, name: 'Dratini', probability: 10 },
+      { id: 148, name: 'Dragonair', probability: 5 },
+      { id: 4, name: 'Charmander', probability: 25 },
+      { id: 5, name: 'Charmeleon', probability: 15 },
+      { id: 59, name: 'Arcanine', probability: 20 },
+      { id: 126, name: 'Magmar', probability: 25 }
     ]
   },
   'ironworks-zone': {
-  name: 'Ironworks Facility',
-  minLevel: 80,
-  maxLevel: 120,
-  encounterRate: 15,
-  spawnTimer: 32,
-  pool: [
-    { id: 81, name: 'Magnemite', probability: 30 },
-    { id: 82, name: 'Magneton', probability: 15 },
-    { id: 95, name: 'Onix', probability: 20 },
-    { id: 208, name: 'Steelix', probability: 5 },
-    { id: 100, name: 'Voltorb', probability: 15 },
-    { id: 101, name: 'Electrode', probability: 10 },
-    { id: 125, name: 'Electabuzz', probability: 5 }
-  ],
-  berryPool: [
-    { id: 81, name: 'Magnemite', probability: 25 },
-    { id: 82, name: 'Magneton', probability: 15 },
-    { id: 100, name: 'Voltorb', probability: 20 },
-    { id: 101, name: 'Electrode', probability: 10 },
-    { id: 125, name: 'Electabuzz', probability: 10 },
-    { id: 89, name: 'Muk', probability: 10 },
-    { id: 109, name: 'Koffing', probability: 10 }
-  ]
-}
+    name: 'Ironworks Facility',
+    minLevel: 80,
+    maxLevel: 120,
+    encounterRate: 15,
+    spawnTimer: 45, 
+    pool: [
+      { id: 81, name: 'Magnemite', probability: 30 },
+      { id: 82, name: 'Magneton', probability: 15 },
+      { id: 95, name: 'Onix', probability: 20 },
+      { id: 208, name: 'Steelix', probability: 5 },
+      { id: 100, name: 'Voltorb', probability: 15 },
+      { id: 101, name: 'Electrode', probability: 10 },
+      { id: 125, name: 'Electabuzz', probability: 5 }
+    ],
+    berryPool: [
+      { id: 81, name: 'Magnemite', probability: 25 },
+      { id: 82, name: 'Magneton', probability: 15 },
+      { id: 100, name: 'Voltorb', probability: 20 },
+      { id: 101, name: 'Electrode', probability: 10 },
+      { id: 125, name: 'Electabuzz', probability: 10 },
+      { id: 89, name: 'Muk', probability: 10 },
+      { id: 109, name: 'Koffing', probability: 10 }
+    ],
+  },
+  'ethereal-nexus': {
+    name: 'Ethereal Nexus',
+    minLevel: 800,
+    maxLevel: 999,
+    encounterRate: 10,
+    spawnTimer: 600 , // 5 minutes 
+
+    pool: [
+      // Legendary and pseudo-legendary Pokemon from Gen 1
+      { id: 144, name: 'Articuno', probability: 8 },     // Legendary Ice bird
+      { id: 145, name: 'Zapdos', probability: 8 },       // Legendary Electric bird
+      { id: 146, name: 'Moltres', probability: 8 },      // Legendary Fire bird
+      { id: 150, name: 'Mewtwo', probability: 3 },       // Ultimate psychic legendary
+      { id: 151, name: 'Mew', probability: 2 },          // Mythical ancestor
+      { id: 149, name: 'Dragonite', probability: 15 },   // Pseudo-legendary dragon
+      { id: 148, name: 'Dragonair', probability: 20 },   // Dragon evolution
+      { id: 147, name: 'Dratini', probability: 25 },     // Dragon starter
+      { id: 143, name: 'Snorlax', probability: 11 }      // Rare sleeping giant
+    ],
+    berryPool: [
+      // Enhanced berry pool for legendary region
+      { id: 144, name: 'Articuno', probability: 15 },
+      { id: 145, name: 'Zapdos', probability: 15 },
+      { id: 146, name: 'Moltres', probability: 15 },
+      { id: 150, name: 'Mewtwo', probability: 5 },
+      { id: 151, name: 'Mew', probability: 3 },
+      { id: 149, name: 'Dragonite', probability: 25 },
+      { id: 148, name: 'Dragonair', probability: 22 }
+    ]
+  }
 
 } as const;
 export default regions;

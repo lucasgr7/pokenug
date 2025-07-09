@@ -55,6 +55,12 @@ interface GameState {
   };
   idleJobs: Record<string, IdleJob>;
   idleWorking: Pokemon[];
+  temporaryRegion: {
+    isActive: boolean;
+    regionId: string | null;
+    endTime: number | null;
+    remainingTime: number;
+  };
 }
 
 // Constants
@@ -94,7 +100,13 @@ export const useGameStore = defineStore('game', {
       idleJobs: false
     },
     idleJobs: DEFAULT_IDLE_JOBS,
-    idleWorking: []
+    idleWorking: [],
+    temporaryRegion: {
+      isActive: false,
+      regionId: null,
+      endTime: null,
+      remainingTime: 0
+    }
   }),
 
   getters: {
@@ -133,44 +145,44 @@ export const useGameStore = defineStore('game', {
       return job.maxSlots + expansion;
     },
 
-    getJobTimeReduction: (state) => (jobId: string) => {
-      const job = state.idleJobs[jobId];
-      if (!job) return 0;
-      return job.assignedPokemon.length * 1000; // 1 second per Pokemon
-    },
-
     getJobRemainingTime: (state) => (jobId: string) => {
       const job = state.idleJobs[jobId];
       if (!job) return 0;
 
-      // Base reduction from number of assigned Pokemon (keeping this for backward compatibility)
-      const baseReduction = job.assignedPokemon.length * 1000;
-
-      // Calculate level-based time reduction
-      let levelReduction = 0;
+      // New distributed time reduction system
+      let totalReductionPercent = 0;
+      
       if (job.assignedPokemon.length > 0) {
-        // Sum up the level contribution of all Pokémon
-        const totalLevelBoost = job.assignedPokemon.reduce((sum, pokemon) => {
-          // Each level provides a small reduction in time (0.5% per level)
-          return sum + ((pokemon.level || 1) * 0.005);
-        }, 0);
-
-        // Apply level-based reduction to base time
-        levelReduction = job.baseTime * totalLevelBoost;
+        // Each Pokémon contributes up to 20% reduction based on their level
+        for (const pokemon of job.assignedPokemon) {
+          const pokemonLevel = pokemon.level || 1;
+          
+          // Calculate individual Pokémon contribution (max 20% per Pokémon)
+          // Level 100+ gives full 20% contribution
+          const individualContribution = Math.min(0.20, (pokemonLevel / 100) * 0.20);
+          totalReductionPercent += individualContribution;
+        }
+        
+        // Cap total reduction at 90% (0.90)
+        totalReductionPercent = Math.min(0.90, totalReductionPercent);
       }
 
       // Additional percentage-based reduction if the job has the percentual property
       let percentReduction = 0;
       if (job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1) {
-        // Apply the percentage reduction for each additional Pokemon (after the first one)
+        // Apply a small additional percentage reduction for each additional Pokemon (after the first one)
         const additionalPokemon = job.assignedPokemon.length - 1;
-        percentReduction = job.baseTime * (job.percentualProgressWithAdditionalPokemon * additionalPokemon);
+        const additionalPercent = Math.min(0.05, job.percentualProgressWithAdditionalPokemon * additionalPokemon);
+        totalReductionPercent = Math.min(0.90, totalReductionPercent + additionalPercent);
       }
 
-      // Total reduction is the sum of base, level-based, and percentage reductions
-      const totalReduction = baseReduction + levelReduction + percentReduction;
+      // Calculate final time with percentage-based reduction
+      const finalTime = job.baseTime * (1 - totalReductionPercent);
 
-      return Math.max(1000, job.baseTime - totalReduction); // Minimum 1 second
+      // Minimum time is 10% of original time (never less than 10% of base time)
+      const minimumTime = job.baseTime * 0.10;
+
+      return Math.max(minimumTime, finalTime);
     },
 
     getJobProgressPercent: (state) => (jobId: string) => {
@@ -186,24 +198,38 @@ export const useGameStore = defineStore('game', {
       const now = Date.now();
       const elapsed = now - job.startTime;
       
-      // Directly calculate job duration instead of calling another getter
-      const baseReduction = job.assignedPokemon.length * 1000;
-      let levelReduction = 0;
+      // Use the same distributed time reduction system as getJobRemainingTime
+      let totalReductionPercent = 0;
+      
       if (job.assignedPokemon.length > 0) {
-        const totalLevelBoost = job.assignedPokemon.reduce((sum, pokemon) => {
-          return sum + ((pokemon.level || 1) * 0.005);
-        }, 0);
-        levelReduction = job.baseTime * totalLevelBoost;
+        // Each Pokémon contributes up to 20% reduction based on their level
+        for (const pokemon of job.assignedPokemon) {
+          const pokemonLevel = pokemon.level || 1;
+          
+          // Calculate individual Pokémon contribution (max 20% per Pokémon)
+          // Level 100+ gives full 20% contribution
+          const individualContribution = Math.min(0.20, (pokemonLevel / 100) * 0.20);
+          totalReductionPercent += individualContribution;
+        }
+        
+        // Cap total reduction at 90% (0.90)
+        totalReductionPercent = Math.min(0.90, totalReductionPercent);
       }
-      
-      let percentReduction = 0;
+
+      // Additional percentage-based reduction if the job has the percentual property
       if (job.percentualProgressWithAdditionalPokemon && job.assignedPokemon.length > 1) {
+        // Apply a small additional percentage reduction for each additional Pokemon (after the first one)
         const additionalPokemon = job.assignedPokemon.length - 1;
-        percentReduction = job.baseTime * (job.percentualProgressWithAdditionalPokemon * additionalPokemon);
+        const additionalPercent = Math.min(0.05, job.percentualProgressWithAdditionalPokemon * additionalPokemon);
+        totalReductionPercent = Math.min(0.90, totalReductionPercent + additionalPercent);
       }
-      
-      const totalReduction = baseReduction + levelReduction + percentReduction;
-      const jobDuration = Math.max(1000, job.baseTime - totalReduction);
+
+      // Calculate final time with percentage-based reduction
+      const finalTime = job.baseTime * (1 - totalReductionPercent);
+
+      // Minimum time is 10% of original time (never less than 10% of base time)
+      const minimumTime = job.baseTime * 0.10;
+      const jobDuration = Math.max(minimumTime, finalTime);
 
       // Calculate progress as a percentage
       const progressPercent = Math.min(100, (elapsed / jobDuration) * 100);
@@ -237,6 +263,21 @@ export const useGameStore = defineStore('game', {
 
       // Cap at 100% chance
       return Math.min(1.0, successChance);
+    },
+
+    // Temporary region getters
+    isTemporaryRegionActive: (state) => state.temporaryRegion.isActive,
+    temporaryRegionId: (state) => state.temporaryRegion.regionId,
+    temporaryRegionRemainingTime: (state) => state.temporaryRegion.remainingTime,
+    temporaryRegionEndTime: (state) => state.temporaryRegion.endTime,
+    
+    // Get available regions including temporary region
+    availableRegions: (state) => {
+      const baseRegions = Object.keys(regions);
+      if (state.temporaryRegion.isActive && state.temporaryRegion.regionId) {
+        return [...baseRegions, state.temporaryRegion.regionId];
+      }
+      return baseRegions;
     }
   },
 
@@ -343,11 +384,21 @@ export const useGameStore = defineStore('game', {
                           }
                           break;
                         case 'material':
-                          // Check if this is an expansion crystal
+                          // Check for specific material types
                           if (name === 'Expansion Crystal') {
                             const expansionCrystal = itemFactory.createFromDefinition('expansion-crystal');
                             if (expansionCrystal) {
                               inventoryStore.addItem(expansionCrystal);
+                            }
+                          } else if (name === 'Dragon Stone') {
+                            const dragonStone = itemFactory.createFromDefinition('dragon-stone');
+                            if (dragonStone) {
+                              inventoryStore.addItem(dragonStone);
+                            }
+                          } else if (name === 'Seeker Stone') {
+                            const seekerStone = itemFactory.createFromDefinition('seeker-stone');
+                            if (seekerStone) {
+                              inventoryStore.addItem(seekerStone);
                             }
                           } else {
                             inventoryStore.addItem(
@@ -726,16 +777,22 @@ export const useGameStore = defineStore('game', {
             this.addBattleLog(`Threw a ${item.name} at ${this.battle.wildPokemon.name}!`, 'system');
 
             const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100;
+            const pokemonLevel = this.battle.wildPokemon.level!;
             let catchChance = item.effect.catchRate;
 
-            // Modify catch chance based on HP percentage
-            if (hpPercentage > 50) {
-              catchChance *= 0.5;  // Harder to catch at high HP
-            } else if (hpPercentage < 10) {
-              catchChance *= 3.0;  // Much easier when almost fainted
-            } else if (hpPercentage < 25) {
-              catchChance *= 2.0;  // Easier when low HP
-            }
+            // Exponential catch rate formula that makes high-level, full-health Pokémon extremely hard to catch
+            // Base formula: catchRate * (100 - hpPercentage)^2 / 10000 * levelPenalty
+            const hpFactor = Math.pow(100 - hpPercentage, 2) / 10000; // HP penalty (0-1, exponential)
+            const levelPenalty = Math.pow(0.95, pokemonLevel - 1); // Level penalty (exponential decay)
+            
+            // Additional legendary penalty for very high level Pokémon (likely legendaries)
+            const legendaryPenalty = pokemonLevel >= 50 ? Math.pow(0.8, pokemonLevel - 49) : 1;
+            
+            // Calculate final catch chance with all modifiers
+            catchChance = catchChance * hpFactor * levelPenalty * legendaryPenalty;
+            
+            // Ensure minimum chance (0.1%) and maximum chance (based on original item rate)
+            catchChance = Math.max(0.001, Math.min(catchChance, item.effect.catchRate));
 
             if (Math.random() < catchChance) {
               this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'system');
@@ -1492,15 +1549,26 @@ export const useGameStore = defineStore('game', {
         this.addBattleLog(`Threw a Pokéball at ${this.battle.wildPokemon!.name}!`, 'system');
 
         const hpPercentage = (this.battle.wildPokemon.currentHP! / this.battle.wildPokemon.maxHP!) * 100;
-        let catchChance = 0;
-
-        if (hpPercentage > 50) {
-          catchChance = Math.max(5 - this.battle.wildPokemon.level!, 1);
-        } else if (hpPercentage < 10) {
-          catchChance = Math.max(55 - this.battle.wildPokemon.level!, 10);
-        } else if (hpPercentage < 25) {
-          catchChance = Math.max(35 - this.battle.wildPokemon.level!, 5);
-        }
+        const pokemonLevel = this.battle.wildPokemon.level!;
+        
+        // Exponential catch rate formula for pokeballs - much lower base rate than special items
+        const baseCatchRate = 0.15; // 15% base catch rate for pokeballs
+        
+        // Exponential catch rate formula that makes high-level, full-health Pokémon extremely hard to catch
+        const hpFactor = Math.pow(100 - hpPercentage, 2) / 10000; // HP penalty (0-1, exponential)
+        const levelPenalty = Math.pow(0.9, pokemonLevel - 1); // Level penalty (stronger than items)
+        
+        // Additional legendary penalty for very high level Pokémon (likely legendaries)
+        const legendaryPenalty = pokemonLevel >= 50 ? Math.pow(0.7, pokemonLevel - 49) : 1;
+        
+        // Calculate final catch chance with all modifiers
+        let catchChance = baseCatchRate * hpFactor * levelPenalty * legendaryPenalty;
+        
+        // Ensure minimum chance (0.05%) and maximum chance (15%)
+        catchChance = Math.max(0.0005, Math.min(catchChance, baseCatchRate));
+        
+        // Convert to percentage for the random check
+        catchChance *= 100;
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -1737,9 +1805,27 @@ export const useGameStore = defineStore('game', {
                 }
                 break;
               case 'material':
-                inventoryStore.addItem(
-                  itemFactory.createMaterial(name, description)
-                );
+                // Check for specific material types
+                if (name === 'Expansion Crystal') {
+                  const expansionCrystal = itemFactory.createFromDefinition('expansion-crystal');
+                  if (expansionCrystal) {
+                    inventoryStore.addItem(expansionCrystal);
+                  }
+                } else if (name === 'Dragon Stone') {
+                  const dragonStone = itemFactory.createFromDefinition('dragon-stone');
+                  if (dragonStone) {
+                    inventoryStore.addItem(dragonStone);
+                  }
+                } else if (name === 'Seeker Stone') {
+                  const seekerStone = itemFactory.createFromDefinition('seeker-stone');
+                  if (seekerStone) {
+                    inventoryStore.addItem(seekerStone);
+                  }
+                } else {
+                  inventoryStore.addItem(
+                    itemFactory.createMaterial(name, description)
+                  );
+                }
                 break;
               case 'buff':
                 try {
@@ -2253,5 +2339,63 @@ export const useGameStore = defineStore('game', {
 
       return allPokemon;
     },
+
+    // Temporary region actions
+    activateTemporaryRegion(regionId: string, duration: number) {
+      const endTime = Date.now() + duration;
+      this.temporaryRegion = {
+        isActive: true,
+        regionId: regionId,
+        endTime: endTime,
+        remainingTime: duration
+      };
+      
+      // Switch to the temporary region
+      this.currentRegion = regionId;
+      this.resetBattleState();
+      this.startSpawnTimer();
+      
+      this.addNotification(`Welcome to the ${regions[regionId as keyof typeof regions]?.name || regionId}! Time remaining: ${Math.ceil(duration / 60000)} minutes`, 'success');
+      
+      // Set up a timer to update remaining time
+      this.updateTemporaryRegionTimer();
+    },
+
+    updateTemporaryRegionTimer() {
+      if (!this.temporaryRegion.isActive || !this.temporaryRegion.endTime) return;
+      
+      const now = Date.now();
+      const remaining = Math.max(0, this.temporaryRegion.endTime - now);
+      
+      this.temporaryRegion.remainingTime = remaining;
+      
+      if (remaining <= 0) {
+        this.deactivateTemporaryRegion();
+      }
+    },
+
+    deactivateTemporaryRegion() {
+      if (!this.temporaryRegion.isActive) return;
+      
+      this.temporaryRegion = {
+        isActive: false,
+        regionId: null,
+        endTime: null,
+        remainingTime: 0
+      };
+      
+      // Return to Home region
+      this.currentRegion = 'Home';
+      this.resetBattleState();
+      this.startSpawnTimer();
+      
+      this.addNotification('The mystical portal has closed. You have been returned to Home.', 'info');
+    },
+
+    consumeDragonStone() {
+      // This function will be called when the dragon stone is used
+      const duration = 600000; // 10 minutes
+      this.activateTemporaryRegion('ethereal-nexus', duration);
+    }
   }
 });

@@ -186,6 +186,19 @@ function useItem(item: InventoryItem) {
         emit('use-seeker-stone', item)
         return
       }
+      // Check if this is a dragon stone
+      if (item.id === 'dragon-stone') {
+        // Check if temporary region is already active
+        if (gameStore.isTemporaryRegionActive) {
+          gameStore.addNotification('A temporary region is already active!', 'error')
+          return
+        }
+        // Use the dragon stone
+        inventory.getInventoryStore().removeItem(item.id, 1)
+        gameStore.consumeDragonStone()
+        gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
+        return
+      }
       gameStore.addNotification(`${item.name} usage not implemented yet`, 'warning')
       break
       

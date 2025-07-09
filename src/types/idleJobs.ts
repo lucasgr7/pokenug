@@ -63,7 +63,7 @@ export const TYPE_COLORS = {
   [PokemonType.Electric]: '#F8D030',
   [PokemonType.Psychic]: '#F85888',
   [PokemonType.Ice]: '#98D8D8',
-  [PokemonType.Dragon]: '#7038F8',
+  [PokemonType.Dragon]: '#1A237E',
   [PokemonType.Dark]: '#705848',
   [PokemonType.Fairy]: '#EE99AC'
 };
@@ -424,5 +424,39 @@ export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
     icon: '/images/seeker-stone.png',
     backgroundColor: TYPE_COLORS[PokemonType.Ground],
     percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+  },
+  'dragon-ascension': {
+    id: 'dragon-ascension',
+    type: PokemonType.Dragon,
+    name: 'Dragon Ascension Ritual',
+    description: 'Dragon Pokemon perform an ancient ritual to create mystical Dragon Stones that temporarily unlock the legendary Ethereal Nexus region.',
+    maxSlots: 1,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 604800000, // 1 week in milliseconds (7 * 24 * 60 * 60 * 1000)
+    chance: 0.4, // 40% chance of success
+    rewards: [
+      {
+        type: 'material',
+        chance: 0.4, // 40% chance
+        weight: 100,
+        itemDetails: {
+          name: 'Dragon Stone',
+          description: 'A powerful mystical stone infused with draconic energy. Consuming it temporarily unlocks access to the legendary Ethereal Nexus, a realm where the most powerful Pokemon dwell.',
+          params: { 
+            effect: 'unlock-temporary-region',
+            isConsumable: true,
+            rarity: 'legendary',
+            temporaryRegion: 'ethereal-nexus',
+            duration: 600000 // 10 minutes in milliseconds
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/dragon-stone.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Dragon],
+    percentualProgressWithAdditionalPokemon: 0.25 // 25% progress per additional Pokemon
   }
 };

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useInventory } from '../composables/useInventory'
+import { useGameStore } from '../stores/gameStore'
 import type { InventoryItem, ItemType } from '../types/pokemon'
 import JobSlotExpansionModal from '../components/JobSlotExpansionModal.vue'
 
 const inventory = useInventory()
+const gameStore = useGameStore()
 const activeTab = ref<ItemType>('pokeball')
 const showExpansionModal = ref(false)
 
@@ -20,7 +22,7 @@ const filteredItems = computed(() => {
   return inventory.getItemsByType(activeTab.value)
 })
 
-const rarityColors = {
+const rarityColors: Record<string, string> = {
   common: 'bg-gray-200 text-gray-800',
   uncommon: 'bg-green-200 text-green-800',
   rare: 'bg-blue-200 text-blue-800',
@@ -34,6 +36,18 @@ function useItem(item: InventoryItem) {
       showExpansionModal.value = true
       return
     }
+    if (item.id === 'dragon-stone') {
+      // Check if temporary region is already active
+      if (gameStore.isTemporaryRegionActive) {
+        gameStore.addNotification('A temporary region is already active!', 'error')
+        return
+      }
+      // Use the dragon stone
+      inventory.getInventoryStore().removeItem(item.id, 1)
+      gameStore.consumeDragonStone()
+      gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
+      return
+    }
     inventory.useItem(item.id)
   }
 }
@@ -41,6 +55,13 @@ function useItem(item: InventoryItem) {
 function handleJobExpansion(jobId: string) {
   // Remove one expansion crystal from inventory
   inventory.useItem('expansion-crystal')
+}
+
+function handleImageError(event: Event) {
+  const target = event.target as HTMLImageElement
+  if (target) {
+    target.src = '/images/not-found.png'
+  }
 }
 </script>
 
@@ -74,7 +95,7 @@ function handleJobExpansion(jobId: string) {
             :src="`/images/${item.id}.png`"
             :alt="item.name"
             class="w-full h-full object-contain"
-            @error="$event.target.src = '/images/not-found.png'"
+            @error="handleImageError"
           >
         </div>
         

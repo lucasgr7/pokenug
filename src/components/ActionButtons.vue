@@ -36,7 +36,7 @@
 
     <!-- Berry Button -->
     <div class="relative group">
-      <button @click="$emit('berry')" :disabled="!canUseBerry"
+      <button @click="$emit('berry')" v-if="canUseBerry"
         class="relative w-16 h-16 bg-green-500 text-white rounded-full hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 overflow-hidden select-none flex items-center justify-center border-4 border-green-400 hover:scale-110 shadow-lg"
         :class="{
           'hover:shadow-green-500/50': canUseBerry,
@@ -105,6 +105,38 @@
         <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
       </div>
     </div>
+
+    <!-- Dragon Stone Button -->
+    <div class="relative group" v-if="canUseDragonStone">
+      <button @click="$emit('dragon-stone')"
+        class="relative w-16 h-16 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 overflow-hidden select-none flex items-center justify-center border-4 border-purple-500 hover:scale-110 shadow-lg"
+        :class="{
+          'hover:shadow-purple-600/50': canUseDragonStone,
+          'opacity-50 cursor-not-allowed': !canUseDragonStone
+        }">
+        <!-- Dragon Stone Icon -->
+        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L16 8L12 14L8 8L12 2Z" fill="currentColor"/>
+          <path d="M8 8L4 12L8 16L12 14L8 8Z" fill="currentColor" opacity="0.7"/>
+          <path d="M16 8L20 12L16 16L12 14L16 8Z" fill="currentColor" opacity="0.7"/>
+          <path d="M8 16L12 22L16 16L12 14L8 16Z" fill="currentColor" opacity="0.9"/>
+        </svg>
+
+        <!-- Mystical dragon energy effect -->
+        <div class="absolute inset-0 rounded-full opacity-0 group-hover:opacity-40 transition-opacity duration-300">
+          <div class="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-600 rounded-full animate-pulse"></div>
+        </div>
+
+        <!-- Hover glow effect -->
+        <div class="absolute inset-0 rounded-full bg-purple-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+      </button>
+
+      <!-- Tooltip on hover -->
+      <div class="absolute left-1/2 -translate-x-1/2 -top-12 bg-gray-900 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+        Dragon Stone ({{ dragonStoneCount }})
+        <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -113,15 +145,18 @@ interface Props {
   canCapture: boolean
   canUseBerry: boolean
   canUseSeekerStone: boolean
+  canUseDragonStone: boolean
   pokeballCount: number
   berryCount: number
   seekerStoneCount: number
+  dragonStoneCount: number
 }
 
 interface Emits {
   (e: 'capture'): void
   (e: 'berry'): void
   (e: 'seeker-stone'): void
+  (e: 'dragon-stone'): void
 }
 
 defineProps<Props>()

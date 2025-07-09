@@ -68,6 +68,13 @@ const availableSeekerStones = computed(() => {
   })
 })
 
+// Get available dragon stones from inventory
+const availableDragonStones = computed(() => {
+  return inventory.getItemsByType('material').filter((material: InventoryItem) => {
+    return material.id === 'dragon-stone' && material.usable
+  })
+})
+
 // Action button states and counts
 const canCapture = computed(() => {
   return !!wildPokemon.value && totalPokeballs.value > 0 && !gameStore.battle.isTryingCatch
@@ -81,12 +88,20 @@ const canUseSeekerStone = computed(() => {
   return availableSeekerStones.value.length > 0 && gameStore.currentRegion !== 'Home'
 })
 
+const canUseDragonStone = computed(() => {
+  return availableDragonStones.value.length > 0 && !gameStore.isTemporaryRegionActive
+})
+
 const berryCount = computed(() => {
   return availableBerries.value.reduce((sum: number, item: InventoryItem) => sum + item.quantity, 0)
 })
 
 const seekerStoneCount = computed(() => {
   return availableSeekerStones.value.reduce((sum: number, item: InventoryItem) => sum + item.quantity, 0)
+})
+
+const dragonStoneCount = computed(() => {
+  return availableDragonStones.value.reduce((sum: number, item: InventoryItem) => sum + item.quantity, 0)
 })
 
 // Fire rate state from buffStore
@@ -288,6 +303,34 @@ function openSeekerStoneSelector() {
   seekerStoneComposable.useSeekerStone(seekerStone)
 }
 
+// Handle using dragon stone
+function openDragonStoneSelector() {
+  if (availableDragonStones.value.length === 0) {
+    gameStore.addNotification('No dragon stones available!', 'error')
+    return
+  }
+  
+  if (gameStore.isTemporaryRegionActive) {
+    gameStore.addNotification('A temporary region is already active!', 'error')
+    return
+  }
+
+  // Use the first available dragon stone
+  const dragonStone = availableDragonStones.value[0]
+  useDragonStone(dragonStone)
+}
+
+// Use dragon stone function
+function useDragonStone(dragonStone: InventoryItem) {
+  // Remove the dragon stone from inventory
+  inventory.getInventoryStore().removeItem(dragonStone.id, 1)
+  
+  // Activate the temporary region
+  gameStore.consumeDragonStone()
+  
+  gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
+}
+
 // Select a berry to use
 function selectBerry(berry: InventoryItem) {
   showBerrySelector.value = false
@@ -319,7 +362,8 @@ const getRegionBackgroundImage = (regionId: string) => {
     // Default to viridian for other regions until more backgrounds are available
     'beach-zone (15-25)': '/images/backgrounds/beach.png',
     'Mountains (30-50)': '/images/backgrounds/mountains.png',
-    'ironworks-zone (80-120)': '/images/backgrounds/ironworks.png',
+    'ironworks-zone': '/images/backgrounds/ironworks.png',
+    'ethereal-nexus': '/images/backgrounds/etheral.png',
 
   }
 
@@ -414,6 +458,9 @@ tickSystem.subscribe((elapsed: number) => {
   // Update countdown progress for fire rate
   updateCountdownFromTick();
 
+  // Update temporary region timer
+  gameStore.updateTemporaryRegionTimer();
+
   // Accumulate time for enemy attacks
   if (gameStore.battle.wildPokemon) {
     enemyAttackAccumulator += elapsed;
@@ -480,20 +527,61 @@ const fireRateStageInfo = computed(() => {
     }
   }
 })
+
+// Temporary region countdown
+const temporaryRegionProgress = computed(() => {
+  if (!gameStore.isTemporaryRegionActive) return 0
+  const remaining = gameStore.temporaryRegionRemainingTime
+  const total = 600000 // 10 minutes in milliseconds
+  return ((total - remaining) / total) * 100
+})
+
+const temporaryRegionTimeFormatted = computed(() => {
+  if (!gameStore.isTemporaryRegionActive) return ''
+  const remaining = gameStore.temporaryRegionRemainingTime
+  const minutes = Math.floor(remaining / 60000)
+  const seconds = Math.floor((remaining % 60000) / 1000)
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+})
 </script>
 
 <template>
   <div class="bg-white p-6 rounded-lg shadow-lg">
     <!-- XP Bar and Buffs Section - Modified layout -->
     <div v-if="gameStore.activePokemon" class="mb-4 flex flex-col gap-2">
+       <!-- Temporary Region Countdown -->
+      <div v-if="gameStore.isTemporaryRegionActive" class="w-full">
+        <div class="bg-gradient-to-r from-purple-900 via-blue-900 to-purple-900 rounded-lg p-3 border-2 border-yellow-400 shadow-lg">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-white font-bold flex items-center">
+              <span class="mr-2">✨</span>
+              Ethereal Nexus Portal Active
+            </div>
+            <div class="text-yellow-300 font-mono font-bold">
+              {{ temporaryRegionTimeFormatted }}
+            </div>
+          </div>
+          <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+            <div 
+              class="h-full bg-gradient-to-r from-red-500 to-purple-500 transition-all duration-1000 ease-linear rainbow-glow"
+              :style="{ width: `${temporaryRegionProgress}%` }"
+            ></div>
+          </div>
+          <div class="text-xs text-gray-300 mt-1 text-center">
+            Portal will close when time expires
+          </div>
+        </div>
+      </div>
+    </div>
+
       <!-- XP Bar with full width -->
       <XPBar class="w-full" :experience="gameStore.activePokemon.experience!"
         :experienceToNextLevel="gameStore.activePokemon.experienceToNextLevel!"
         :level="gameStore.activePokemon.level!" />
       <!-- BuffDisplay positioned below XPBar -->
       <BuffDisplay class="w-full" />
-    </div>
-
+      
+     
     <!-- Add warning message -->
     <div v-if="!gameStore.activePokemon && gameStore.hasAnyHealthyPokemon()"
       class="mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4">
@@ -505,8 +593,10 @@ const fireRateStageInfo = computed(() => {
     <div class="mb-4">
       <select v-model="gameStore.currentRegion" @change="handleRegionChange"
         class="px-4 py-2 border rounded-lg bg-gray-50">
-        <option v-for="(region, id) in regions" :key="id" :value="id">
+        <option v-for="(region, id) in regions" :key="id" :value="id"
+          :disabled="id === 'ethereal-nexus' && !gameStore.isTemporaryRegionActive">
           {{ region.name }} (Lvl {{ region.minLevel }}-{{ region.maxLevel }})
+          <span v-if="id === 'ethereal-nexus'"> - ✨ Mystical Portal</span>
         </option>
       </select>
     </div>
@@ -518,7 +608,7 @@ const fireRateStageInfo = computed(() => {
         <span class="text-sm text-gray-500 ml-2">Encounter Rate: {{ gameStore.currentRegionData.encounterRate }}%</span>
       </div>
       <div v-if="!wildPokemon" class="text-sm text-gray-600">
-        Next spawn in: {{ spawnTimer ?? '...' }}s
+        Next spawn in: {{ Math.ceil(spawnTimer) ?? '...' }}s
       </div>
       <div class="bg-red-100 px-3 py-1 rounded-full text-red-600">
         <span class="mr-1">🔴</span>{{ totalPokeballs }} Pokéballs
@@ -683,12 +773,15 @@ const fireRateStageInfo = computed(() => {
             :canCapture="canCapture"
             :canUseBerry="canUseBerry"
             :canUseSeekerStone="canUseSeekerStone"
+            :canUseDragonStone="canUseDragonStone"
             :pokeballCount="totalPokeballs"
             :berryCount="berryCount"
             :seekerStoneCount="seekerStoneCount"
+            :dragonStoneCount="dragonStoneCount"
             @capture="openPokeballSelector"
             @berry="openBerrySelector"
             @seeker-stone="openSeekerStoneSelector"
+            @dragon-stone="openDragonStoneSelector"
           />
         </div>
       </div>
@@ -967,5 +1060,17 @@ const fireRateStageInfo = computed(() => {
   font-weight: bold;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
   transition: opacity 0.2s ease;
+}
+
+/* Rainbow glow effect for temporary region countdown */
+.rainbow-glow {
+  animation: rainbow-animation 3s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes rainbow-animation {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(180deg); }
+  100% { filter: hue-rotate(360deg); }
 }
 </style>
