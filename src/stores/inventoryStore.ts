@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { InventoryItem, ItemType } from '@/types/pokemon'
 import { itemFactory } from '@/services/itemFactory'
+import { useBuffStore } from '@/stores/buffStore'
 
 interface InventoryState {
   items: Record<string, InventoryItem>;
@@ -13,6 +14,12 @@ export const useInventoryStore = defineStore('inventory', {
 
   getters: {
     getAllItems: (state) => Object.values(state.items),
+    // Dynamic item cap: 99 + Steel Storage Emblem buff value from buffStore
+    getItemCap: () => {
+      const buffStore = useBuffStore();
+      const steelBuff = buffStore.getBuffById('steel-storage-emblem');
+      return 99 + (steelBuff?.value || 0);
+    },
     
     getItemsByType: (state) => (type: ItemType) => {
       return Object.values(state.items)
@@ -40,12 +47,13 @@ export const useInventoryStore = defineStore('inventory', {
 
   actions: {
     addItem(item: InventoryItem) {
+      const cap = this.getItemCap;
       if (this.items[item.id]) {
-        // Item exists, increase quantity
-        this.items[item.id].quantity += item.quantity
+        // Item exists, increase quantity but cap at dynamic cap
+        this.items[item.id].quantity = Math.min(cap, this.items[item.id].quantity + item.quantity)
       } else {
-        // New item
-        this.items[item.id] = { ...item }
+        // New item, but cap at dynamic cap
+        this.items[item.id] = { ...item, quantity: Math.min(cap, item.quantity) }
       }
       this.saveState()
     },
@@ -82,18 +90,24 @@ export const useInventoryStore = defineStore('inventory', {
 
     initializeInventory() {
       const savedState = localStorage.getItem('inventoryState')
-      
+      const cap = this.getItemCap;
       if (savedState) {
         const state = JSON.parse(savedState)
+        // Cap all item quantities at dynamic cap if above
+        const cappedItems = Object.fromEntries(
+          Object.entries(state.items || {}).map(([id, item]) => {
+            const typedItem = item as InventoryItem;
+            return [id, { ...typedItem, quantity: Math.min(cap, typedItem.quantity) }];
+          })
+        );
         this.$patch({
-          items: state.items || {}
+          items: cappedItems
         })
       } else {
         // Add default starter items using the new item definitions
         const starterPokeball = itemFactory.createFromDefinition('crappy-pokeball', 25);
         const starterPotion = itemFactory.createFromDefinition('simple-potion', 2);
         const starterLure = itemFactory.createFromDefinition('lure-berry', 5);
-        
         if (starterPokeball) {
           this.addItem(starterPokeball);
         } else {
@@ -114,7 +128,6 @@ export const useInventoryStore = defineStore('inventory', {
             }
           })
         }
-        
         if (starterPotion) {
           this.addItem(starterPotion);
         }

@@ -332,12 +332,14 @@ export const useGameStore = defineStore('game', {
   actions: {
     initializeGame() {
       const savedState = localStorage.getItem('gameState')
+      const buffStore = useBuffStore();
+      buffStore.initializeBuffStore();
       if (savedState) {
         const state = JSON.parse(savedState)
         const now = Date.now()
         const lastSaveTime = state.lastSaveTime ?? now
 
-        // Initialize the inventory store
+        // Then initialize the inventory store
         const inventoryStore = useInventoryStore();
         inventoryStore.initializeInventory();
 
@@ -515,13 +517,9 @@ export const useGameStore = defineStore('game', {
         // Set up save on page unload to prevent data loss
         this.setupSaveOnUnload();
       } else {
-        // Initialize the inventory store with defaults
+        // Then initialize the inventory store with defaults
         const inventoryStore = useInventoryStore();
         inventoryStore.initializeInventory();
-
-        // Initialize buff store
-        const buffStore = useBuffStore();
-        buffStore.initializeBuffStore();
 
         this.selectRandomStarter()
 

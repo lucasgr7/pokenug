@@ -70,6 +70,38 @@ export const TYPE_COLORS = {
 
 // Default idle jobs configuration
 export const DEFAULT_IDLE_JOBS: Record<string, IdleJob> = {
+  'steel-storage-expansion': {
+    id: 'steel-storage-expansion',
+    type: PokemonType.Steel,
+    name: 'Steel Storage Expansion',
+    description: 'Steel Pokémon work tirelessly to expand your inventory storage. Each completion increases your maximum item capacity by 1.',
+    maxSlots: 1,
+    assignedPokemon: [],
+    progress: 0,
+    baseTime: 28800000, // 8 hours in milliseconds (8 * 60 * 60 * 1000)
+    chance: 1.0, // 100% chance of success
+    rewards: [
+      {
+        type: 'buff',
+        chance: 1.0, // Always grants the reward
+        weight: 100,
+        itemDetails: {
+          name: 'Steel Storage Emblem',
+          description: 'Increases your maximum item capacity by 1 for all items.',
+          params: {
+            buffId: 'steel-storage-emblem',
+            buffType: 'item-capacity',
+            imageUrl: '/images/steel-emblem.png' // You may need to add this image
+          }
+        }
+      }
+    ],
+    completions: 0,
+    successfulCompletions: 0,
+    icon: '/images/steel-emblem.png',
+    backgroundColor: TYPE_COLORS[PokemonType.Steel],
+    percentualProgressWithAdditionalPokemon: 0.15 // 15% progress per additional Pokemon
+  },
   'electric-emblem': {
     id: 'electric-emblem',
     type: PokemonType.Electric,
