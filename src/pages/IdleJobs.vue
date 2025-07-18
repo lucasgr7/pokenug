@@ -13,39 +13,61 @@ const columnSize = ref(2)
 const showParty = ref(true)
 const itemsPerPage = ref(8) // Added itemsPerPage with default value
 
-// Timer for updating job progress
-let progressUpdateTimer: number | null = null
 
-// Setup and cleanup for the progress timer
+
+// Utility: Get live remaining time for a job (ms) using fixed duration
+function getLiveJobRemainingTime(jobId: string): number {
+  const job = gameStore.idleJobs[jobId];
+  if (!job || !job.startTime || !job.currentDuration) return 0;
+  const now = Date.now();
+  const elapsed = now - job.startTime;
+  return Math.max(0, job.currentDuration - elapsed);
+}
+
+// Helper: Set job duration and start time (call when job starts or assignment changes)
+function setJobStart(jobId: string) {
+  const job = gameStore.idleJobs[jobId];
+  if (!job) return;
+  job.currentDuration = gameStore.getJobRemainingTime(jobId);
+  job.startTime = Date.now();
+}
+
+let progressUpdateTimer: number | null = null;
 onMounted(() => {
-  // Start the timer to update job progress every second
+  // Patch: On mount, ensure all jobs with assignedPokemon and no currentDuration get initialized
+  Object.keys(gameStore.idleJobs).forEach(jobId => {
+    const job = gameStore.idleJobs[jobId];
+    if (job.assignedPokemon.length > 0 && (!job.currentDuration || !job.startTime)) {
+      setJobStart(jobId);
+    }
+  });
   progressUpdateTimer = window.setInterval(() => {
+    const now = Date.now();
     Object.keys(gameStore.idleJobs).forEach(jobId => {
-      // Only update active jobs with assigned Pokémon 
-      if (gameStore.idleJobs[jobId].assignedPokemon.length > 0) {
-        // Update the UI using the getJobProgressPercent method which uses startTime
-        const currentProgress = gameStore.getJobProgressPercent(jobId);
-        gameStore.idleJobs[jobId].progress = currentProgress;
-        
+      const job = gameStore.idleJobs[jobId];
+      if (job.assignedPokemon.length > 0 && job.startTime && job.currentDuration) {
+        const elapsed = now - job.startTime;
+        let progress = Math.min(100, (elapsed / job.currentDuration) * 100);
+        progress = Math.max(0, Math.min(100, progress));
+        job.progress = progress;
         // Check if job has completed
-        if (currentProgress >= 100) {
+        if (progress >= 100) {
           gameStore.completeJob(jobId);
-          
-          // After completion, reset startTime to now for the next cycle
-          gameStore.idleJobs[jobId].startTime = Date.now();
+          setJobStart(jobId);
         }
+      } else {
+        job.progress = 0;
       }
     });
   }, 1000);
-})
+});
 
 onUnmounted(() => {
-  // Clear the timer when component is unmounted
   if (progressUpdateTimer !== null) {
     clearInterval(progressUpdateTimer);
     progressUpdateTimer = null;
   }
-})
+});
 
 // Filtrar apenas os jobs com tipos de Pokémon que o jogador possui
 const availableJobs = computed(() => {
@@ -133,43 +155,36 @@ const tooltips = {
 // Rest of the existing code
 function handleDrop(event: DragEvent, jobId: string | number) {
   if (!event.dataTransfer) return
-  
   const data = JSON.parse(event.dataTransfer.getData('application/json'))
-  
-  // Find the actual Pokemon reference from the store based on data properties
-  // Include uniqueId in the comparison to distinguish between same Pokemon types
   let pokemon
   if (data.isParty) {
-    // For party Pokémon, now including uniqueId in comparison when available
     pokemon = gameStore.playerPokemon.find(p => 
       p.name === data.name && 
       p.level === data.level && 
       (data.uniqueId ? p.uniqueId === data.uniqueId : true)
     )
   } else {
-    // For available Pokémon, now including uniqueId in comparison when available
     pokemon = gameStore.availablePokemon.find(p => 
       p.name === data.name && 
       p.level === data.level && 
       (data.uniqueId ? p.uniqueId === data.uniqueId : true)
     )
   }
-  
   if (pokemon) {
-    // Don't assign fainted Pokémon to jobs
     if (pokemon.faintedAt) {
-      // Instead of attempting to assign to a job, move to available if from party
       if (data.isParty) {
         gameStore.swapPokemonBetweenPartyAndAvailable(pokemon, false)
       }
       return
     }
     gameStore.assignPokemonToJob(pokemon, String(jobId))
+    setJobStart(String(jobId)); // Reset duration and start time on assignment
   }
 }
 
 function removePokemon(pokemon: Pokemon, jobId: string | number) {
   gameStore.removePokemonFromJob(pokemon, String(jobId))
+  setJobStart(String(jobId)); // Reset duration and start time on removal
 }
 
 // Function to get contrasting text color (white or black) based on background color
@@ -478,17 +493,16 @@ function getTotalLevels(jobId: string): number {
                   <!-- Progress Section -->
                   <div class="mb-3 lg:mb-4 flex-shrink-0">
                     <div class="flex justify-between items-center mb-2 text-xs lg:text-sm">
-                      <span class="font-medium opacity-80">Progress</span>
+                      <span class="font-medium opacity-80">Progress (Time Remaining)</span>
                       <span 
                         class="font-bold bg-white bg-opacity-30 px-2 py-1 rounded-full cursor-help"
                         @mouseover="showInfoTooltip($event, tooltips.remainingTime)"
                         @mouseout="hideTooltip"
                       >
-                        {{ formatTimeRemaining(gameStore.getJobRemainingTime(String(id))) }}
+                        {{ formatTimeRemaining(getLiveJobRemainingTime(String(id))) }}
                       </span>
                     </div>
-                    
-                    <!-- Animated Progress Bar -->
+                    <!-- Animated Progress Bar with Remaining Time -->
                     <div class="relative h-3 lg:h-4 bg-black bg-opacity-20 rounded-full overflow-hidden">
                       <div 
                         :style="{ width: job.progress + '%' }"
@@ -497,7 +511,7 @@ function getTotalLevels(jobId: string): number {
                         <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-50 animate-pulse"></div>
                       </div>
                       <div class="absolute inset-0 flex items-center justify-center text-xs font-bold text-black">
-                        {{ Math.round(job.progress) }}%
+                        {{ formatTimeRemaining(getLiveJobRemainingTime(String(id))) }}
                       </div>
                     </div>
                     
