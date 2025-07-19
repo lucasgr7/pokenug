@@ -17,7 +17,7 @@ const selectedType = ref('all')
 
 // Pagination
 const currentPage = ref(1)
-const itemsPerPage = 12
+const itemsPerPage = 9 
 
 // Modal state
 const showReleaseModal = ref(false)
@@ -264,23 +264,23 @@ watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => 
   resetPagination()
 });</script>
 <template>
-    <div class="h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-4">
+    <div class="h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-0 m-0">
         <!-- Pokédex Header -->
-        <div class="bg-red-600 rounded-t-lg shadow-2xl border-4 border-red-700 p-3 mb-0">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
+        <div class="bg-red-600 rounded-t-lg shadow-2xl border-4 border-red-700 p-2 mb-0">
+            <div class="flex items-center justify-between min-h-0">
+                <div class="flex items-center space-x-2">
                     <!-- Pokédex Logo -->
-                    <div class="w-10 h-10 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center">
-                        <div class="w-5 h-5 bg-blue-400 rounded-full border-2 border-white"></div>
+                    <div class="w-8 h-8 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center">
+                        <div class="w-4 h-4 bg-blue-400 rounded-full border-2 border-white"></div>
                     </div>
                     <div>
-                        <h1 class="text-xl font-bold text-white">Pokédex</h1>
-                        <p class="text-sm text-red-100">Digital Encyclopedia</p>
+                        <h1 class="text-lg font-bold text-white leading-tight">Pokédex</h1>
+                        <p class="text-xs text-red-100 leading-tight">Digital Encyclopedia</p>
                     </div>
                 </div>
                 
                 <!-- Status Lights -->
-                <div class="flex space-x-2">
+                <div class="flex space-x-1">
                     <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                     <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
                     <div class="w-2 h-2 bg-red-400 rounded-full"></div>
@@ -289,27 +289,27 @@ watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => 
         </div>
 
         <!-- Main Pokédex Body -->
-        <div class="bg-red-500 border-4 border-red-600 rounded-b-lg shadow-2xl h-[calc(100vh-100px)]">
+        <div class="bg-red-500 border-4 border-red-600 rounded-b-lg shadow-2xl h-[calc(100vh-64px)]">
             <!-- Control Panel -->
-            <div class="bg-gray-800 p-4 border-b-4 border-gray-700">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div class="bg-gray-800 p-2 border-b-4 border-gray-700">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-2 items-center">
                     <!-- Search Bar -->
                     <div class="lg:col-span-2">
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Search Pokémon</label>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Search Pokémon</label>
                         <input 
                             v-model="searchQuery"
                             type="text" 
                             placeholder="Enter Pokémon name..."
-                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         >
                     </div>
 
                     <!-- Type Filter -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Filter by Type</label>
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Filter by Type</label>
                         <select 
                             v-model="selectedType"
-                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            class="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         >
                             <option value="all">All Types</option>
                             <option v-for="type in availableTypes" :key="type" :value="type" class="capitalize">
@@ -320,32 +320,32 @@ watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => 
 
                     <!-- Display Options -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Status Filter</label>
-                        <div class="flex flex-wrap gap-2">
+                        <label class="block text-xs font-medium text-gray-300 mb-1">Status Filter</label>
+                        <div class="flex flex-wrap gap-1">
                             <button
                                 @click="showParty = !showParty"
                                 :class="showParty ? 'bg-blue-600 text-white' : 'bg-gray-600 text-gray-300'"
-                                class="px-3 py-1 rounded text-sm font-medium transition-colors"
+                                class="px-2 py-0.5 rounded text-xs font-medium transition-colors"
                             >
                                 Party
                             </button>
                             <button
                                 @click="showWorking = !showWorking"
                                 :class="showWorking ? 'bg-purple-600 text-white' : 'bg-gray-600 text-gray-300'"
-                                class="px-3 py-1 rounded text-sm font-medium transition-colors"
+                                class="px-2 py-0.5 rounded text-xs font-medium transition-colors"
                             >
                                 Working
                             </button>
                             <button
                                 @click="showAvailable = !showAvailable"
                                 :class="showAvailable ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'"
-                                class="px-3 py-1 rounded text-sm font-medium transition-colors"
+                                class="px-2 py-0.5 rounded text-xs font-medium transition-colors"
                             >
                                 Available
                             </button>
                             <button
                                 @click="clearSelection"
-                                class="px-3 py-1 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 transition-colors"
+                                class="px-2 py-0.5 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 transition-colors"
                             >
                                 Clear
                             </button>
@@ -392,7 +392,7 @@ watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => 
                         </div>
 
                         <!-- Pokemon List -->
-                        <div class="flex-1 overflow-y-auto p-2">
+                        <div class="flex-1 p-2">
                             <div v-if="filteredPokemon.length === 0" class="text-center py-8 text-gray-500">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

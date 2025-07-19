@@ -1,17 +1,23 @@
 <template>
   <div class="relative">
     <!-- Clean flat header -->
-    <div class="flex justify-between items-center px-4 py-3 bg-slate-800/90 rounded-2xl border border-slate-700/50">
-      <h3 class="text-sm font-semibold text-white flex items-center">
-        <div class="w-2 bg-blue-400  mr-3"></div>
-        Quick Inventory
-      </h3>
-      <router-link to="/inventory" class="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1">
-        View All
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-        </svg>
-      </router-link>
+    <div class="px-3 pt-2 pb-1 bg-slate-800/90 rounded-2xl border border-slate-700/50">
+      <div class="w-full flex flex-col items-center">
+        <span class="text-xs font-semibold text-slate-400 tracking-wide mb-1 uppercase">Quick Inventory</span>
+        <div class="flex flex-row items-center gap-2">
+          <button @click="showFilterModal = true" class="p-1.5 rounded-full bg-slate-700/60 border border-slate-600/50 text-slate-400 hover:text-blue-400 hover:bg-slate-700/80 transition-colors focus:outline-none flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M4 6h16M6 12h12M10 18h4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <router-link to="/inventory" class="px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1 rounded focus:outline-none border border-slate-600/50 bg-slate-700/60">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+            <span class="sr-only">View All</span>
+          </router-link>
+        </div>
+      </div>
     </div>
 
     <!-- Flat items grid -->
@@ -70,6 +76,15 @@
       @close="showExpansionModal = false"
       @expand="handleJobExpansion"
     />
+
+  <!-- QuickInventoryFilter Modal -->
+  <QuickInventoryFilter
+    :show="showFilterModal"
+    :allItems="allItems"
+    :selected="selectedItemIds"
+    @close="showFilterModal = false"
+    @apply-filter="onApplyFilter"
+  />
   </div>
 </template>
 
@@ -79,6 +94,7 @@ import { useInventory } from '../composables/useInventory'
 import { useGameStore } from '../stores/gameStore'
 import type { InventoryItem } from '@/types/pokemon'
 import JobSlotExpansionModal from './JobSlotExpansionModal.vue'
+import QuickInventoryFilter from './QuickInventoryFilter.vue'
 
 // Define emits
 const emit = defineEmits<{
@@ -91,21 +107,46 @@ const inventory = useInventory()
 // Get the game store for item effects
 const gameStore = useGameStore()
 
-// Modal state
+// Modal states
 const showExpansionModal = ref(false)
+const showFilterModal = ref(false)
 
-// Get the most common items (pokeballs and potions)
-const commonItems = computed(() => {
+
+// Filter state (sync with gameStore)
+import { watch } from 'vue'
+const selectedItemIds = ref<string[]>([...gameStore.quickInventoryFilter])
+
+// Keep local ref in sync with store
+watch(() => gameStore.quickInventoryFilter, (val) => {
+  selectedItemIds.value = [...val]
+})
+
+// Get all items for filter modal
+const allItems = computed(() => {
   const pokeballs = inventory.getItemsByType('pokeball')
   const potions = inventory.getItemsByType('potion')
   const berries = inventory.getItemsByType('berries')
   const materials = inventory.getItemsByType('material')
-  
-  // Combine and limit to 6 most used items
   return [...pokeballs, ...potions, ...berries, ...materials]
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 6)
+    .sort((a, b) => b.name.localeCompare(a.name))
 })
+
+// Items to display in quick inventory (filtered or default)
+const commonItems = computed(() => {
+  const items = allItems.value
+  if (selectedItemIds.value.length > 0) {
+    return items.filter(item => selectedItemIds.value.includes(item.id)).slice(0, 6)
+  }
+  // Default: top 6 by quantity
+  return items.sort((a, b) => b.quantity - a.quantity).slice(0, 6)
+})
+
+
+// Handle filter apply event
+function onApplyFilter(ids: string[]) {
+  selectedItemIds.value = ids
+  gameStore.quickInventoryFilter = ids
+}
 
 /**
  * Use an item from the quick inventory

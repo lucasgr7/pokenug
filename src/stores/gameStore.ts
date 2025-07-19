@@ -58,6 +58,7 @@ interface GameState {
       }
     }
   };
+  quickInventoryFilter: RemovableRef<string[]>;
   unlocked: {
     pokedex: boolean
     inventory: boolean;
@@ -131,8 +132,11 @@ export const useGameStore = defineStore('game', {
     phantomContract: useStorage<PhantomContractState>('phantomContract', {
       guaranteedCaptureAvailable: false
     }),
-    pendingSave: false
+    pendingSave: false,
+    quickInventoryFilter: useStorage<string[]>('quickInventoryFilter', [])
   }),
+
+
 
   getters: {
     hasStarterPokemon: (state) => state.playerPokemon.length > 0,

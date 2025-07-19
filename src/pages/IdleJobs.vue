@@ -34,11 +34,46 @@ function setJobStart(jobId: string) {
 
 let progressUpdateTimer: number | null = null;
 onMounted(() => {
-  // Patch: On mount, ensure all jobs with assignedPokemon and no currentDuration get initialized
+  // On mount, handle jobs with assignedPokemon:
+  // - If missing BOTH startTime and currentDuration, initialize them
+  // - If only currentDuration is missing (after refresh), recalculate it
+  // - If both are present, check if job is already completed and reset if needed
   Object.keys(gameStore.idleJobs).forEach(jobId => {
     const job = gameStore.idleJobs[jobId];
-    if (job.assignedPokemon.length > 0 && (!job.currentDuration || !job.startTime)) {
-      setJobStart(jobId);
+    if (job.assignedPokemon.length > 0) {
+      const missingStart = typeof job.startTime === 'undefined' || job.startTime === null;
+      const missingDuration = typeof job.currentDuration === 'undefined' || job.currentDuration === null;
+      if (missingStart && missingDuration) {
+        setJobStart(jobId);
+      } else if (!missingStart && missingDuration) {
+        // After refresh: startTime exists but currentDuration is missing, so recalculate it
+        job.currentDuration = gameStore.getJobRemainingTime(jobId);
+      }
+      // Now, if both are present, check if job is already completed (time elapsed >= duration)
+      if (!missingStart && !missingDuration) {
+        if (typeof job.startTime === 'number' && typeof job.currentDuration === 'number') {
+          const now = Date.now();
+          const elapsed = now - job.startTime;
+          if (elapsed >= job.currentDuration) {
+            gameStore.completeJob(jobId);
+            setJobStart(jobId);
+          }
+        }
+      }
+    }
+  });
+
+  // Immediately recalculate and set progress for all jobs with assigned Pokémon
+  const now = Date.now();
+  Object.keys(gameStore.idleJobs).forEach(jobId => {
+    const job = gameStore.idleJobs[jobId];
+    if (job.assignedPokemon.length > 0 && typeof job.startTime === 'number' && typeof job.currentDuration === 'number') {
+      const elapsed = now - job.startTime;
+      let progress = Math.min(100, (elapsed / job.currentDuration) * 100);
+      progress = Math.max(0, Math.min(100, progress));
+      job.progress = progress;
+    } else {
+      job.progress = 0;
     }
   });
   progressUpdateTimer = window.setInterval(() => {
@@ -189,16 +224,32 @@ function removePokemon(pokemon: Pokemon, jobId: string | number) {
 
 // Function to get contrasting text color (white or black) based on background color
 function getContrastingTextColor(hexColor: string): string {
-  // Convert hex to RGB
   const r = parseInt(hexColor.slice(1, 3), 16);
   const g = parseInt(hexColor.slice(3, 5), 16);
   const b = parseInt(hexColor.slice(5, 7), 16);
-  
-  // Calculate luminance (perceived brightness)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  
-  // Return white for dark backgrounds, black for light backgrounds
   return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
+// Function to get the complementary (opposite) color of a hex color
+function getComplementaryColor(hexColor: string): string {
+  // Remove the hash if present
+  const hex = hexColor.replace('#', '');
+  // Parse r, g, b values
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // Get complementary
+  const compR = 255 - r;
+  const compG = 255 - g;
+  const compB = 255 - b;
+  // Convert back to hex
+  return (
+    '#' +
+    compR.toString(16).padStart(2, '0') +
+    compG.toString(16).padStart(2, '0') +
+    compB.toString(16).padStart(2, '0')
+  );
 }
 
 // Function to adjust brightness of a hex color
