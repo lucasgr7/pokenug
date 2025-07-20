@@ -657,7 +657,7 @@ const getFireRateEffectVariant = computed(() => {
       <div v-else-if="gameStore?.activePokemon" class="bg-blue-50 p-4 rounded-lg shadow">
         <div class="text-center mb-2 font-bold">Your Pokémon</div>
         <div class="relative">
-          <CachedImage :src="gameStore?.activePokemon?.sprite ?? ''" :alt="'Player Pokemon'"
+          <CachedImage :pokemonId="gameStore?.activePokemon?.id" :shiny="gameStore?.activePokemon?.isShiny" :alt="'Player Pokemon'"
             :className="`w-32 h-32 mx-auto transition-transform duration-200 ${isPlayerAttacking ? 'animate-attack' : ''}`" />
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2">
@@ -799,12 +799,9 @@ const getFireRateEffectVariant = computed(() => {
           <!-- Pokemon container with fixed position -->
           <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 z-10">
             <!-- Pokemon image inside container -->
-            <CachedImage :src="wildPokemon.sprite" :alt="'Wild Pokemon'" :className="`w-full h-full transition-transform duration-200 ${isWildPokemonHurt ? 'animate-damage' : ''
+            <CachedImage :pokemonId="wildPokemon.id" :alt="'Wild Pokemon'" :className="`w-full h-full transition-transform duration-200 ${isWildPokemonHurt ? 'animate-damage' : ''
               } ${isEnemyAttacking ? 'animate-enemy-attack' : ''} ${isTryingCatch ? 'animate-catch' : ''
-              }`" @error="(e: Event) => {
-                const target = e.target as HTMLImageElement;
-                target.src = '/images/not-found.png';
-              }" />
+              }`" />
           </div>
           <!-- Type Tags -->
           <div class="flex justify-center gap-2 my-2 absolute bottom-2 left-0 right-0">

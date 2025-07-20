@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import PokemonGrid from '@/components/PokemonGrid.vue'
 import PokemonDetails from '@/components/PokemonDetails.vue'
+import CachedImage from '@/components/CachedImage.vue'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import { ref, computed, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
@@ -410,11 +411,11 @@ watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => 
                                 <div class="flex items-center space-x-2">
                                     <!-- Pokemon Image -->
                                     <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center border border-gray-200 flex-shrink-0">
-                                        <img 
-                                            :src="pokemon.sprite" 
+                                        <CachedImage
+                                            :pokemonId="pokemon.id"
+                                            :shiny="pokemon.isShiny"
                                             :alt="pokemon.name"
-                                            class="w-6 h-6 object-contain"
-                                            @error="(e) => (e.target as HTMLImageElement).src = '/images/not-found.png'"
+                                            :className="'w-6 h-6 object-contain'"
                                         />
                                     </div>
 
@@ -604,11 +605,12 @@ watch([searchQuery, selectedType, showParty, showWorking, showAvailable], () => 
     >
         <template #details v-if="pokemonToRelease">
             <div class="flex items-center space-x-3">
-                <img 
-                    :src="pokemonToRelease.sprite" 
+                <CachedImage
+                    v-if="pokemonToRelease"
+                    :pokemonId="pokemonToRelease.id"
+                    :shiny="pokemonToRelease.isShiny"
                     :alt="pokemonToRelease.name"
-                    class="w-12 h-12 object-contain"
-                    @error="(e) => (e.target as HTMLImageElement).src = '/images/not-found.png'"
+                    :className="'w-12 h-12 object-contain'"
                 />
                 <div>
                     <div class="font-medium text-gray-900 capitalize">{{ pokemonToRelease.name }}</div>

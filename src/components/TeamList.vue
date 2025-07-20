@@ -77,11 +77,10 @@ onUnmounted(() => {
            }"
            @click="swapPokemon(gameStore.playerPokemon[index - 1])">
         <div class="relative">
-          <CachedImage 
-            :src="(gameStore.playerPokemon[index - 1].isShiny && gameStore.playerPokemon[index - 1].shinySprite) ? 
-                   gameStore.playerPokemon[index - 1].shinySprite! : 
-                   gameStore.playerPokemon[index - 1].sprite" 
-            :alt="gameStore.playerPokemon[index - 1].name" 
+          <CachedImage
+            :pokemonId="gameStore.playerPokemon[index - 1].id"
+            :shiny="gameStore.playerPokemon[index - 1].isShiny"
+            :alt="gameStore.playerPokemon[index - 1].name"
             :className="'w-5 h-5 object-contain'"
           />
           <!-- Shiny indicator -->

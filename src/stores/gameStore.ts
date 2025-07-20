@@ -798,7 +798,6 @@ export const useGameStore = defineStore('game', {
       // Mark that we need to save - the actual saving will be handled by the worker timer
       if (!this.pendingSave) {
         this.pendingSave = true
-        console.log('State marked for saving, immediate:', immediate);
       }
       
       // For critical actions, save immediately
@@ -820,8 +819,6 @@ export const useGameStore = defineStore('game', {
       // Use requestIdleCallback if available for better performance
       const saveFn = () => {
         try {
-          console.log('performBatchSave: Executing actual save');
-          // Create a minimal state object with only essential data
           // Note: We exclude battleLogs and notifications as they are handled by useStorage
           const essentialState = {
             playerPokemon: this.playerPokemon,
