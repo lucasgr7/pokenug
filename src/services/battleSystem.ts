@@ -30,7 +30,7 @@ export function getTypeEffectiveness(attackerTypes: string[], defenderTypes: str
   for (const atk of attackerTypes) {
     for (const def of defenderTypes) {
       if (typeChart[atk]?.strongAgainst.includes(def)) {
-        multiplier *= 4
+        multiplier *= 2
         superEffective = true
       } else if (typeChart[atk]?.weakAgainst.includes(def)) {
         multiplier *= 0.5
