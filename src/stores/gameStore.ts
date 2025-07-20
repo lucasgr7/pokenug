@@ -2,6 +2,7 @@ import { Pokemon, PokemonType, InventoryItem } from '@/types/pokemon.js'
 import { IdleJob, DEFAULT_IDLE_JOBS } from '@/types/idleJobs.js'
 import { itemFactory } from '@/services/itemFactory.js'
 import { defineStore } from 'pinia'
+import { playerAttack, enemyAttack } from '../services/battleSystem.js'
 import { useInventoryStore } from './inventoryStore.js'
 import regions from '@/constants/regions.js'
 import { useBuffStore } from './buffStore.js'
@@ -1315,175 +1316,29 @@ export const useGameStore = defineStore('game', {
     },
 
     async attack() {
-      if (!this.battle.wildPokemon || !this.activePokemon) return false;
-
-      // Prevent attack spam by checking if we're already attacking (but allow enemy attacks to interrupt)
-      if (this.battle.isPlayerAttacking) return false;
-
-      // Set battle state for animations
-      this.battle.isPlayerAttacking = true;
-
-      // Import the buff store to apply buffs
-      const buffStore = useBuffStore();
-
-      // Register attack for fire rate feature
-      buffStore.registerFireRateAttack(
-        this.activePokemon.id,
-        this.activePokemon.level || 1,
-        this.currentRegion
-      );
-
-      // Get XP boost from buffs
-      const xpBoost = buffStore.getTotalXPBonus;
-
-      // Get fire rate multiplier
-      const fireRateMultiplier = buffStore.getFireRateMultiplier;
-
-      // Calculate XP gain with buffs
-      const baseXpPerAttack = 1;
-      const boostedXp = baseXpPerAttack + xpBoost;
-      const totalXpPerAttack = Math.floor(boostedXp * fireRateMultiplier);
-
-      // Apply XP gain to active Pokemon
-      this.activePokemon.experience = (this.activePokemon.experience || 0) + totalXpPerAttack;
-
-      // Check for level up on active Pokemon
-      const nextLevelXP = this.activePokemon.experienceToNextLevel ||
-        Math.floor(100 * Math.pow(this.activePokemon.level || 1, 1.5));
-
-      if (this.activePokemon.experience >= nextLevelXP) {
-        this.levelUpPokemon(this.activePokemon);
-      }
-
-      // Handle Water Emblem XP sharingdeb
-      if (buffStore.hasWaterEmblem) {
-        const shareMultiplier = buffStore.getWaterEmblemShareMultiplier;
-        const sharedXp = Math.floor(totalXpPerAttack * shareMultiplier);
-        
-        if (sharedXp > 0) {
-          // Share XP with all other party members (excluding the active Pokemon)
-          const otherPartyMembers = this.playerPokemon.filter(pokemon => 
-            pokemon !== this.activePokemon && !pokemon.faintedAt
-          );
-          
-          otherPartyMembers.forEach(pokemon => {
-            if (pokemon.experience !== undefined) {
-              pokemon.experience += sharedXp;
-              
-              // Check for level up on shared XP recipients
-              const memberNextLevelXP = pokemon.experienceToNextLevel ||
-                Math.floor(100 * Math.pow(pokemon.level || 1, 1.5));
-              
-              if (pokemon.experience >= memberNextLevelXP) {
-                this.levelUpPokemon(pokemon);
-              }
-            }
-          });
-          
-          // Add battle log for shared XP
-          if (otherPartyMembers.length > 0) {
-            this.addBattleLog(
-              `Water Emblem shared ${sharedXp} XP with ${otherPartyMembers.length} party member(s)! (${(shareMultiplier * 100).toFixed(1)}% sharing)`,
-              'system'
-            );
-          }
-        }
-      }
-
-      // Calculate damage first
-      let damage = 0;
-      try {
-        damage = this.calculateDamage(
-          this.activePokemon.attack!,
-          this.battle.wildPokemon.defense!,
-          this.activePokemon.level!,
-          this.battle.wildPokemon.level!
-        );
-      }
-      catch (ex) {
-        console.error('Error calculating damage:', ex);
-        this.battle.isPlayerAttacking = false;
-        return false;
-      }
-
-      // Apply damage to wild Pokemon immediately
-      this.battle.wildPokemon.currentHP = Math.max(0, this.battle.wildPokemon.currentHP! - damage);
-
-      // Add battle log
-      this.addBattleLog(
-        `${this.activePokemon.name} attacks ${this.battle.wildPokemon.name} for ${damage} damage!`,
-        'damage'
-      );
-
-      // Start hurt animation
-      this.battle.isWildPokemonHurt = true;
-
-      // Short delay for attack animation
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Add XP log if applicable
-      if (totalXpPerAttack > 0) {
-        let xpLogMessage = '';
-
-        // Base XP message
-        if (baseXpPerAttack > 0) {
-          xpLogMessage = `+${baseXpPerAttack} base XP`;
-        }
-
-        // Add Toxic Emblem message if active
-        if (xpBoost > 0) {
-          xpLogMessage += (xpLogMessage ? ', ' : '') + `+${xpBoost} XP from Toxic Emblem`;
-        }
-
-        // Add fire rate multiplier message if active
-        const fireRateState = buffStore.getFireRateState;
-        if (fireRateState.active && fireRateMultiplier > 1) {
-          xpLogMessage += (xpLogMessage ? ', ' : '') + `x${fireRateMultiplier.toFixed(1)} Fire Rate`;
-          xpLogMessage += ` (tier ${fireRateState.tier})`;
-        }
-
-        // Log total XP gain
-        this.addBattleLog(
-          `${xpLogMessage} = ${totalXpPerAttack} total XP gained!`,
-          'system'
-        );
-      }
-
-      // End animations
-      this.battle.isPlayerAttacking = false;
-      this.battle.isWildPokemonHurt = false;
-
-      // Check if Pokemon fainted
-      if (this.battle?.wildPokemon?.currentHP === 0) {
-        const defeatedPokemon = { ...this.battle.wildPokemon };
-        this.handleXPGain(this.activePokemon, defeatedPokemon);
-
-        // Track defeat for fear factor
-        this.addDefeatToFearFactor(this.currentRegion);
-
-        // Check for guaranteed capture (phantom contract)
-        if (this.phantomContract.guaranteedCaptureAvailable) {
-          this.addBattleLog(`${defeatedPokemon.name} fainted! Phantom Contract activates - guaranteed capture!`, 'system');
-          // Create a copy of the defeated Pokemon and add a unique identifier to it
-          const capturedPokemon = {
-            ...defeatedPokemon,
-            uniqueId: generateRandomId(),
-            currentHP: defeatedPokemon.maxHP // Restore to full HP when captured
-          };
-          this.addPokemonToInventory(capturedPokemon);
-          // Consume the phantom contract
-          this.phantomContract.guaranteedCaptureAvailable = false;
-          this.addNotification('Phantom Contract used! Pokemon captured!', 'success');
-        } else {
-          this.addBattleLog(`${defeatedPokemon.name} fainted!`, 'system');
-        }
-        
-        this.battle.wildPokemon = null;
-        this.startSpawnTimer();
-      }
-
-      this.markStateForSaving();
-      return true;
+      return await playerAttack({
+        battle: this.battle,
+        playerPokemon: this.playerPokemon,
+        activePokemon: this.activePokemon,
+        currentRegion: this.currentRegion,
+        player: this,
+        phantomContract: this.phantomContract,
+        addBattleLog: this.addBattleLog,
+        addNotification: this.addNotification,
+        updatePokemonHP: this.updatePokemonHP,
+        useInventoryItem: this.useInventoryItem,
+        removeItem: (id: string, qty: number) => useInventoryStore().removeItem(id, qty),
+        handlePokemonFaint: this.handlePokemonFaint,
+        handleXPGain: this.handleXPGain,
+        addDefeatToFearFactor: this.addDefeatToFearFactor,
+        startSpawnTimer: this.startSpawnTimer,
+        markStateForSaving: this.markStateForSaving,
+        levelUpPokemon: this.levelUpPokemon,
+        addPokemonToInventory: this.addPokemonToInventory,
+        calculateDamage: this.calculateDamage,
+        getBuffStore: () => useBuffStore(),
+        getInventoryStore: () => useInventoryStore(),
+      })
     },
 
     handlePokemonFaint() {
@@ -1502,196 +1357,33 @@ export const useGameStore = defineStore('game', {
       if (nextPokemon) {
         this.addBattleLog(`Go, ${nextPokemon.name}!`, 'system')
         this.setActivePokemon(nextPokemon)
-      } else {
-        // No more healthy Pokémon available - send player to Home
-        this.addBattleLog(
-          `All your Pokémon have fainted! Returning to Home for safety...`,
-          'system'
-        )
-        
-        // Clear the wild Pokémon and send player to Home
-        this.battle.wildPokemon = null
-        this.currentRegion = 'Home'
-        
-        // Add notification about going home
-        this.addNotification(
-          'All your Pokémon fainted! You have been safely returned to Home.',
-          'error'
-        )
-        
-        // Reset battle state
-        this.resetBattleState()
       }
-
-      this.markStateForSaving()
+      // If no nextPokemon, handled below
     },
-
     enemyAttack() {
-      const wildPokemon = this.battle.wildPokemon
-      const activePokemon = this.activePokemon
-      const buffStore = useBuffStore()
-      const inventoryStore = useInventoryStore()
-
-      if (!wildPokemon || !activePokemon || wildPokemon.isRunning) return
-
-      // If another enemy attack is already in progress, skip this cycle
-      // The tickSystem will call this again on the next tick
-      if (this.battle.isEnemyAttacking) {
-        return
-      }
-
-      // Enemy attacks have ABSOLUTE PRIORITY - they can interrupt player attacks
-
-      // Initialize lastAttackTime to allow for first enemy attack if not set
-      // This ensures the first enemy attack can happen immediately when called by the accumulator
-      if (!wildPokemon.lastAttackTime) {
-        wildPokemon.lastAttackTime = Date.now() - ENEMY_ATTACK_INTERVAL - 1000; // Set to past time to allow immediate attack
-      }
-
-      const now = Date.now()
-      if (now - wildPokemon.lastAttackTime >= ENEMY_ATTACK_INTERVAL) {
-        // Enemy attack has absolute priority - force set enemy attacking state
-        this.battle.isEnemyAttacking = true
-        
-        // Calculate damage immediately to avoid state changes during timeout
-        const damage = this.calculateDamage(
-          wildPokemon.attack ?? 0,
-          activePokemon.defense ?? 0,
-          wildPokemon.level ?? 1,
-          activePokemon.level ?? 1,
-          true
-        )
-
-        // Calculate if damage would cause fainting
-        const currentHP = activePokemon.currentHP ?? 0
-        const wouldFaint = currentHP <= damage
-
-        // Apply the attack with priority (immediate execution for absolute priority)
-        // Double-check that the battle state is still valid
-        if (!this.battle.wildPokemon || !this.activePokemon) {
-          this.battle.isEnemyAttacking = false
-          return
-        }
-
-        // Keep the enemy attacking animation for a short duration to allow the UI to show it
-        // Set the end time for the animation (300ms from now)
-        this.battle.enemyAttackAnimationEndTime = Date.now() + 300
-
-        if (wouldFaint && buffStore.hasRockEmblem) {
-          // Check if we have potions that can be auto-used
-          const potions = inventoryStore.getItemsByType('potion')
-          const totalPotions = potions.reduce((sum, potion) => sum + potion.quantity, 0)
-          if (potions.length >= 1 && totalPotions >= 4) {
-
-            // Auto-use the smallest potion that can would prevent fainting
-            const sortedPotions = [...potions].sort((a, b) => {
-              const healA = a.effect?.type === 'heal' ? a.effect.value : 0
-              const healB = b.effect?.type === 'heal' ? b.effect.value : 0
-              return healA - healB // Sort from smallest to largest
-            })
-
-            const potion = sortedPotions[0] // Get the smallest potion
-
-            // Use the potion
-            this.addBattleLog(
-              `Rock Emblem activated! Using ${potion.name} to prevent fainting!`,
-              'system'
-            )
-
-            // Apply the potion effect first
-            for(let i = 0; i < 4; i++) {
-              this.useInventoryItem(potion)
-            }
-
-            // Remove the potion from inventory
-            inventoryStore.removeItem(potion.id, 4)
-
-            // Calculate damage after potion was applied
-            const newCurrentHP = activePokemon.currentHP ?? 0
-            const finalHP = Math.max(0, newCurrentHP - damage)
-            this.updatePokemonHP(activePokemon, finalHP)
-
-            // Log the damage
-            this.addBattleLog(
-              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-              'damage'
-            )
-
-            // Update attack time
-            if (this.battle.wildPokemon) {
-              this.battle.wildPokemon.lastAttackTime = now
-            }
-            
-            // Check if still fainted after potion use
-            if (finalHP === 0) {
-              this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
-              this.handlePokemonFaint()
-            }
-          }
-          // No potions but we can try using stun resistance
-          else if (buffStore.shouldResistStun()) {
-            // Calculate 10% of max HP as the minimum HP to leave
-            const minHP = Math.max(1, Math.floor(activePokemon.maxHP! * 0.1))
-
-            this.addBattleLog(
-              `Rock Emblem protected ${activePokemon.name} from fainting!`,
-              'system'
-            )
-
-            // Set the Pokemon's HP to 10% instead of fainting
-            this.updatePokemonHP(activePokemon, minHP)
-
-            // Log the damage but show it was reduced
-            const actualDamage = currentHP - minHP
-            this.addBattleLog(
-              `${wildPokemon.name} attacks ${activePokemon.name} for ${actualDamage} damage (reduced by Rock Emblem)!`,
-              'damage'
-            )
-
-            if (this.battle.wildPokemon) {
-              this.battle.wildPokemon.lastAttackTime = now
-            }
-          }
-          // No resistance triggered, proceed with normal damage and fainting
-          else {
-            const finalHP = Math.max(0, currentHP - damage)
-            this.updatePokemonHP(activePokemon, finalHP)
-
-            if (this.battle.wildPokemon) {
-              this.battle.wildPokemon.lastAttackTime = now
-            }
-
-            this.addBattleLog(
-              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-              'damage'
-            )
-
-            if (finalHP === 0) {
-              this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
-              this.handlePokemonFaint()
-            }
-          }
-        }
-        // Normal damage without Rock Emblem protection
-        else {
-          const finalHP = Math.max(0, currentHP - damage)
-          this.updatePokemonHP(activePokemon, finalHP)
-
-          if (this.battle.wildPokemon) {
-            this.battle.wildPokemon.lastAttackTime = now
-
-            this.addBattleLog(
-              `${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!`,
-              'damage'
-            )
-          }
-
-          if (finalHP === 0) {
-            this.addBattleLog(`${activePokemon.name} fainted!`, 'system')
-            this.handlePokemonFaint()
-          }
-        }
-      }
+      return enemyAttack({
+        battle: this.battle,
+        playerPokemon: this.playerPokemon,
+        activePokemon: this.activePokemon,
+        currentRegion: this.currentRegion,
+        player: this,
+        phantomContract: this.phantomContract,
+        addBattleLog: this.addBattleLog,
+        addNotification: this.addNotification,
+        updatePokemonHP: this.updatePokemonHP,
+        useInventoryItem: this.useInventoryItem,
+        removeItem: (id: string, qty: number) => useInventoryStore().removeItem(id, qty),
+        handlePokemonFaint: this.handlePokemonFaint,
+        handleXPGain: this.handleXPGain,
+        addDefeatToFearFactor: this.addDefeatToFearFactor,
+        startSpawnTimer: this.startSpawnTimer,
+        markStateForSaving: this.markStateForSaving,
+        levelUpPokemon: this.levelUpPokemon,
+        addPokemonToInventory: this.addPokemonToInventory,
+        calculateDamage: this.calculateDamage,
+        getBuffStore: () => useBuffStore(),
+        getInventoryStore: () => useInventoryStore(),
+      })
     },
 
     tryPokemonRun() {
