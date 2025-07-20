@@ -699,37 +699,26 @@ export const useGameStore = defineStore('game', {
       this.saveImmediately() // Save immediately when adding Pokemon to inventory
     },
 
-    levelUpPokemon(pokemon: Pokemon) {
-      pokemon.level!++
+levelUpPokemon(pokemon: Pokemon) {
+  pokemon.level!++
+  // Use the same stat calculation as wild Pokémon
+  const stats = this.calculateStats(pokemon.level!)
+  pokemon.maxHP = stats.maxHP
+  pokemon.currentHP = stats.maxHP // Heal to full on level up
+  pokemon.attack = stats.attack
+  pokemon.defense = stats.defense
+  // Reset XP and calculate new requirement
+  pokemon.experience = 0
+  pokemon.experienceToNextLevel = Math.floor(100 * Math.pow(pokemon.level!, 1.5))
+  // Add level up message to battle logs
+  this.battle.battleLogs.push({
+    message: `${pokemon.name} reached level ${pokemon.level}!`,
+    type: 'system'
+  })
+  this.recycleBattleLogs()
 
-      // Calculate incremental stat increases based on current level
-      // Use a consistent growth formula that doesn't randomize existing stats
-      const STAT_GROWTH_EXP = 0.8;
-      const HP_PER_LEVEL = 20;
-      const growth = Math.pow(pokemon.level!, STAT_GROWTH_EXP);
-      
-      // Calculate incremental increases
-      const hpIncrease = Math.floor(HP_PER_LEVEL * growth);
-
-      // Update stats incrementally
-      pokemon.maxHP = pokemon.maxHP! + hpIncrease;
-      pokemon.currentHP = pokemon.maxHP; // Heal to full on level up
-      pokemon.attack = pokemon.attack! + 1;
-      pokemon.defense = pokemon.defense! + 1;
-
-      // Reset XP and calculate new requirement
-      pokemon.experience = 0
-      pokemon.experienceToNextLevel = Math.floor(100 * Math.pow(pokemon.level!, 1.5))
-
-      // Add level up message to battle logs
-      this.battle.battleLogs.push({
-        message: `${pokemon.name} reached level ${pokemon.level}!`,
-        type: 'system'
-      })
-      this.recycleBattleLogs()
-
-      this.saveImmediately() // Save immediately for level ups
-    },
+  this.saveImmediately() // Save immediately for level ups
+},
 
     async setStarterPokemon(pokemonName: string) {
       const response = await fetch('/pokemon-data.json')
