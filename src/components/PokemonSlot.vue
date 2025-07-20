@@ -17,8 +17,9 @@
   >
     <div class="flex" :class="verticalMode ? 'flex-row items-center' : 'flex-col items-center'">
       <div class="relative">
-        <img
-          :src="pokemon.isShiny && pokemon.shinySprite ? pokemon.shinySprite : pokemon.sprite"
+        <CachedImage
+          :pokemonId="pokemon.id"
+          :shiny="pokemon.isShiny"
           :alt="pokemon.name"
           :class="verticalMode ? 'w-10 h-10 mr-2' : 'w-20 h-20'"
           class="object-contain"
@@ -84,6 +85,7 @@
 import { computed, ref, onUnmounted, defineEmits } from 'vue'
 import type { Pokemon } from '../types/pokemon'
 import { useGameStore } from '../stores/gameStore'
+import CachedImage from './CachedImage.vue'
 
 const gameStore = useGameStore()
 const emits = defineEmits(['dragstart'])

@@ -615,7 +615,7 @@ function getTotalLevels(jobId: string): number {
                             @click="removePokemon(job.assignedPokemon[i-1], id)"
                           >
                             <CachedImage 
-                              :src="job.assignedPokemon[i-1].sprite" 
+                              :pokemon-id="job.assignedPokemon[i-1].id"
                               :alt="job.assignedPokemon[i-1].name"
                               :className="'w-6 h-6 lg:w-8 lg:h-8 object-contain'"
                             />

@@ -799,7 +799,7 @@ const getFireRateEffectVariant = computed(() => {
           <!-- Pokemon container with fixed position -->
           <div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 z-10">
             <!-- Pokemon image inside container -->
-            <CachedImage :pokemonId="wildPokemon.id" :alt="'Wild Pokemon'" :className="`w-full h-full transition-transform duration-200 ${isWildPokemonHurt ? 'animate-damage' : ''
+            <CachedImage :pokemonId="wildPokemon.id" :shiny="wildPokemon.isShiny" :alt="'Wild Pokemon'" :className="`w-full h-full transition-transform duration-200 ${isWildPokemonHurt ? 'animate-damage' : ''
               } ${isEnemyAttacking ? 'animate-enemy-attack' : ''} ${isTryingCatch ? 'animate-catch' : ''
               }`" />
           </div>
