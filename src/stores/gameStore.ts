@@ -1212,7 +1212,7 @@ export const useGameStore = defineStore('game', {
       const SHINY_CONFIG = {
         // 100% for testing purposes (normally would be 1/4096 = 0.000244)
         testingChance: 1.0,
-        normalChance: 1 / 6,
+        normalChance: 1 / 1000,
         useTestingChance: false // Set to false for normal gameplay
       };
       
