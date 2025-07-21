@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import type { InventoryItem, ItemType } from '@/types/pokemon'
-import { itemFactory } from '@/services/itemFactory'
-import { useBuffStore } from '@/stores/buffStore'
+import type { InventoryItem, ItemType } from '../types/pokemon.js'
+import { itemFactory } from '../services/itemFactory.js'
+import { useBuffStore } from './buffStore.js'
+import { saveInventory, loadInventory } from '../services/inventoryIdb.js'
 
 interface InventoryState {
   items: Record<string, InventoryItem>;
@@ -46,7 +47,7 @@ export const useInventoryStore = defineStore('inventory', {
   },
 
   actions: {
-    addItem(item: InventoryItem) {
+    async addItem(item: InventoryItem) {
       const cap = this.getItemCap;
       if (this.items[item.id]) {
         // Item exists, increase quantity but cap at dynamic cap
@@ -55,49 +56,47 @@ export const useInventoryStore = defineStore('inventory', {
         // New item, but cap at dynamic cap
         this.items[item.id] = { ...item, quantity: Math.min(cap, item.quantity) }
       }
-      this.saveState()
+      await this.saveState()
     },
 
-    removeItem(itemId: string, quantity: number = 1) {
+    async removeItem(itemId: string, quantity: number = 1) {
       if (!this.items[itemId] || this.items[itemId].quantity < quantity) {
         return false
       }
 
       this.items[itemId].quantity -= quantity
-      
+
       // Remove item completely if quantity is 0
       if (this.items[itemId].quantity <= 0) {
         delete this.items[itemId]
       }
 
-      this.saveState()
+      await this.saveState()
       return true
     },
 
-    useItem(itemId: string) {
-      if (!this.items[itemId] || !this.items[itemId].usable) {
+    async useItem(itemId: string) {
+      if (!this.items[itemId]?.usable) {
         return false
       }
 
       // For consumable items, remove one from quantity
       if (this.items[itemId].consumable) {
-        return this.removeItem(itemId, 1)
+        return await this.removeItem(itemId, 1)
       }
-      
+
       // For non-consumable items, just return true to indicate successful use
       return true
     },
 
-    initializeInventory() {
-      const savedState = localStorage.getItem('inventoryState')
+    async initializeInventory() {
       const cap = this.getItemCap;
-      if (savedState) {
-        const state = JSON.parse(savedState)
+      const state = await loadInventory();
+      if (state && Object.keys(state).length > 0) {
         // Cap all item quantities at dynamic cap if above
         const cappedItems = Object.fromEntries(
-          Object.entries(state.items || {}).map(([id, item]) => {
-            const typedItem = item as InventoryItem;
-            return [id, { ...typedItem, quantity: Math.min(cap, typedItem.quantity) }];
+          Object.entries(state).map(([id, item]) => {
+            return [id, { ...item, quantity: Math.min(cap, item.quantity) }];
           })
         );
         this.$patch({
@@ -137,12 +136,8 @@ export const useInventoryStore = defineStore('inventory', {
       }
     },
 
-    saveState() {
-      const state = {
-        items: JSON.parse(JSON.stringify(this.items))
-      }
-      
-      localStorage.setItem('inventoryState', JSON.stringify(state))
+    async saveState() {
+      await saveInventory(JSON.parse(JSON.stringify(this.items)))
     }
   }
 })

@@ -113,6 +113,7 @@ const availableJobs = computed(() => {
     if (gameStore.hasAnyPokemonOfType(job.type)) {
       filteredJobs[id] = job;
     }
+    job.progress = Math.round(job.progress || 0); // Ensure progress is rounded to 2 decimal places
   });
   
   return filteredJobs;
@@ -291,7 +292,7 @@ function formatTimeRemaining(milliseconds: number): string {
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+  const seconds = Math.floor(totalSeconds % 60);
   
   // Build the time string based on what values are non-zero
   if (days > 0) {
