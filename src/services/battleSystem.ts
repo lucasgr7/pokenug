@@ -39,9 +39,9 @@ export function getTypeEffectiveness(attackerTypes: string[], defenderTypes: str
     }
   }
   let message = ''
-  if (superEffective && !notEffective) message = " It's super effective!"
-  else if (!superEffective && notEffective) message = " It's not very effective."
-  else if (superEffective && notEffective) message = " It has mixed effectiveness."
+  if (superEffective && !notEffective) message = ' <span class="text-purple-400">It\'s super effective!</span>'
+  else if (!superEffective && notEffective) message = ' <span class="text-gray-400">It\'s not very effective.</span>'
+  else if (superEffective && notEffective) message = ' <span class="text-green-400">It has mixed effectiveness.</span>'
   else message = ''
   return { multiplier, message }
 }
@@ -100,7 +100,7 @@ export async function playerAttack(ctx: BattleContext): Promise<boolean> {
         }
       })
       if (otherPartyMembers.length > 0) {
-        addBattleLog(`Water Emblem shared ${sharedXp} XP with ${otherPartyMembers.length} party member(s)! (${(shareMultiplier * 100).toFixed(1)}% sharing)`, 'system')
+        addBattleLog(`<span class="text-blue-400">Water Emblem</span> shared <span class="text-green-400 font-bold">${sharedXp} XP</span> with <span class="text-blue-400 font-bold">${otherPartyMembers.length}</span> party member(s)! (<span class="text-green-400">${(shareMultiplier * 100).toFixed(1)}% sharing</span>)`, 'system')
       }
     }
   }
@@ -123,20 +123,9 @@ export async function playerAttack(ctx: BattleContext): Promise<boolean> {
     return false
   }
   battle.wildPokemon.currentHP = Math.max(0, battle.wildPokemon.currentHP - damage)
-  addBattleLog(`${activePokemon.name} attacks ${battle.wildPokemon.name} for ${damage} damage!${effectivenessMsg}`, 'damage')
+  addBattleLog(`<span class="text-blue-400 font-bold">${activePokemon.name}</span> attacks <span class="text-yellow-400 font-bold">${battle.wildPokemon.name}</span> for <span class="text-red-400 font-bold">${damage}</span> damage!${effectivenessMsg}`, 'player')
   battle.isWildPokemonHurt = true
   await new Promise(resolve => setTimeout(resolve, 200))
-  if (totalXpPerAttack > 0) {
-    let xpLogMessage = ''
-    if (baseXpPerAttack > 0) xpLogMessage = `+${baseXpPerAttack} base XP`
-    if (xpBoost > 0) xpLogMessage += (xpLogMessage ? ', ' : '') + `+${xpBoost} XP from Toxic Emblem`
-    const fireRateState = buffStore.getFireRateState
-    if (fireRateState.active && fireRateMultiplier > 1) {
-      xpLogMessage += (xpLogMessage ? ', ' : '') + `x${fireRateMultiplier.toFixed(1)} Fire Rate`
-      xpLogMessage += ` (tier ${fireRateState.tier})`
-    }
-    addBattleLog(`${xpLogMessage} = ${totalXpPerAttack} total XP gained!`, 'system')
-  }
   battle.isPlayerAttacking = false
   battle.isWildPokemonHurt = false
   if (battle?.wildPokemon?.currentHP === 0) {
@@ -144,7 +133,7 @@ export async function playerAttack(ctx: BattleContext): Promise<boolean> {
     handleXPGain(activePokemon, defeatedPokemon)
     addDefeatToFearFactor(currentRegion)
     if (phantomContract.guaranteedCaptureAvailable) {
-      addBattleLog(`${defeatedPokemon.name} fainted! Phantom Contract activates - guaranteed capture!`, 'system')
+      addBattleLog(`<span class="text-yellow-400 font-bold">${defeatedPokemon.name}</span> fainted! <span class="text-purple-400">Phantom Contract activates - guaranteed capture!</span>`, 'system')
       const capturedPokemon = {
         ...defeatedPokemon,
         uniqueId: Math.random().toString(36).slice(2),
@@ -154,7 +143,7 @@ export async function playerAttack(ctx: BattleContext): Promise<boolean> {
       phantomContract.guaranteedCaptureAvailable = false
       addNotification('Phantom Contract used! Pokemon captured!', 'success')
     } else {
-      addBattleLog(`${defeatedPokemon.name} fainted!`, 'system')
+      addBattleLog(`<span class="text-yellow-400 font-bold">${defeatedPokemon.name}</span> fainted!`, 'system')
     }
     battle.wildPokemon = null
     startSpawnTimer()
@@ -205,32 +194,32 @@ export function enemyAttack(ctx: BattleContext): void {
           return healA - healB
         })
         const potion = sortedPotions[0]
-        addBattleLog(`Rock Emblem activated! Using ${potion.name} to prevent fainting!`, 'system')
+        addBattleLog(`<span class="text-purple-400">Rock Emblem activated!</span> Using <span class="text-blue-400">${potion.name}</span> to prevent fainting!`, 'system')
         for(let i = 0; i < 4; i++) ctx.useInventoryItem(potion)
         inventoryStore.removeItem(potion.id, 4)
         const newCurrentHP = activePokemon.currentHP ?? 0
         const finalHP = Math.max(0, newCurrentHP - damage)
         updatePokemonHP(activePokemon, finalHP)
-        addBattleLog(`${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!${effectivenessMsg}`, 'damage')
+        addBattleLog(`<span class="text-yellow-400 font-bold">${wildPokemon.name}</span> attacks <span class="text-blue-400 font-bold">${activePokemon.name}</span> for <span class="text-red-400 font-bold">${damage}</span> damage!${effectivenessMsg}`, 'damage')
         if (battle.wildPokemon) battle.wildPokemon.lastAttackTime = now
         if (finalHP === 0) {
-          addBattleLog(`${activePokemon.name} fainted!`, 'system')
+          addBattleLog(`<span class="text-blue-400 font-bold">${activePokemon.name}</span> fainted!`, 'system')
           handlePokemonFaint()
         }
       } else if (buffStore.shouldResistStun()) {
         const minHP = Math.max(1, Math.floor(activePokemon.maxHP * 0.1))
-        addBattleLog(`Rock Emblem protected ${activePokemon.name} from fainting!`, 'system')
+        addBattleLog(`<span class="text-purple-400">Rock Emblem protected <span class="text-blue-400 font-bold">${activePokemon.name}</span> from fainting!</span>`, 'system')
         updatePokemonHP(activePokemon, minHP)
         const actualDamage = currentHP - minHP
-        addBattleLog(`${wildPokemon.name} attacks ${activePokemon.name} for ${actualDamage} damage (reduced by Rock Emblem)!${effectivenessMsg}`, 'damage')
+        addBattleLog(`<span class="text-yellow-400 font-bold">${wildPokemon.name}</span> attacks <span class="text-blue-400 font-bold">${activePokemon.name}</span> for <span class="text-red-400 font-bold">${actualDamage}</span> damage <span class="text-purple-400">(reduced by Rock Emblem)</span>!${effectivenessMsg}`, 'damage')
         if (battle.wildPokemon) battle.wildPokemon.lastAttackTime = now
       } else {
         const finalHP = Math.max(0, currentHP - damage)
         updatePokemonHP(activePokemon, finalHP)
         if (battle.wildPokemon) battle.wildPokemon.lastAttackTime = now
-        addBattleLog(`${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!${effectivenessMsg}`, 'damage')
+        addBattleLog(`<span class="text-yellow-400 font-bold">${wildPokemon.name}</span> attacks <span class="text-blue-400 font-bold">${activePokemon.name}</span> for <span class="text-red-400 font-bold">${damage}</span> damage!${effectivenessMsg}`, 'damage')
         if (finalHP === 0) {
-          addBattleLog(`${activePokemon.name} fainted!`, 'system')
+          addBattleLog(`<span class="text-blue-400 font-bold">${activePokemon.name}</span> fainted!`, 'system')
           handlePokemonFaint()
         }
       }
@@ -239,10 +228,10 @@ export function enemyAttack(ctx: BattleContext): void {
       updatePokemonHP(activePokemon, finalHP)
       if (battle.wildPokemon) {
         battle.wildPokemon.lastAttackTime = now
-        addBattleLog(`${wildPokemon.name} attacks ${activePokemon.name} for ${damage} damage!${effectivenessMsg}`, 'damage')
+      addBattleLog(`<span class="text-yellow-400 font-bold">${wildPokemon.name}</span> attacks <span class="text-blue-400 font-bold">${activePokemon.name}</span> for <span class="text-red-400 font-bold">${damage}</span> damage!${effectivenessMsg}`, 'damage')
       }
       if (finalHP === 0) {
-        addBattleLog(`${activePokemon.name} fainted!`, 'system')
+      addBattleLog(`<span class="text-blue-400 font-bold">${activePokemon.name}</span> fainted!`, 'system')
         handlePokemonFaint()
       }
     }

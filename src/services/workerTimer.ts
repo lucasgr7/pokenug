@@ -10,7 +10,7 @@ class WorkerTimer {
   /**
    * @param interval Tick interval in ms. Default is 750ms to match game logic.
    */
-  constructor(interval: number = 750) {
+  constructor(interval: number = 500) {
     this.tickInterval = interval
     this.initWorker()
   }

@@ -8,7 +8,7 @@ import { berryService } from '@/services/berryService'
 import BattleLog from '@/components/BattleLog.vue'
 import XPBar from '@/components/XPBar.vue'
 import CachedImage from '@/components/CachedImage.vue'
-import BerryTasksDisplay from '@/components/BerryTasksDisplay.vue'
+// ...existing code...
 import PokemonSelectionModal from '@/components/PokemonSelectionModal.vue'
 import ActionButtons from '@/components/ActionButtons.vue'
 import CircularActionButton from '@/components/CircularActionButton.vue'
@@ -265,10 +265,18 @@ async function performCapture(ball: InventoryItem) {
   const result = await attemptCapture(wildPokemon.value, ballDefinition)
 
   // Add the result message to battle logs
-  gameStore.battle.battleLogs.push({
-    message: result.message,
-    type: 'system'
-  })
+  if(result.success){
+    gameStore.battle.battleLogs.push({
+      message: result.message,
+      type: 'success'
+    })
+  }
+  else {
+    gameStore.battle.battleLogs.push({
+      message: `Failed to catch ${wildPokemon.value.name} with ${ball.name}.`,
+      type: 'system'
+    })
+  }
 
   // If the capture was successful, clear the wild Pokemon and restart spawn timer
   if (result.success) {
@@ -644,8 +652,7 @@ const getFireRateEffectVariant = computed(() => {
       </div>
     </div>
 
-    <!-- Berry Tasks Display -->
-    <BerryTasksDisplay :active-tasks="activeTasks" @cancel-task="cancelBerryTask" class="mb-4" />
+    <!-- Berry Tasks Display removed, will be placed in NotificationHeader.vue -->
 
     <!-- Battle Area -->
     <div class="grid grid-cols-3 gap-4">

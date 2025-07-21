@@ -21,7 +21,7 @@ interface BattleState {
   enemyAttackAnimationEndTime?: number; // Track when enemy attack animation should end
   isTryingCatch: boolean;
   currentCaptureAttemptId?: string;
-  battleLogs: RemovableRef<Array<{ message: string; type: 'damage' | 'heal' | 'system' }>>;
+  battleLogs: RemovableRef<Array<{ message: string; type: 'player' | 'damage' | 'heal' | 'system' | 'success' }>>;
   nextSpawnQueue: Array<{ id: number, name: string }>;
 }
 
@@ -934,7 +934,7 @@ levelUpPokemon(pokemon: Pokemon) {
             catchChance = Math.max(0.001, Math.min(catchChance, item.effect.catchRate));
 
             if (Math.random() < catchChance) {
-              this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'system');
+              this.addBattleLog(`Caught ${this.battle.wildPokemon.name}!`, 'success');
               // Create a copy of the wild Pokemon and add a unique identifier to it
               const caughtPokemon = {
                 ...this.battle.wildPokemon,
@@ -1095,12 +1095,6 @@ levelUpPokemon(pokemon: Pokemon) {
       isEnemy: boolean = false
     ): number {
 
-      // log the details
-      this.addBattleLog(
-        `Calculating damage: Attack=${attack}, Defense=${defense}, Attacker Level=${attackerLevel}, Defender Level=${defenderLevel}, Is Enemy=${isEnemy}`,
-        'system'
-      );
-
       // se for inimigo adicionar um fator de 300%
       attack *= isEnemy ? 2.5 : 1.5; // Aumenta o ataque do inimigo
       const BASE_SCALING = 1.28;   // era o LEVEL_SCALING_FACTOR
@@ -1126,13 +1120,13 @@ levelUpPokemon(pokemon: Pokemon) {
       return Math.floor(10 * (enemyLevel / playerLevel)) * 35
     },
 
-    addBattleLog(message: string, type: 'damage' | 'heal' | 'system') {
+    addBattleLog(message: string, type: 'player' | 'damage' | 'heal' | 'system' | 'success') {
       this.battle.battleLogs.push({ message, type })
       this.recycleBattleLogs()
     },
 
     recycleBattleLogs() {
-      const MAX_BATTLE_LOGS = 100
+      const MAX_BATTLE_LOGS = 50
       if (this.battle.battleLogs.length > MAX_BATTLE_LOGS) {
         // Keep only the latest MAX_BATTLE_LOGS messages
         this.battle.battleLogs.splice(0, this.battle.battleLogs.length - MAX_BATTLE_LOGS)
@@ -1344,7 +1338,7 @@ levelUpPokemon(pokemon: Pokemon) {
       const nextPokemon = this.findNextAvailablePokemon()
 
       if (nextPokemon) {
-        this.addBattleLog(`Go, ${nextPokemon.name}!`, 'system')
+        this.addBattleLog(`Go, ${nextPokemon.name}!`, 'player')
         this.setActivePokemon(nextPokemon)
       }
       // If no nextPokemon, handled below
@@ -1475,7 +1469,7 @@ levelUpPokemon(pokemon: Pokemon) {
         }
 
         if (Math.random() * 100 <= catchChance) {
-          this.addBattleLog(`Caught ${this.battle.wildPokemon!.name}!`, 'system');
+          this.addBattleLog(`Caught ${this.battle.wildPokemon!.name}!`, 'success');
           // Create a copy of the wild Pokemon and add a unique identifier to it
           const caughtPokemon = {
             ...this.battle.wildPokemon!,
