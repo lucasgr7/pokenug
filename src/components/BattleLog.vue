@@ -1,9 +1,14 @@
 <template>
   <div class="bg-gray-800 text-white p-4 rounded-lg mt-4 h-48 overflow-y-auto" ref="logContainer">
     <div v-for="(log, index) in logs" :key="index" 
-         :class="{'text-red-400': log.type === 'damage', 'text-green-400': log.type === 'heal', 'text-yellow-400': log.type === 'system'}"
+         :class="{'text-red-400': log.type === 'damage', 
+         'text-green-400': log.type === 'heal', 
+         'text-yellow-400': log.type === 'system',
+         'text-blue-400': log.type === 'success'
+       }"
     >
-      {{ log.message }}
+      <!-- Supports HTML formatting in log messages. Ensure log.message is sanitized if user input is possible. -->
+      <span v-html="log.message"></span>
     </div>
   </div>
 </template>
@@ -13,7 +18,7 @@ import { ref, onMounted, watch } from 'vue'
 
 interface LogMessage {
   message: string;
-  type: 'damage' | 'heal' | 'system';
+  type: 'player' | 'damage' | 'heal' | 'system' | 'success';
 }
 
 const props = defineProps<{

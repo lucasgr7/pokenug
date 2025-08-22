@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useInventory } from '../composables/useInventory'
+import { useGameStore } from '../stores/gameStore'
 import type { InventoryItem, ItemType } from '../types/pokemon'
+import JobSlotExpansionModal from '../components/JobSlotExpansionModal.vue'
 
 const inventory = useInventory()
+const gameStore = useGameStore()
 const activeTab = ref<ItemType>('pokeball')
+const showExpansionModal = ref(false)
 
 const tabs = [
   { id: 'pokeball', label: 'Pokeballs', icon: '🔴' },
@@ -18,7 +22,7 @@ const filteredItems = computed(() => {
   return inventory.getItemsByType(activeTab.value)
 })
 
-const rarityColors = {
+const rarityColors: Record<string, string> = {
   common: 'bg-gray-200 text-gray-800',
   uncommon: 'bg-green-200 text-green-800',
   rare: 'bg-blue-200 text-blue-800',
@@ -28,8 +32,43 @@ const rarityColors = {
 
 function useItem(item: InventoryItem) {
   if (item.usable) {
+    if (item.id === 'expansion-crystal') {
+      showExpansionModal.value = true
+      return
+    }
+    if (item.id === 'dragon-stone') {
+      // Check if temporary region is already active
+      if (gameStore.isTemporaryRegionActive) {
+        gameStore.addNotification('A temporary region is already active!', 'error')
+        return
+      }
+      // Use the dragon stone
+      inventory.getInventoryStore().removeItem(item.id, 1)
+      gameStore.consumeDragonStone()
+      gameStore.addNotification('Dragon Stone consumed! The Ethereal Nexus portal is now open!', 'success')
+      return
+    }
+    if (item.id === 'phantom-contract') {
+      // Use the phantom contract
+      const success = gameStore.useInventoryItem(item)
+      if (success) {
+        gameStore.addNotification('Phantom Contract activated! Fear factor reset and guaranteed capture enabled!', 'success')
+      }
+      return
+    }
     inventory.useItem(item.id)
-    // TODO: Add effects based on item type
+  }
+}
+
+function handleJobExpansion(jobId: string) {
+  // Remove one expansion crystal from inventory
+  inventory.useItem('expansion-crystal')
+}
+
+function handleImageError(event: Event) {
+  const target = event.target as HTMLImageElement
+  if (target) {
+    target.src = '/images/not-found.png'
   }
 }
 </script>
@@ -64,7 +103,7 @@ function useItem(item: InventoryItem) {
             :src="`/images/${item.id}.png`"
             :alt="item.name"
             class="w-full h-full object-contain"
-            @error="$event.target.src = '/images/not-found.png'"
+            @error="handleImageError"
           >
         </div>
         
@@ -80,13 +119,13 @@ function useItem(item: InventoryItem) {
           
           <div class="flex justify-between items-center mt-2">
             <span class="text-sm font-semibold">Qty: {{ item.quantity }}</span>
-            <!-- <button 
+            <button 
               v-if="item.usable"
               @click="useItem(item)"
               class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
             >
-              Use
-            </button> -->
+              {{ item.id === 'expansion-crystal' ? 'Expand Job' : 'Use' }}
+            </button>
           </div>
         </div>
       </div>
@@ -100,5 +139,12 @@ function useItem(item: InventoryItem) {
         <p class="mt-1">Try assigning Pokémon to jobs to collect new items!</p>
       </div>
     </div>
+    
+    <!-- Job Slot Expansion Modal -->
+    <JobSlotExpansionModal 
+      :show="showExpansionModal" 
+      @close="showExpansionModal = false"
+      @expand="handleJobExpansion"
+    />
   </div>
 </template>

@@ -1,14 +1,15 @@
 <template>
   <div class="flex min-h-screen bg-gray-100">
     <!-- Left Panel -->
-    <div class="w-64 bg-red-600 text-white p-4 space-y-4">
+    <div class="w-64 flex-shrink-0 bg-red-600 text-white p-4 space-y-4">
       <div class="text-xl font-bold mb-6 text-center">PokéNGU</div>
-      <nav class="space-y-2">
+      <NotificationHeader />
+      <nav class="space-y-1">
         <router-link 
           v-for="route in routes" 
           :key="route.path" 
           :to="route.path"
-          class="block px-4 py-2 rounded-lg transition-colors duration-200 hover:bg-red-700 hover:text-white text-center bg-red-500 shadow-md"
+          class="block px-2 py-1 rounded-lg transition-colors duration-200 hover:bg-red-700 hover:text-white text-center bg-red-500 shadow-md"
           :class="{ 'bg-red-700 font-bold': $route.path === route.path }"
         >
           {{ route.name }}
@@ -31,25 +32,25 @@
       <router-view></router-view>
     </div>
     
-    <!-- Notification System -->
-    <NotificationSystem />
   </div>
 </template>
 
 <script setup lang="ts">
+/// <reference types="vite/client" />
 import { onMounted } from 'vue'
 import TeamList from './components/TeamList.vue'
 import QuickInventory from './components/QuickInventory.vue'
-import NotificationSystem from '@/components/NotificationSystem.vue'
 import { useInventory } from './composables/useInventory'
 import { useBuffStore } from './stores/buffStore'
+import NotificationHeader from './components/NotificationHeader.vue'
+
 
 const routes = [
   { path: '/', name: 'Explore' },
+  { path: '/collection', name: 'Collection' },
   { path: '/idle-jobs', name: 'Idle Jobs' },
   { path: '/inventory', name: 'Inventory' },
   { path: '/pokedex', name: 'Pokédex' },
-  { path: '/collection', name: 'Collection' },
 ]
 
 if(import.meta.env.MODE === 'development') {
@@ -63,11 +64,5 @@ const inventory = useInventory()
 const buffStore = useBuffStore()
 
 onMounted(() => {
-  // Initialize inventory
-  const inventoryStore = inventory.getInventoryStore()
-  inventoryStore.initializeInventory()
-  
-  // Initialize buff store to load saved buffs
-  buffStore.initializeBuffStore()
 })
 </script>

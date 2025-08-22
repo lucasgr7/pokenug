@@ -164,17 +164,53 @@
             <div v-else-if="selectedBuff.type === 'auto-attack'" class="flex items-center bg-gradient-to-r from-yellow-50 to-blue-50 p-3 rounded-lg">
               <div class="w-8 h-8 bg-gradient-to-r from-yellow-400 to-blue-300 rounded-full flex items-center justify-center text-white mr-3">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div>
                 <div class="font-medium">Auto Attack</div>
                 <div class="text-sm mb-1">Level {{ selectedBuff.value }}: Automatically attacks every {{ getAutoAttackInterval(selectedBuff.value).toFixed(1) }} seconds</div>
                 <div v-if="buffStore.autoAttackState.active" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                  <span>Status: Active</span>
                 </div>
                 <div v-else class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                  <span>Status: Inactive (Click the lightning bolt to activate)</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- XP Share Buff Display (Water Emblem) -->
+            <div v-else-if="selectedBuff.type === 'xp-share'" class="flex items-center bg-gradient-to-r from-blue-50 to-cyan-50 p-3 rounded-lg">
+              <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-white mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium">XP Share</div>
+                <div class="text-sm mb-1">Level {{ selectedBuff.value }}: Shares {{ getXPSharePercentage(selectedBuff.value) }}% of battle XP with all party members</div>
+                <div class="text-xs bg-blue-50 text-blue-800 px-2 py-1 rounded">
+                  <span v-if="selectedBuff.value <= 10">Linear growth: {{ selectedBuff.value }}% sharing</span>
+                  <span v-else>With diminishing returns: {{ getXPSharePercentage(selectedBuff.value) }}% sharing (max 50%)</span>
+                </div>
+                <div class="text-xs text-gray-700 mt-1">
+                  Affects all healthy party members except the active attacker
+                </div>
+              </div>
+            </div>
+            
+            <!-- Spawn Timer Reduction Buff Display (Flying Emblem) -->
+            <div v-else-if="selectedBuff.type === 'spawn-timer-reduction'" class="flex items-center bg-gradient-to-r from-purple-50 to-blue-50 p-3 rounded-lg">
+              <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white mr-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-medium">Spawn Timer Reduction</div>
+                <div class="text-sm mb-1">Level {{ selectedBuff.value }}: Reduces spawn timers by {{ (getSpawnTimerReduction(selectedBuff.value) * 100).toFixed(1) }}%</div>
+                <div class="text-xs bg-purple-50 text-purple-800 px-2 py-1 rounded mb-1">
+                  <span>Exponential scaling - early levels provide significant benefits</span>
+                </div>
+                <div class="text-xs text-gray-700">
+                  Affects all regions except Home. Maximum reduction: 80%
                 </div>
               </div>
             </div>
@@ -184,16 +220,16 @@
           <button @click="closeModal" class="mt-6 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
             Close
           </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useBuffStore } from '@/stores/buffStore'
-import type { BuffEffect } from '@/types/idleJobs'
+import { useBuffStore } from '../stores/buffStore'
+import type { BuffEffect } from '../types/idleJobs'
 
 const buffStore = useBuffStore()
 const showModal = ref(false)
@@ -228,7 +264,9 @@ const getBuffBorderClass = (type: string) => {
     'loot-chance': 'border-yellow-500',
     'fire-rate': 'border-orange-500',
     'auto-attack': 'border-yellow-400',
-    'stun-resistance': 'border-yellow-700'
+    'stun-resistance': 'border-yellow-700',
+    'xp-share': 'border-cyan-500',
+    'spawn-timer-reduction': 'border-purple-400'
   }
   
   return typeClasses[type] || 'border-gray-400'
@@ -238,6 +276,30 @@ const getBuffBorderClass = (type: string) => {
 const getAutoAttackInterval = (level: number) => {
   // Formula: auto_attack_interval = 0.5 + (5.0 - 0.5) * exp(-0.003 * level)
   return 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
+}
+
+// Calculate XP share percentage for Water Emblem
+const getXPSharePercentage = (level: number) => {
+  if (level <= 10) {
+    // First 10 levels: 1% per level (linear growth)
+    return level;
+  } else {
+    // After level 10: diminishing returns using logarithmic scaling
+    const baseShare = 10; // 10% from first 10 levels
+    const additionalLevels = level - 10;
+    // Use logarithmic formula: additional_share = 5 * ln(1 + additionalLevels * 0.5)
+    const additionalShare = 5 * Math.log(1 + additionalLevels * 0.5);
+    return Math.min(baseShare + additionalShare, 50); // Cap at 50% sharing
+  }
+}
+
+// Calculate spawn timer reduction percentage for Flying Emblem
+const getSpawnTimerReduction = (level: number) => {
+  // Exponential scaling formula: reduction = 1 - (0.99)^(level^1.2)
+  const exponent = Math.pow(level, 1.2);
+  const reduction = 1 - Math.pow(0.99, exponent);
+  // Cap at 80% reduction (minimum 20% of original time)
+  return Math.min(reduction, 0.80);
 }
 </script>
 

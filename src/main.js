@@ -3,9 +3,9 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './style.css'
-import { tickSystem } from './services/tickSystem'
 import { useGameStore } from './stores/gameStore'
 import { useBuffStore } from './stores/buffStore'
+import { workerTimer } from './services/workerTimer.js'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -21,10 +21,13 @@ const buffStore = useBuffStore()
 buffStore.initializeBuffStore()
 
 // Set up global tick handler for idle jobs
-tickSystem.subscribe((elapsed) => {
+workerTimer.subscribe('idle jobs', (elapsed) => {
   Object.keys(gameStore.idleJobs).forEach(jobId => {
     gameStore.updateJobProgress(jobId, elapsed)
   })
 })
+
+// Start the worker timer - this is essential for all subscriptions to work
+workerTimer.start()
 
 app.mount('#app')

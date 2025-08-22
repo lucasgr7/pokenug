@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
-import type { InventoryItem, ItemType } from '@/types/pokemon'
-import { itemFactory } from '@/services/itemFactory'
+import type { InventoryItem, ItemType } from '../types/pokemon.js'
+import { itemFactory } from '../services/itemFactory.js'
+import { useBuffStore } from './buffStore.js'
+import { saveInventory, loadInventory } from '../services/inventoryIdb.js'
 
 interface InventoryState {
   items: Record<string, InventoryItem>;
@@ -13,6 +15,12 @@ export const useInventoryStore = defineStore('inventory', {
 
   getters: {
     getAllItems: (state) => Object.values(state.items),
+    // Dynamic item cap: 99 + Steel Storage Emblem buff value from buffStore
+    getItemCap: () => {
+      const buffStore = useBuffStore();
+      const steelBuff = buffStore.getBuffById('steel-storage-emblem');
+      return 99 + (steelBuff?.value || 0);
+    },
     
     getItemsByType: (state) => (type: ItemType) => {
       return Object.values(state.items)
@@ -39,61 +47,66 @@ export const useInventoryStore = defineStore('inventory', {
   },
 
   actions: {
-    addItem(item: InventoryItem) {
+    async addItem(item: InventoryItem) {
+      const cap = this.getItemCap;
       if (this.items[item.id]) {
-        // Item exists, increase quantity
-        this.items[item.id].quantity += item.quantity
+        // Item exists, increase quantity but cap at dynamic cap
+        this.items[item.id].quantity = Math.min(cap, this.items[item.id].quantity + item.quantity)
       } else {
-        // New item
-        this.items[item.id] = { ...item }
+        // New item, but cap at dynamic cap
+        this.items[item.id] = { ...item, quantity: Math.min(cap, item.quantity) }
       }
-      this.saveState()
+      await this.saveState()
     },
 
-    removeItem(itemId: string, quantity: number = 1) {
+    async removeItem(itemId: string, quantity: number = 1) {
       if (!this.items[itemId] || this.items[itemId].quantity < quantity) {
         return false
       }
 
       this.items[itemId].quantity -= quantity
-      
+
       // Remove item completely if quantity is 0
       if (this.items[itemId].quantity <= 0) {
         delete this.items[itemId]
       }
 
-      this.saveState()
+      await this.saveState()
       return true
     },
 
-    useItem(itemId: string) {
-      if (!this.items[itemId] || !this.items[itemId].usable) {
+    async useItem(itemId: string) {
+      if (!this.items[itemId]?.usable) {
         return false
       }
 
       // For consumable items, remove one from quantity
       if (this.items[itemId].consumable) {
-        return this.removeItem(itemId, 1)
+        return await this.removeItem(itemId, 1)
       }
-      
+
       // For non-consumable items, just return true to indicate successful use
       return true
     },
 
-    initializeInventory() {
-      const savedState = localStorage.getItem('inventoryState')
-      
-      if (savedState) {
-        const state = JSON.parse(savedState)
+    async initializeInventory() {
+      const cap = this.getItemCap;
+      const state = await loadInventory();
+      if (state && Object.keys(state).length > 0) {
+        // Cap all item quantities at dynamic cap if above
+        const cappedItems = Object.fromEntries(
+          Object.entries(state).map(([id, item]) => {
+            return [id, { ...item, quantity: Math.min(cap, item.quantity) }];
+          })
+        );
         this.$patch({
-          items: state.items || {}
+          items: cappedItems
         })
       } else {
         // Add default starter items using the new item definitions
         const starterPokeball = itemFactory.createFromDefinition('crappy-pokeball', 25);
         const starterPotion = itemFactory.createFromDefinition('simple-potion', 2);
         const starterLure = itemFactory.createFromDefinition('lure-berry', 5);
-        
         if (starterPokeball) {
           this.addItem(starterPokeball);
         } else {
@@ -114,7 +127,6 @@ export const useInventoryStore = defineStore('inventory', {
             }
           })
         }
-        
         if (starterPotion) {
           this.addItem(starterPotion);
         }
@@ -124,12 +136,8 @@ export const useInventoryStore = defineStore('inventory', {
       }
     },
 
-    saveState() {
-      const state = {
-        items: JSON.parse(JSON.stringify(this.items))
-      }
-      
-      localStorage.setItem('inventoryState', JSON.stringify(state))
+    async saveState() {
+      await saveInventory(JSON.parse(JSON.stringify(this.items)))
     }
   }
 })

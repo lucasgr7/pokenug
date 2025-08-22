@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useGameStore } from '../stores/gameStore'
-import { tickSystem } from '../services/tickSystem'
 import type { Pokemon } from '../types/pokemon'
 import CachedImage from './CachedImage.vue'
+import { workerTimer } from '@/services/workerTimer'
 
 const gameStore = useGameStore()
-let regenInterval: number | NodeJS.Timeout | null = null
 let unsubscribe: (() => void) | null = null
 
 const hpPercentage = (pokemon: Pokemon) => {
@@ -53,17 +52,13 @@ const swapPokemon = (pokemon: Pokemon) => {
 }
 
 onMounted(() => {
-  regenInterval = gameStore.startHPRegen()
   // Subscribe to tick system for recovery time updates
-  unsubscribe = tickSystem.subscribe(() => {
+  unsubscribe = workerTimer.subscribe(updateRecoveryTimes.name, () => {
     updateRecoveryTimes()
   })
 })
 
 onUnmounted(() => {
-  if (regenInterval) {
-    clearInterval(regenInterval)
-  }
   if (unsubscribe) {
     unsubscribe()
   }
@@ -81,15 +76,20 @@ onUnmounted(() => {
              'opacity-75': gameStore.playerPokemon[index - 1] !== gameStore.activePokemon 
            }"
            @click="swapPokemon(gameStore.playerPokemon[index - 1])">
-        <CachedImage 
-          :src="gameStore.playerPokemon[index - 1].sprite" 
-          :alt="gameStore.playerPokemon[index - 1].name" 
-          :className="'w-5 h-5 object-contain'"
-        />
+        <div class="relative">
+          <CachedImage
+            :pokemonId="gameStore.playerPokemon[index - 1].id"
+            :shiny="gameStore.playerPokemon[index - 1].isShiny"
+            :alt="gameStore.playerPokemon[index - 1].name"
+            :className="'w-5 h-5 object-contain'"
+          />
+          <!-- Shiny indicator -->
+          <div v-if="gameStore.playerPokemon[index - 1].isShiny" class="absolute -top-1 -right-1 text-xs">✨</div>
+        </div>
         <div class="ml-2 flex-1">
           <div class="flex justify-between items-center">
             <div class="flex items-center">
-              <span class="text-xs text-white capitalize">{{ gameStore.playerPokemon[index - 1].name }}</span>
+              <span class="text-xs text-white capitalize" :class="gameStore.playerPokemon[index - 1].isShiny ? 'text-yellow-300' : ''">{{ gameStore.playerPokemon[index - 1].name }}</span>
               <span v-if="isFainted(gameStore.playerPokemon[index - 1])" 
                     class="ml-1 text-xs bg-gray-700 text-white px-1 rounded">
                 Fainted ({{ getRecoveryTimeLeft(gameStore.playerPokemon[index - 1]) }}s)

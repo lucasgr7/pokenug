@@ -1,5 +1,5 @@
 // Game items definitions with standardized properties
-import type { ItemType, ItemRarity } from '@/types/pokemon';
+import type { ItemType, ItemRarity } from '../types/pokemon.js';
 
 // Item effect types
 export type HealEffect = {
@@ -32,7 +32,12 @@ export type AutoCatchEffect = {
   catchRate: number; // Base catch rate modifier
 }
 
-export type ItemEffect = HealEffect | CatchEffect | StatBoostEffect | StatusEffect | AutoCatchEffect;
+export type SpecialEffect = {
+  type: 'special';
+  effect: string;
+}
+
+export type ItemEffect = HealEffect | CatchEffect | StatBoostEffect | StatusEffect | AutoCatchEffect | SpecialEffect;
 
 // Item definition structure
 export interface ItemDefinition {
@@ -189,6 +194,62 @@ const items: Record<string, ItemDefinition> = {
     icon: '/images/stone.png',
     usable: false,
     consumable: false
+  },
+  'seeker-stone': {
+    id: 'seeker-stone',
+    name: 'Seeker Stone',
+    description: 'A mystical stone that reveals hidden Pokemon. Use it to choose the next Pokemon that will appear in your current region.',
+    type: 'material',
+    rarity: 'rare',
+    icon: '/images/seeker-stone.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'choose-next-spawn'
+    }
+  },
+  'expansion-crystal': {
+    id: 'expansion-crystal',
+    name: 'Expansion Crystal',
+    description: 'A mystical crystal created by Psychic Pokemon. Can permanently expand any idle job by +1 slot.',
+    type: 'material',
+    rarity: 'epic',
+    icon: '/images/psychic-emblem.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'expand-job-slot'
+    }
+  },
+  'dragon-stone': {
+    id: 'dragon-stone',
+    name: 'Dragon Stone',
+    description: 'A powerful mystical stone infused with draconic energy. Consuming it temporarily unlocks access to the legendary Ethereal Nexus, a realm where the most powerful Pokemon dwell.',
+    type: 'material',
+    rarity: 'legendary',
+    icon: '/images/stone.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'unlock-temporary-region'
+    }
+  },
+  'phantom-contract': {
+    id: 'phantom-contract',
+    name: 'Phantom Contract',
+    description: 'A mysterious contract that allows you to reset the fear factor of a captured Pokemon and guarantees its capture on the next attempt.',
+    type: 'material',
+    rarity: 'legendary',
+    icon: '/images/phantom-contract.png',
+    usable: true,
+    consumable: true,
+    effect: {
+      type: 'special',
+      effect: 'reset-fear-factor'
+    }
   }
 };
 

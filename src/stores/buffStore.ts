@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { BuffEffect } from '@/types/idleJobs'
-import regions from '@/constants/regions'
+import { BuffEffect } from '../types/idleJobs.js'
+import regions from '../constants/regions.js'
 
 interface BuffState {
   buffs: Record<string, BuffEffect>;
@@ -34,7 +34,7 @@ export const useBuffStore = defineStore('buff', {
       lastAttackTime: 0,
       multiplier: 1.0,
       activePokemonId: null,
-      timeAllowed: 5000 // Default 5 seconds
+      timeAllowed: 10000 // Updated default timeout
     },
     pokemonDefeatedCount: 0,
     lastRegionId: null,
@@ -63,6 +63,31 @@ export const useBuffStore = defineStore('buff', {
       return Object.values(state.buffs)
         .filter(buff => buff.type === 'xp-boost')
         .reduce((total, buff) => total + buff.value, 0);
+    },
+
+    // Helper for getting water emblem XP sharing multiplier
+    getWaterEmblemShareMultiplier: (state) => {
+      const waterEmblem = state.buffs['water-emblem'];
+      if (!waterEmblem) return 0;
+      
+      // Calculate sharing percentage with diminishing returns after level 10
+      const level = waterEmblem.value;
+      if (level <= 10) {
+        // First 10 levels: 1% per level (linear growth)
+        return level * 0.01;
+      } else {
+        // After level 10: diminishing returns using logarithmic scaling
+        const baseShare = 0.10; // 10% from first 10 levels
+        const additionalLevels = level - 10;
+        // Use logarithmic formula: additional_share = 0.05 * ln(1 + additionalLevels * 0.5)
+        const additionalShare = 0.05 * Math.log(1 + additionalLevels * 0.5);
+        return Number((Math.min(baseShare + additionalShare, 0.50)).toFixed(2)); // Cap at 50% sharing
+      }
+    },
+
+    // Check if Water Emblem is active
+    hasWaterEmblem: (state) => {
+      return state.buffs['water-emblem'] !== undefined;
     },
 
     // Get fire rate state
@@ -120,6 +145,69 @@ export const useBuffStore = defineStore('buff', {
       const electricEmblem = state.buffs['electric-emblem'];
       return electricEmblem !== undefined && electricEmblem.value > 0;
     },
+
+    // Get fire rate progress toward activation (percentage)
+    getFireRateProgress: (state) => {
+      const fireEmblemBuff = state.buffs['fire-emblem'];
+      if (!fireEmblemBuff) return 0;
+      
+      if (!state.fireRateState.active) {
+        // Progress toward 40 attacks needed to activate
+        return Math.min(100, (state.fireRateState.count / 40) * 100);
+      }
+      
+      // When active, show progress toward next tier
+      if (state.fireRateState.tier === 1) {
+        // Progress from 40 to 80 (tier 2)
+        const progress = Math.min(100, ((state.fireRateState.count - 40) / (80 - 40)) * 100);
+        return progress;
+      } else if (state.fireRateState.tier === 2) {
+        // Progress from 80 to 120 (tier 3)
+        const progress = Math.min(100, ((state.fireRateState.count - 80) / (120 - 80)) * 100);
+        return progress;
+      } else {
+        // Tier 3 - show full progress
+        return 100;
+      }
+    },
+
+    // Get countdown progress (for showing time remaining before reset)
+    getCountdownProgress: (state) => {
+      const fireEmblemBuff = state.buffs['fire-emblem'];
+      if (!fireEmblemBuff || state.fireRateState.active || state.fireRateState.count === 0) return 0;
+      
+      const now = Date.now();
+      const elapsed = now - state.fireRateState.lastAttackTime;
+      const timeLimit = 10000; // 10 seconds before reset (matches the reset logic)
+      
+      // Return percentage of time remaining (countdown)
+      const timeRemaining = Math.max(0, timeLimit - elapsed);
+      return (timeRemaining / timeLimit) * 100;
+    },
+
+    // Check if Flying Emblem is active
+    hasFlyingEmblem: (state) => {
+      return state.buffs['flying-emblem'] !== undefined;
+    },
+
+    // Get spawn timer reduction percentage from Flying Emblem
+    getSpawnTimerReduction: (state) => {
+      const flyingEmblem = state.buffs['flying-emblem'];
+      if (!flyingEmblem) return 0;
+
+      const level = flyingEmblem.value;
+      
+      // Exponential scaling formula: reduction = 1 - (0.99)^(level^1.2)
+      // This creates a steep curve where early levels provide significant benefit
+      // but later levels provide diminishing returns, reaching ~63% reduction at level 100
+      const exponent = Math.pow(level, 1.2);
+      const reduction = 1 - Math.pow(0.99, exponent);
+      
+      // Cap at 80% reduction (minimum 20% of original time)
+      return Math.min(reduction, 0.80);
+    },
+
+    // ...existing code...
   },
 
   actions: {
@@ -214,14 +302,22 @@ export const useBuffStore = defineStore('buff', {
       }
 
       // Set active Pokemon ID if not set
-      if (this.fireRateState.activePokemonId === null) {
-        this.fireRateState.activePokemonId = pokemonId;
-      }
+      this.fireRateState.activePokemonId ??= pokemonId;
 
       // Check if the time since last attack is within the allowed time
+      // Only reset if the player has been inactive for a significant period
       if (this.fireRateState.active && now - this.fireRateState.lastAttackTime > this.fireRateState.timeAllowed) {
         // Reset if the player took too long between attacks
         this.resetFireRate();
+        return;
+      }
+
+      // If not active and player took too long between attacks (10 seconds), reset count
+      if (!this.fireRateState.active && this.fireRateState.count > 0 && 
+          now - this.fireRateState.lastAttackTime > 10000) {
+        this.fireRateState.count = 0;
+        this.fireRateState.lastAttackTime = 0;
+        this.saveState();
         return;
       }
 
@@ -229,42 +325,38 @@ export const useBuffStore = defineStore('buff', {
       this.fireRateState.count++;
       this.fireRateState.lastAttackTime = now;
 
-      // Update time allowed based on count (every 100 clicks)
+      // Update time allowed based on count
       this.updateTimeAllowed();
 
-      // If we haven't activated fire rate yet, check if we've hit 25 attacks
-      if (!this.fireRateState.active && this.fireRateState.count >= 20) {
+      // If we haven't activated fire rate yet, check if we've hit 40 attacks
+      if (!this.fireRateState.active && this.fireRateState.count >= 40) {
         this.activateFireRate();
       }
       // Update tiers based on consecutive attacks
       else if (this.fireRateState.active) {
         this.updateFireRateTier();
       }
+
+      // Save state after each attack registration
+      this.saveState();
     },
 
     // Update the time allowed between attacks based on count
     updateTimeAllowed() {
-      // Base time is determined by tier
+      // Base time is determined by tier - but we need reasonable timeouts to prevent accidental resets
       let baseTime;
 
       if (this.fireRateState.tier === 1) {
-        baseTime = 3000; // 3 seconds for tier 1
-      } else if (this.fireRateState.tier === 2.2) {
-        // For tier 2, add 1 second for every 100 attacks (after the first 100)
-        const extraSeconds = Math.floor(this.fireRateState.count / 100);
-        baseTime = 2000 + (extraSeconds * 1000); // 2 seconds + bonus time
-      } else if (this.fireRateState.tier === 3.5) {
-        // For tier 3, add 1 second for every 100 attacks (after the first 100)
-        const extraSeconds = Math.floor(this.fireRateState.count / 100);
-        baseTime = 1500 + (extraSeconds * 1000); // 1.5 seconds + bonus time
+        baseTime = 8000; // 8 seconds for tier 1 (more forgiving)
+      } else if (this.fireRateState.tier === 2) {
+        baseTime = 6000; // 6 seconds for tier 2
+      } else if (this.fireRateState.tier === 3) {
+        baseTime = 5000; // 5 seconds for tier 3 (still reasonable)
       } else {
-        baseTime = 5000; // Default
+        baseTime = 10000; // Default 10 seconds (before activation)
       }
 
-      // Minimum time is 100ms regardless of tier or count
-      const reducedTime = Math.max(100, baseTime);
-
-      this.fireRateState.timeAllowed = reducedTime;
+      this.fireRateState.timeAllowed = baseTime;
     },
 
     // Activate fire rate
@@ -274,27 +366,32 @@ export const useBuffStore = defineStore('buff', {
       if (!fireEmblemBuff) return;
 
       this.fireRateState.active = true;
-      this.fireRateState.tier = 1.5;
+      this.fireRateState.tier = 1; // Start at tier 1
 
       // Update the time allowed between attacks
       this.updateTimeAllowed();
 
       // Set initial multiplier based on buff level
-      // First tier is always 1.1 (10% bonus) for level 1
       this.updateFireRateMultiplier();
+      
+      // Save state
+      this.saveState();
     },
 
     // Update fire rate tier
     updateFireRateTier() {
       const fireEmblemBuff = this.getBuffById('fire-emblem');
-      if (!fireEmblemBuff ?? !this.fireRateState.active) return;
+      if (!fireEmblemBuff || !this.fireRateState.active) return;
 
       // Check count thresholds for tier upgrades
-      if (this.fireRateState.count >= 80 && this.fireRateState.tier < 3) {
+      // Tier 1: 40-79 attacks
+      // Tier 2: 80-119 attacks  
+      // Tier 3: 120+ attacks
+      if (this.fireRateState.count >= 120 && this.fireRateState.tier < 3) {
         this.fireRateState.tier = 3; // Max tier
         this.updateTimeAllowed(); // Update time allowed
         this.updateFireRateMultiplier();
-      } else if (this.fireRateState.count >= 40 && this.fireRateState.tier < 2) {
+      } else if (this.fireRateState.count >= 80 && this.fireRateState.tier < 2) {
         this.fireRateState.tier = 2;
         this.updateTimeAllowed(); // Update time allowed
         this.updateFireRateMultiplier();
@@ -310,8 +407,9 @@ export const useBuffStore = defineStore('buff', {
         lastAttackTime: 0,
         multiplier: 1.0,
         activePokemonId: this.fireRateState.activePokemonId, // Preserve the active Pokemon ID
-        timeAllowed: 5000
+        timeAllowed: 10000 // Use updated default timeout
       };
+      this.saveState();
     },
 
     // Reset all buffs (for testing)
@@ -324,7 +422,7 @@ export const useBuffStore = defineStore('buff', {
         lastAttackTime: 0,
         multiplier: 1.0,
         activePokemonId: null,
-        timeAllowed: 5000
+        timeAllowed: 10000 // Use updated default timeout
       };
       this.saveState();
     },
@@ -411,7 +509,14 @@ export const useBuffStore = defineStore('buff', {
 
     // Update auto-attack interval (should be called when buff level changes)
     updateAutoAttackInterval() {
-      this.autoAttackState.interval = this.getAutoAttackInterval;
+      const electricEmblem = this.buffs['electric-emblem'];
+      if (!electricEmblem) {
+        this.autoAttackState.interval = 5000;
+      } else {
+        const level = electricEmblem.value;
+        const intervalSeconds = 0.5 + (5.0 - 0.5) * Math.exp(-0.003 * level);
+        this.autoAttackState.interval = Math.round(intervalSeconds * 1000);
+      }
       this.saveState();
     },
 
@@ -429,14 +534,15 @@ export const useBuffStore = defineStore('buff', {
             lastAttackTime: 0,
             multiplier: 1.0,
             activePokemonId: null,
-            timeAllowed: 5000
+            timeAllowed: 10000 // Updated default timeout
           },
           pokemonDefeatedCount: state.pokemonDefeatedCount ?? 0,
           lastRegionId: state.lastRegionId ?? null,
           autoAttackState: state.autoAttackState ?? {
             active: false,
             lastAttackTime: 0,
-            interval: 5000
+            interval: 5000,
+            triggerAttack: false
           }
         });
       }

@@ -12,11 +12,11 @@ interface SimplifiedPokemon {
   name: string;
   types: string[];
   sprite: string;
+  shinySprite: string;
   description: string;
 }
 
 async function preloadPokemonData() {
-  console.log('Starting Pokémon data preload...');
   
   try {
     // Fetch first 151 Pokémon (1st generation)
@@ -41,6 +41,7 @@ async function preloadPokemonData() {
           name: details.name,
           types: details.types.map(t => t.type.name),
           sprite: details.sprites.other['official-artwork'].front_default,
+          shinySprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/${details.id}.png`,
           description
         };
 

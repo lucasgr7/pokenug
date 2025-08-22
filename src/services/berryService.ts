@@ -1,9 +1,9 @@
 import { ref } from 'vue'
-import { tickSystem } from './tickSystem'
 import { useGameStore } from '@/stores/gameStore'
 import { useInventoryStore } from '@/stores/inventoryStore'
 import type { ItemDefinition } from '@/constants/items'
 import type { Pokemon } from '@/types/pokemon'
+import { workerTimer } from './workerTimer.js'
 
 interface BerryTask {
   id: string;
@@ -220,8 +220,13 @@ class BerryService {
     }
 
     // Subscribe to the tick system
-    this.unsubscribe = tickSystem.subscribe((elapsed) => {
-      const now = Date.now()
+    this.unsubscribe = workerTimer.subscribe(this.workerHandleBerryTasks.name, () => {
+      this.workerHandleBerryTasks();
+    })
+  }
+
+  public workerHandleBerryTasks() {
+    const now = Date.now()
       const completedTasks: BerryTask[] = []
 
       // Check for completed tasks
@@ -240,8 +245,7 @@ class BerryService {
       if (completedTasks.length > 0) {
         this.saveState()
       }
-    })
-  }
+    }
 
   /**
    * Save the current state to localStorage

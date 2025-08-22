@@ -1,5 +1,13 @@
 // Region definitions
 const regions = {
+  'Home': {
+    name: 'Home',
+    minLevel: 0,
+    maxLevel: 0,
+    encounterRate: 0,
+    spawnTimer: 0.5, // 5 seconds
+    pool: []
+  },
   'viridian-forest': {
     name: 'Viridian Forest',
     minLevel: 3,
@@ -16,15 +24,18 @@ const regions = {
       { id: 37, name: 'vulpix', probability: 1.5 }, // Very rare (2%)
       { id: 16, name: 'Pidgey', probability: 5 },       // Uncommon (7%)
       { id: 43, name: 'oddish', probability: 5 }, // Very rare (2%)
-      { id: 69, name: 'Bellsprout', probability: 7 }, // Very rare (2%)
-      { id: 102, name: 'exeggcute', probability: 7 }, // Very rare (2%)
+      { id: 69, name: 'Bellsprout', probability: 5 }, // Very rare (2%)
+      { id: 19, name: 'rattata', probability: 10 },
+      { id: 143, name: 'snorlax', probability: 1 },
+      { id: 48, name: 'venonat', probability: 2 },
+      { id: 102, name: 'exeggcute', probability: 7 }
     ],
     berryPool: [
-      { id: 19, name: 'rattata', probability: 10 }, 
-      { id: 20, name: 'raticate', probability: 8 }, 
-      { id: 133, name: 'Eevee', probability: 5 },   
-      { id: 25, name: 'Pikachu', probability: 5 },  
-      { id: 143, name: 'snorlax', probability: 2 }, 
+      { id: 19, name: 'rattata', probability: 10 },
+      { id: 20, name: 'raticate', probability: 8 },
+      { id: 133, name: 'Eevee', probability: 5 },
+      { id: 25, name: 'Pikachu', probability: 5 },
+      { id: 143, name: 'snorlax', probability: 2 },
       { id: 12, name: 'butterfree', probability: 5 },
       { id: 15, name: 'beedrill', probability: 10 },
       { id: 48, name: 'venonat', probability: 8 },
@@ -76,7 +87,7 @@ const regions = {
       { id: 69, name: 'Bellsprout', probability: 15 },   // Common (15%)
       { id: 114, name: 'Tangela', probability: 5 },       // Rare (5%)
       { id: 118, name: 'Goldeen', probability: 5 },       // Rare (5%)
-      
+
     ],
     berryPool: [
       { id: 1, name: 'Squirtle', probability: 10 }, // Super rare (1%)
@@ -95,23 +106,23 @@ const regions = {
     spawnTimer: 16, // 30 seconds
     pool: [
       //bulbasaur
-      {id: 1, name: 'Bulbasaur', probability: 5},
-      {id: 2, name: 'Ivysaur', probability: 2.5},
-      {id: 147, name: 'Dratini', probability: 1},
-      {id: 148, name: 'Dragonair', probability: 0.5},
-      {id: 4, name: 'Charmander', probability: 5},
-      {id: 5, name: 'Charmeleon', probability: 2.5},
-      {id: 58, name: 'Growlithe', probability: 10},
-      {id: 59, name: 'Arcanine', probability: 5},
-      {id: 126, name: 'Magmar', probability: 7.5}
+      { id: 1, name: 'Bulbasaur', probability: 5 },
+      { id: 2, name: 'Ivysaur', probability: 2.5 },
+      { id: 147, name: 'Dratini', probability: 1 },
+      { id: 148, name: 'Dragonair', probability: 0.5 },
+      { id: 4, name: 'Charmander', probability: 5 },
+      { id: 5, name: 'Charmeleon', probability: 2.5 },
+      { id: 58, name: 'Growlithe', probability: 10 },
+      { id: 59, name: 'Arcanine', probability: 5 },
+      { id: 126, name: 'Magmar', probability: 7.5 }
     ],
     berryPool: [
-      {id: 147, name: 'Dratini', probability: 10},
-      {id: 148, name: 'Dragonair', probability: 5},
-      {id: 4, name: 'Charmander', probability: 25},
-      {id: 5, name: 'Charmeleon', probability: 15},
-      {id: 59, name: 'Arcanine', probability: 20},
-      {id: 126, name: 'Magmar', probability: 25}
+      { id: 147, name: 'Dratini', probability: 10 },
+      { id: 148, name: 'Dragonair', probability: 5 },
+      { id: 4, name: 'Charmander', probability: 25 },
+      { id: 5, name: 'Charmeleon', probability: 15 },
+      { id: 59, name: 'Arcanine', probability: 20 },
+      { id: 126, name: 'Magmar', probability: 25 }
     ]
   },
   'ironworks-zone': {

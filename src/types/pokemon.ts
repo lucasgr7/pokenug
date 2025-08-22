@@ -18,7 +18,9 @@ export interface Pokemon {
   lastAttackTime?: number;
   isRunning?: boolean;
   workId?: string;
-  uniqueId?: string; // Added unique ID to distinguish same Pokemon types
+  uniqueId: string; // Added unique ID to distinguish same Pokemon types
+  isShiny?: boolean; // Added shiny property
+  shinySprite?: string; // Added separate shiny sprite URL
 }
 
 export enum PokemonType {

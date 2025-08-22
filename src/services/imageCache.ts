@@ -12,8 +12,8 @@ class ImageCacheService {
   private cache: Map<string, CacheEntry>;
   private readonly STORAGE_KEY = 'pokemon-sprite-cache';
   private readonly MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-  private readonly MAX_CACHE_SIZE = 100; // Maximum number of images to store
-  private readonly MAX_STORAGE_SIZE = 4.5 * 1024 * 1024; // 4.5MB limit for localStorage
+  private readonly MAX_CACHE_SIZE = 1000; // Maximum number of images to store
+  private readonly MAX_STORAGE_SIZE = 7.5 * 1024 * 1024; // 4.5MB limit for localStorage
 
   constructor() {
     this.cache = new Map();
@@ -171,7 +171,6 @@ class ImageCacheService {
       const entry = this.cache.get(url)!;
       // Update timestamp to mark as recently used
       entry.timestamp = Date.now();
-      console.info(`[ImageCache] Cache hit: ${url}`);
       return entry.data;
     }
 
