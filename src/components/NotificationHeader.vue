@@ -1,5 +1,5 @@
 <template>
-  <div class="notification-header bg-red-600 border-red-700 px-1 py-1">
+  <div class="notification-header bg-red-700  border-red-700 px-1 py-1">
       
       <div class="flex items-center space-x-2">
         <button

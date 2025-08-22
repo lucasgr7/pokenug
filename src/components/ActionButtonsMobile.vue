@@ -83,14 +83,12 @@
         }">
         <!-- Diamond/Stone Icon -->
         <svg viewBox="0 0 24 24" width="24" class="sm:w-7 sm:h-7" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g>
-            <path
-              d="M12 18.4731C11.7501 18.4731 11.5002 18.5344 11.2706 18.657L5.36689 21.809C3.97914 22.5499 2.49789 20.9984 3.16496 19.5025L10.5275 2.99281C10.8226 2.33094 11.4113 2 12 2"
-              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
-            <path opacity="0.5"
-              d="M12 18.4731C12.2499 18.4731 12.4998 18.5344 12.7294 18.657L18.6331 21.809C20.0209 22.5499 21.5021 20.9984 20.835 19.5025L13.4725 2.99281C13.1774 2.33094 12.5887 2 12 2"
-              stroke="currentColor" stroke-width="1.5"></path>
-          </g>
+          <path
+            d="M12 18.4731C11.7501 18.4731 11.5002 18.5344 11.2706 18.657L5.36689 21.809C3.97914 22.5499 2.49789 20.9984 3.16496 19.5025L10.5275 2.99281C10.8226 2.33094 11.4113 2 12 2"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+          <path opacity="0.5"
+            d="M12 18.4731C12.2499 18.4731 12.4998 18.5344 12.7294 18.657L18.6331 21.809C20.0209 22.5499 21.5021 20.9984 20.835 19.5025L13.4725 2.99281C13.1774 2.33094 12.5887 2 12 2"
+            stroke="currentColor" stroke-width="1.5"></path>
         </svg>
 
         <!-- Mystical sparkle effect for seeker stone -->
@@ -158,48 +156,6 @@
   </div>
 </template>
 
-      <!-- Tooltip on hover -->
-      <div
-        class="absolute left-1/2 -translate-x-1/2 -top-12 bg-gray-900 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-        Seeker Stone ({{ seekerStoneCount }})
-        <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-      </div>
-    </div>
-
-    <!-- Dragon Stone Button -->
-    <div class="relative group" v-if="canUseDragonStone">
-      <button @click="$emit('dragon-stone')"
-        class="relative w-16 h-16 bg-purple-600 text-white rounded-full hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 overflow-hidden select-none flex items-center justify-center border-4 border-purple-500 hover:scale-110 shadow-lg"
-        :class="{
-          'hover:shadow-purple-600/50': canUseDragonStone,
-          'opacity-50 cursor-not-allowed': !canUseDragonStone
-        }">
-        <!-- Dragon Stone Icon -->
-        <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L16 8L12 14L8 8L12 2Z" fill="currentColor"/>
-          <path d="M8 8L4 12L8 16L12 14L8 8Z" fill="currentColor" opacity="0.7"/>
-          <path d="M16 8L20 12L16 16L12 14L16 8Z" fill="currentColor" opacity="0.7"/>
-          <path d="M8 16L12 22L16 16L12 14L8 16Z" fill="currentColor" opacity="0.9"/>
-        </svg>
-
-        <!-- Mystical dragon energy effect -->
-        <div class="absolute inset-0 rounded-full opacity-0 group-hover:opacity-40 transition-opacity duration-300">
-          <div class="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-600 rounded-full animate-pulse"></div>
-        </div>
-
-        <!-- Hover glow effect -->
-        <div class="absolute inset-0 rounded-full bg-purple-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-      </button>
-
-      <!-- Tooltip on hover -->
-      <div class="absolute left-1/2 -translate-x-1/2 -top-12 bg-gray-900 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-        Dragon Stone ({{ dragonStoneCount }})
-        <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 interface Props {
   canCapture: boolean
@@ -224,26 +180,7 @@ defineEmits<Emits>()
 </script>
 
 <style scoped>
-/* Additional sparkle animation for seeker stone */
-@keyframes sparkle {
-
-  0%,
-  100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.8;
-    transform: scale(1.1);
-  }
-}
-
-.group:hover .animate-sparkle {
-  animation: sparkle 1.5s ease-in-out infinite;
-}
-
-/* Enhanced glow effects */
+/* Enhanced glow effects for mobile touch */
 button:hover {
   filter: brightness(1.1);
 }
@@ -255,5 +192,33 @@ button:active {
 button:disabled:hover {
   transform: none;
   filter: none;
+}
+
+/* Additional sparkle animation for seeker stone */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+.group:hover .animate-sparkle {
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+/* Mobile touch optimization */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Better tap highlight for mobile */
+@media (hover: none) {
+  button:active {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
 }
 </style>

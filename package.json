@@ -10,8 +10,10 @@
     "preload": "node --loader ts-node/esm --experimental-specifier-resolution=node scripts/preloadPokemon.ts"
   },
   "dependencies": {
-    "@vueuse/core": "^13.5.0",
+    "@vueuse/core": "^13.7.0",
+    "@vueuse/gesture": "^2.0.0",
     "dotenv": "^16.5.0",
+    "hammerjs": "^2.0.8",
     "idb": "^8.0.3",
     "pinia": "^3.0.2",
     "pinia-plugin-persistedstate": "^4.2.0",
